@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Plus, Pencil, Trash2, Eye, EyeOff, X, Check, ChefHat, Search, AlertTriangle } from 'lucide-react';
 import { useMenu } from '../context/MenuContext';
 import { useInventory } from '../context/InventoryContext';
+import { useUI } from '../context/UIContext';
 import { categories } from '../data/coffeeData';
 
 const BLANK_FORM = { name: '', price: '', category: 'Cà phê', description: '', image: '' };
@@ -12,6 +13,7 @@ function ItemForm({ initial, onSave, onClose }) {
   const [errors, setErrors] = useState({});
   const { inventory, fetchRecipe } = useInventory();
   const [recipeItems, setRecipeItems] = useState([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (initial && initial.id) {
@@ -35,7 +37,7 @@ function ItemForm({ initial, onSave, onClose }) {
     return e;
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     const e = validate();
     const recipeErrors = {};
     recipeItems.forEach(item => {
@@ -57,7 +59,14 @@ function ItemForm({ initial, onSave, onClose }) {
       qty: Number(item.qty)
     }));
 
-    onSave(form, cleanedRecipe);
+    try {
+      setIsSubmitting(true);
+      await onSave(form, cleanedRecipe);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleAddIngredient = (e) => {
@@ -211,10 +220,18 @@ function ItemForm({ initial, onSave, onClose }) {
         </div>
 
         <div className="px-5 py-4 border-t border-cream-medium/40 flex gap-3 shrink-0">
-          <button onClick={onClose} className="min-h-[44px] flex-1 btn-secondary">Hủy</button>
-          <button onClick={handleSubmit} className="min-h-[44px] flex-1 btn-primary flex items-center justify-center gap-2">
-            <Check size={16} />
-            {initial && initial.id ? 'Lưu thay đổi' : 'Thêm món'}
+          <button onClick={onClose} disabled={isSubmitting} className="min-h-[44px] flex-1 btn-secondary disabled:opacity-50">Hủy</button>
+          <button 
+            onClick={handleSubmit} 
+            disabled={isSubmitting}
+            className="min-h-[44px] flex-1 btn-primary flex items-center justify-center gap-2 disabled:opacity-50"
+          >
+            {isSubmitting ? (
+              <span className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+            ) : (
+              <Check size={16} />
+            )}
+            {isSubmitting ? 'Đang xử lý...' : (initial && initial.id ? 'Lưu thay đổi' : 'Thêm món')}
           </button>
         </div>
       </div>
@@ -226,11 +243,13 @@ function ItemForm({ initial, onSave, onClose }) {
 export default function MenuManagementPage() {
   const { menuList, addItem, updateItem, removeItem, toggleHidden } = useMenu();
   const { saveRecipe } = useInventory();
+  const { showNotification } = useUI();
   const [search, setSearch] = useState('');
   const [filterCat, setFilterCat] = useState('Tất cả');
   const [editTarget, setEditTarget] = useState(null);  // item being edited
   const [showAdd, setShowAdd] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const filtered = menuList.filter(item => {
     const matchCat = filterCat === 'Tất cả' || item.category === filterCat;
@@ -239,30 +258,48 @@ export default function MenuManagementPage() {
   });
 
   const handleAdd = async (form, recipeIngredients) => {
-    const createdProduct = await addItem(form);
-    if (createdProduct && createdProduct.id && recipeIngredients && recipeIngredients.length > 0) {
-      await saveRecipe(createdProduct.id, recipeIngredients);
+    try {
+      const createdProduct = await addItem(form);
+      if (createdProduct && createdProduct.id && recipeIngredients && recipeIngredients.length > 0) {
+        await saveRecipe(createdProduct.id, recipeIngredients);
+      }
+      showNotification('Thêm món mới thành công! 🎉', 'success');
+      setShowAdd(false);
+    } catch (err) {
+      showNotification('Lỗi khi thêm món mới!', 'error');
     }
-    setShowAdd(false);
   };
 
   const handleEdit = async (form, recipeIngredients) => {
-    await updateItem(editTarget.id, {
-      name: form.name,
-      price: Number(form.price),
-      category: form.category,
-      description: form.description,
-      image: form.image,
-    });
-    if (recipeIngredients) {
-      await saveRecipe(editTarget.id, recipeIngredients);
+    try {
+      await updateItem(editTarget.id, {
+        name: form.name,
+        price: Number(form.price),
+        category: form.category,
+        description: form.description,
+        image: form.image,
+      });
+      if (recipeIngredients) {
+        await saveRecipe(editTarget.id, recipeIngredients);
+      }
+      showNotification('Cập nhật món thành công! 🎉', 'success');
+      setEditTarget(null);
+    } catch (err) {
+      showNotification('Lỗi khi cập nhật món!', 'error');
     }
-    setEditTarget(null);
   };
 
-  const handleDelete = (item) => {
-    removeItem(item.id);
-    setDeleteConfirm(null);
+  const handleDelete = async (item) => {
+    try {
+      setIsDeleting(true);
+      await removeItem(item.id);
+      showNotification('Xóa món thành công! 🗑️', 'success');
+      setDeleteConfirm(null);
+    } catch (err) {
+      showNotification('Lỗi khi xóa món!', 'error');
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   const statsVisible = menuList.filter(i => !i.hidden).length;
@@ -424,10 +461,18 @@ export default function MenuManagementPage() {
               "<span className="font-semibold text-coffee-dark">{deleteConfirm.name}</span>" sẽ bị xóa vĩnh viễn khỏi hệ thống.
             </p>
             <div className="flex gap-3">
-              <button onClick={() => setDeleteConfirm(null)} className="min-h-[44px] flex-1 btn-secondary">Hủy</button>
-              <button onClick={() => handleDelete(deleteConfirm)} className="min-h-[44px] flex-1 btn-danger flex items-center justify-center gap-2">
-                <Trash2 size={16} />
-                Xóa
+              <button onClick={() => setDeleteConfirm(null)} disabled={isDeleting} className="min-h-[44px] flex-1 btn-secondary disabled:opacity-50">Hủy</button>
+              <button 
+                onClick={() => handleDelete(deleteConfirm)} 
+                disabled={isDeleting}
+                className="min-h-[44px] flex-1 btn-danger flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                {isDeleting ? (
+                  <span className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                ) : (
+                  <Trash2 size={16} />
+                )}
+                {isDeleting ? 'Đang xóa...' : 'Xóa'}
               </button>
             </div>
           </div>

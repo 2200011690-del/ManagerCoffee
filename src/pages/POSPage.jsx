@@ -602,17 +602,6 @@ export default function POSPage() {
         />
       )}
 
-      {/* Toast Notification */}
-      {notification && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-slide-up pointer-events-none">
-          <div className={`flex items-center gap-3 px-5 py-3 rounded-2xl shadow-coffee-lg text-white text-sm font-medium ${
-            notification.type === 'success' ? 'bg-green-600' :
-            notification.type === 'error' ? 'bg-red-600' : 'bg-coffee-dark'
-          }`}>
-            {notification.message}
-          </div>
-        </div>
-      )}
       {/* Split Bill Modal */}
       {showSplitBill && (
         <SplitBillModal 
