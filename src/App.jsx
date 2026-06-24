@@ -18,10 +18,6 @@ function AppContent() {
   const { currentView } = useUI();
   const { currentUser, canAccess } = useAuth();
 
-  if (!currentUser) {
-    return <LockScreen />;
-  }
-
   const renderPage = () => {
     switch (currentView) {
       case 'pos': 
@@ -49,22 +45,34 @@ function AppContent() {
   );
 }
 
+function AuthenticatedApp() {
+  return (
+    <InventoryProvider>
+      <MenuProvider>
+        <UIProvider>
+          <TableProvider>
+            <OrderHistoryProvider>
+              <CartProvider>
+                <AppContent />
+              </CartProvider>
+            </OrderHistoryProvider>
+          </TableProvider>
+        </UIProvider>
+      </MenuProvider>
+    </InventoryProvider>
+  );
+}
+
+function AppRoot() {
+  const { currentUser } = useAuth();
+  if (!currentUser) return <LockScreen />;
+  return <AuthenticatedApp />;
+}
+
 export default function App() {
   return (
     <AuthProvider>
-      <InventoryProvider>
-        <MenuProvider>
-          <UIProvider>
-            <TableProvider>
-              <OrderHistoryProvider>
-                <CartProvider>
-                  <AppContent />
-                </CartProvider>
-              </OrderHistoryProvider>
-            </TableProvider>
-          </UIProvider>
-        </MenuProvider>
-      </InventoryProvider>
+      <AppRoot />
     </AuthProvider>
   );
 }
