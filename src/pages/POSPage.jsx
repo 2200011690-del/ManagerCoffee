@@ -119,7 +119,7 @@ export default function POSPage() {
     activeTableId, setSelectedTable, tableHasCart
   } = useCart();
   const { tables, updateTableStatus } = useTable();
-  const { showNotification } = useUI();
+  const { showNotification, notification } = useUI();
   const { addOrder } = useOrderHistory();
   const { visibleMenu } = useMenu();
   const { deductStock } = useInventory();
