@@ -116,7 +116,7 @@ export default function POSPage() {
   const {
     cart, subtotal, vatAmount, total, cartCount,
     addToCart, removeFromCart, updateQty, clearCart, clearCurrentCart,
-    activeTableId, setSelectedTable, tableHasCart
+    activeTableId, setSelectedTable, setTakeaway, tableHasCart, tableCarts
   } = useCart();
   const { tables, updateTableStatus } = useTable();
   const { showNotification, notification } = useUI();
@@ -154,7 +154,14 @@ export default function POSPage() {
   }, [activeCategory, searchQuery, visibleMenu]);
 
   const handleAddItem = (item, sugar, ice, note, qty = 1) => {
-    for (let i = 0; i < qty; i++) addToCart(item, sugar, ice, note);
+    // Nếu đây là lần đầu thêm món vào bàn này => tự động chuyển trạng thái bàn sang "Có khách"
+    const onFirstItem = activeTableId && activeTable?.status === 'available'
+      ? () => updateTableStatus(activeTableId, 'occupied')
+      : null;
+
+    for (let i = 0; i < qty; i++) {
+      addToCart(item, sugar, ice, note, i === 0 ? onFirstItem : null);
+    }
   };
 
   // Get table name for display
@@ -285,8 +292,50 @@ export default function POSPage() {
     <div className="flex h-full gap-0 overflow-hidden">
       {/* ======== LEFT: Menu Grid ======== */}
       <div className="flex-1 flex flex-col overflow-hidden bg-cream-warm">
-        {/* Top Bar */}
-        <div className="px-6 py-4 border-b border-cream-medium/60 bg-white/80 backdrop-blur-sm">
+        {/* Quick Table Tab Strip (KiotViet style) */}
+        <div className="px-4 pt-3 pb-0 border-b border-cream-medium/60 bg-white/90 flex items-center gap-1.5 overflow-x-auto scrollbar-hide flex-shrink-0">
+          {/* Takeaway tab */}
+          <button
+            onClick={() => { setTakeaway(); }}
+            className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-t-xl text-sm font-semibold border-b-2 transition-all ${
+              activeTableId === null
+                ? 'border-coffee-accent text-coffee-accent bg-coffee-accent/8'
+                : 'border-transparent text-coffee-light hover:text-coffee-dark'
+            }`}
+          >
+            <ShoppingCart size={14} />
+            <span>Mang về</span>
+            {tableHasCart(null) && <span className="w-1.5 h-1.5 rounded-full bg-coffee-accent" />}
+          </button>
+
+          {/* Occupied table tabs */}
+          {tables.filter(t => t.status === 'occupied').map(t => (
+            <button
+              key={t.id}
+              onClick={() => setSelectedTable(t.id)}
+              className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-t-xl text-sm font-semibold border-b-2 transition-all ${
+                activeTableId === t.id
+                  ? 'border-coffee-accent text-coffee-accent bg-coffee-accent/8'
+                  : 'border-transparent text-coffee-light hover:text-coffee-dark'
+              }`}
+            >
+              <span>{t.name}</span>
+              {tableHasCart(t.id) && <span className="w-1.5 h-1.5 rounded-full bg-pink-400" />}
+            </button>
+          ))}
+
+          {/* All tables button */}
+          <button
+            onClick={() => setShowTablePicker(true)}
+            className="flex-shrink-0 ml-auto flex items-center gap-1 px-3 py-2 text-xs text-coffee-light hover:text-coffee-accent transition-colors border-b-2 border-transparent"
+          >
+            <LayoutGrid size={13} />
+            Tất cả bàn
+          </button>
+        </div>
+
+        {/* Top Bar: Search + Categories */}
+        <div className="px-6 py-3 border-b border-cream-medium/60 bg-white/80 backdrop-blur-sm">
           <div className="flex items-center gap-4">
             <div className="relative flex-1 max-w-md">
               <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-coffee-light" />

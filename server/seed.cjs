@@ -23,17 +23,17 @@ const INITIAL_MENU = [
 ];
 
 const INITIAL_TABLES = [
-  { name: 'T1', zone: 'Trong nhà', capacity: 2 },
-  { name: 'T2', zone: 'Trong nhà', capacity: 2 },
-  { name: 'T3', zone: 'Trong nhà', capacity: 4 },
-  { name: 'T4', zone: 'Trong nhà', capacity: 4 },
-  { name: 'T5', zone: 'Trong nhà', capacity: 6 },
-  { name: 'V1', zone: 'Ngoài sân', capacity: 4 },
-  { name: 'V2', zone: 'Ngoài sân', capacity: 4 },
-  { name: 'V3', zone: 'Ngoài sân', capacity: 2 },
-  { name: 'V4', zone: 'Ngoài sân', capacity: 6 },
-  { name: 'VIP1', zone: 'Tầng 2', capacity: 8 },
-  { name: 'VIP2', zone: 'Tầng 2', capacity: 12 },
+  { name: 'Bàn 1', zone: 'Tầng trệt', capacity: 2 },
+  { name: 'Bàn 2', zone: 'Tầng trệt', capacity: 2 },
+  { name: 'Bàn 3', zone: 'Tầng trệt', capacity: 4 },
+  { name: 'Bàn 4', zone: 'Tầng trệt', capacity: 4 },
+  { name: 'Bàn 5', zone: 'Tầng trệt', capacity: 6 },
+  { name: 'Bàn 6', zone: 'Lầu 1', capacity: 4 },
+  { name: 'Bàn 7', zone: 'Lầu 1', capacity: 4 },
+  { name: 'Bàn 8', zone: 'Lầu 1', capacity: 2 },
+  { name: 'Bàn 9', zone: 'Sân vườn', capacity: 4 },
+  { name: 'Bàn VIP 1', zone: 'Sân vườn', capacity: 8 },
+  { name: 'Bàn VIP 2', zone: 'Sân vườn', capacity: 12 },
 ];
 
 const INITIAL_INVENTORY = [

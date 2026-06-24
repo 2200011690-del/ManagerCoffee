@@ -85,11 +85,13 @@ export function CartProvider({ children }) {
     }
   };
 
-  const addToCart = useCallback((product, sugar = '100% đường', ice = '100% đá', note = '') => {
+  const addToCart = useCallback((product, sugar = '100% đường', ice = '100% đá', note = '', onFirstItem = null) => {
     const newCart = [...cart];
     const existingIndex = newCart.findIndex(
       i => i.id === product.id && i.sugar === sugar && i.ice === ice && i.note === note
     );
+
+    const isFirstItem = newCart.length === 0;
 
     if (existingIndex > -1) {
       newCart[existingIndex] = { ...newCart[existingIndex], qty: newCart[existingIndex].qty + 1 };
@@ -105,6 +107,11 @@ export function CartProvider({ children }) {
     }
     syncCartToBackend(cartKey, newCart);
     showNotification(`Đã thêm ${product.name}`);
+
+    // Nếu đây là món đầu tiên được thêm vào bàn, báo cho POSPage để đổi trạng thái bàn
+    if (isFirstItem && onFirstItem) {
+      onFirstItem();
+    }
   }, [cart, cartKey, showNotification]);
 
   const removeFromCart = useCallback((cartItemId) => {
