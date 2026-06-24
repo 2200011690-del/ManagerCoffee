@@ -10,6 +10,11 @@ export function AuthProvider({ children }) {
     try {
       const saved = sessionStorage.getItem(AUTH_KEY);
       const user = saved ? JSON.parse(saved) : null;
+      if (user && !user.storeId) {
+        // Old session without storeId, force logout
+        sessionStorage.removeItem(AUTH_KEY);
+        return null;
+      }
       if (user && user.storeId) {
         joinStore(user.storeId);
       }
