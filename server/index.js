@@ -757,21 +757,261 @@ app.put('/api/products/:productId/recipe', async (req, res) => {
 // 6. Dashboard Analytics
 app.get('/api/dashboard', async (req, res) => {
   const storeId = req.storeId;
-  const orders = await prisma.order.findMany({
-    where: { storeId, status: 'paid' },
-    include: { items: true }
-  });
+  try {
+    const orders = await prisma.order.findMany({
+      where: { storeId, status: 'paid' },
+      include: { items: true },
+      orderBy: { timestamp: 'desc' }
+    });
 
-  const totalRevenue = orders.reduce((sum, o) => sum + o.total, 0);
-  const totalOrders = orders.length;
+    const now = new Date();
+    const todayStr = now.toLocaleDateString('vi-VN');
 
-  res.json({
-    totalRevenue,
-    totalOrders,
-    completedOrders: totalOrders,
-    revenueGrowth: 0,
-    ordersGrowth: 0,
-  });
+    // 1. Today Stats
+    const todayOrders = orders.filter(o => o.date === todayStr);
+    const todayRevenue = todayOrders.reduce((sum, o) => sum + o.total, 0);
+    const todayOrdersCount = todayOrders.length;
+    
+    // Unique customers today
+    const uniqueCustomerIds = new Set();
+    let guestCount = 0;
+    todayOrders.forEach(o => {
+      if (o.customerId) uniqueCustomerIds.add(o.customerId);
+      else guestCount++;
+    });
+    const todayCustomersCount = uniqueCustomerIds.size + guestCount;
+    const avgOrderValue = todayOrdersCount > 0 ? Math.round(todayRevenue / todayOrdersCount) : 0;
+
+    // 2. Weekly Revenue (Last 7 days, including today)
+    const weeklyRevenue = [];
+    const DAY_NAMES = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(now.getDate() - i);
+      const dateStr = d.toLocaleDateString('vi-VN');
+      const dayName = DAY_NAMES[d.getDay()];
+      
+      const dayOrders = orders.filter(o => o.date === dateStr);
+      const dayRevenue = dayOrders.reduce((sum, o) => sum + o.total, 0);
+      weeklyRevenue.push({ day: dayName, date: dateStr, revenue: dayRevenue });
+    }
+
+    // 3. This Week vs Last Week (growth)
+    const oneDayMs = 24 * 60 * 60 * 1000;
+    const sevenDaysAgo = new Date(now.getTime() - 7 * oneDayMs);
+    const fourteenDaysAgo = new Date(now.getTime() - 14 * oneDayMs);
+
+    const thisWeekOrders = orders.filter(o => o.timestamp >= sevenDaysAgo);
+    const thisWeekRevenue = thisWeekOrders.reduce((sum, o) => sum + o.total, 0);
+
+    const lastWeekOrders = orders.filter(o => o.timestamp >= fourteenDaysAgo && o.timestamp < sevenDaysAgo);
+    const lastWeekRevenue = lastWeekOrders.reduce((sum, o) => sum + o.total, 0);
+
+    let growth = 0;
+    if (lastWeekRevenue > 0) {
+      growth = Math.round(((thisWeekRevenue - lastWeekRevenue) / lastWeekRevenue) * 100);
+    } else if (thisWeekRevenue > 0) {
+      growth = 100;
+    }
+
+    // 4. Top items
+    const itemsMap = {};
+    orders.forEach(o => {
+      o.items.forEach(it => {
+        if (!itemsMap[it.name]) {
+          itemsMap[it.name] = { name: it.name, qty: 0, revenue: 0 };
+        }
+        itemsMap[it.name].qty += it.qty;
+        itemsMap[it.name].revenue += it.price * it.qty;
+      });
+    });
+    const topItems = Object.values(itemsMap)
+      .sort((a, b) => b.qty - a.qty)
+      .slice(0, 5);
+
+    // 5. Recent orders
+    const recentOrdersList = orders
+      .slice(0, 5)
+      .map(o => ({
+        id: o.id,
+        orderNumber: o.orderNumber,
+        tableName: o.tableName,
+        total: o.total,
+        time: o.time,
+        date: o.date,
+        itemsCount: o.items.reduce((sum, i) => sum + i.qty, 0)
+      }));
+
+    res.json({
+      today: {
+        revenue: todayRevenue,
+        orders: todayOrdersCount,
+        customers: todayCustomersCount,
+        avgOrderValue,
+        target: 5000000 // 5M VNĐ target
+      },
+      thisWeek: {
+        revenue: thisWeekRevenue,
+        orders: thisWeekOrders.length,
+        growth
+      },
+      weeklyRevenue,
+      topItems,
+      recentOrders: recentOrdersList
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 7. Customers CRM CRUD Extensions
+app.put('/api/customers/:id', async (req, res) => {
+  const storeId = req.storeId;
+  const { id } = req.params;
+  const { name, phone, points, tier } = req.body;
+  try {
+    const customer = await prisma.customer.update({
+      where: { id, storeId },
+      data: {
+        name,
+        phone,
+        points: Number(points) || 0,
+        tier
+      }
+    });
+    res.json(customer);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.delete('/api/customers/:id', async (req, res) => {
+  const storeId = req.storeId;
+  const { id } = req.params;
+  try {
+    await prisma.customer.delete({
+      where: { id, storeId }
+    });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// 8. Vouchers CRUD
+app.post('/api/vouchers', async (req, res) => {
+  const storeId = req.storeId;
+  const { code, type, value, minOrderValue, maxDiscount, expiryDate, isActive } = req.body;
+  try {
+    const voucher = await prisma.voucher.create({
+      data: {
+        storeId,
+        code,
+        type,
+        value: Number(value) || 0,
+        minOrderValue: Number(minOrderValue) || 0,
+        maxDiscount: maxDiscount ? Number(maxDiscount) : null,
+        expiryDate: expiryDate ? new Date(expiryDate) : null,
+        isActive: isActive !== false
+      }
+    });
+    res.json(voucher);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.put('/api/vouchers/:id', async (req, res) => {
+  const storeId = req.storeId;
+  const { id } = req.params;
+  const { code, type, value, minOrderValue, maxDiscount, expiryDate, isActive } = req.body;
+  try {
+    const voucher = await prisma.voucher.update({
+      where: { id, storeId },
+      data: {
+        code,
+        type,
+        value: Number(value) || 0,
+        minOrderValue: Number(minOrderValue) || 0,
+        maxDiscount: maxDiscount ? Number(maxDiscount) : null,
+        expiryDate: expiryDate ? new Date(expiryDate) : null,
+        isActive: isActive !== false
+      }
+    });
+    res.json(voucher);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.delete('/api/vouchers/:id', async (req, res) => {
+  const storeId = req.storeId;
+  const { id } = req.params;
+  try {
+    await prisma.voucher.delete({
+      where: { id, storeId }
+    });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// 9. Tables Configuration CRUD
+app.post('/api/tables', async (req, res) => {
+  const storeId = req.storeId;
+  const { name, zone, capacity } = req.body;
+  try {
+    const table = await prisma.table.create({
+      data: {
+        storeId,
+        name,
+        zone,
+        capacity: Number(capacity) || 2
+      }
+    });
+    broadcast('tableUpdated', table, storeId);
+    res.json(table);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.put('/api/tables/:id', async (req, res) => {
+  const storeId = req.storeId;
+  const { id } = req.params;
+  const { name, zone, capacity, status } = req.body;
+  try {
+    const table = await prisma.table.update({
+      where: { id, storeId },
+      data: {
+        name,
+        zone,
+        capacity: Number(capacity) || 2,
+        status: status || undefined
+      }
+    });
+    broadcast('tableUpdated', table, storeId);
+    res.json(table);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.delete('/api/tables/:id', async (req, res) => {
+  const storeId = req.storeId;
+  const { id } = req.params;
+  try {
+    await prisma.table.delete({
+      where: { id, storeId }
+    });
+    // In a real websocket setup, we can broadcast tableDeletion.
+    // For now we just return success.
+    res.json({ success: true });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
 });
 
 const PORT = process.env.PORT || 5000;

@@ -36,7 +36,7 @@ export function MenuProvider({ children }) {
 
   const addItem = useCallback(async (item) => {
     try {
-      await api.post('/products', {
+      const res = await api.post('/products', {
         name: item.name,
         price: Number(item.price),
         category: item.category,
@@ -46,6 +46,7 @@ export function MenuProvider({ children }) {
         prepTime: '5 phút',
         hidden: false,
       });
+      return res;
     } catch (err) {
       console.error(err);
     }

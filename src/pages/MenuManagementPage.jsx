@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Plus, Pencil, Trash2, Eye, EyeOff, X, Check, ChefHat, Search, AlertTriangle } from 'lucide-react';
 import { useMenu } from '../context/MenuContext';
+import { useInventory } from '../context/InventoryContext';
 import { categories } from '../data/coffeeData';
 
 const BLANK_FORM = { name: '', price: '', category: 'Cà phê', description: '', image: '' };
@@ -9,6 +10,23 @@ const BLANK_FORM = { name: '', price: '', category: 'Cà phê', description: '',
 function ItemForm({ initial, onSave, onClose }) {
   const [form, setForm] = useState(initial ?? BLANK_FORM);
   const [errors, setErrors] = useState({});
+  const { inventory, fetchRecipe } = useInventory();
+  const [recipeItems, setRecipeItems] = useState([]);
+
+  useEffect(() => {
+    if (initial && initial.id) {
+      fetchRecipe(initial.id).then(data => {
+        if (Array.isArray(data)) {
+          setRecipeItems(data.map(item => ({
+            inventoryId: item.inventoryId,
+            name: item.inventory?.name || '',
+            unit: item.inventory?.unit || '',
+            qty: item.qty
+          })));
+        }
+      });
+    }
+  }, [initial, fetchRecipe]);
 
   const validate = () => {
     const e = {};
@@ -19,9 +37,62 @@ function ItemForm({ initial, onSave, onClose }) {
 
   const handleSubmit = () => {
     const e = validate();
-    if (Object.keys(e).length) { setErrors(e); return; }
-    onSave(form);
+    const recipeErrors = {};
+    recipeItems.forEach(item => {
+      if (item.qty === '' || isNaN(item.qty) || Number(item.qty) < 0) {
+        recipeErrors[item.inventoryId] = true;
+      }
+    });
+
+    if (Object.keys(e).length || Object.keys(recipeErrors).length) {
+      setErrors(prev => ({ ...prev, ...e }));
+      if (Object.keys(recipeErrors).length) {
+        alert('Vui lòng nhập số lượng định lượng hợp lệ (>= 0).');
+      }
+      return;
+    }
+
+    const cleanedRecipe = recipeItems.map(item => ({
+      inventoryId: item.inventoryId,
+      qty: Number(item.qty)
+    }));
+
+    onSave(form, cleanedRecipe);
   };
+
+  const handleAddIngredient = (e) => {
+    const invId = e.target.value;
+    if (!invId) return;
+    const invItem = inventory.find(i => i.id === invId);
+    if (!invItem) return;
+    setRecipeItems(prev => [
+      ...prev,
+      {
+        inventoryId: invItem.id,
+        name: invItem.name,
+        unit: invItem.unit,
+        qty: 0
+      }
+    ]);
+    e.target.value = ''; // reset select
+  };
+
+  const handleRemoveIngredient = (invId) => {
+    setRecipeItems(prev => prev.filter(i => i.inventoryId !== invId));
+  };
+
+  const handleQtyChange = (invId, val) => {
+    setRecipeItems(prev => prev.map(i => {
+      if (i.inventoryId === invId) {
+        return { ...i, qty: val };
+      }
+      return i;
+    }));
+  };
+
+  const availableIngredients = inventory.filter(
+    inv => !recipeItems.some(item => item.inventoryId === inv.id)
+  );
 
   const field = (label, key, type = 'text', placeholder = '') => (
     <div>
@@ -40,12 +111,12 @@ function ItemForm({ initial, onSave, onClose }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in"
       style={{ background: 'rgba(26,15,10,0.65)', backdropFilter: 'blur(6px)' }}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md animate-slide-up">
-        <div className="px-5 py-4 border-b border-cream-medium/40 flex items-center justify-between">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg flex flex-col max-h-[90vh] animate-slide-up">
+        <div className="px-5 py-4 border-b border-cream-medium/40 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2">
             <ChefHat size={18} className="text-coffee-accent" />
             <h3 className="font-display font-bold text-coffee-dark">
-              {initial ? 'Sửa món' : 'Thêm món mới'}
+              {initial && initial.id ? 'Sửa món' : 'Thêm món mới'}
             </h3>
           </div>
           <button onClick={onClose} className="min-w-[36px] min-h-[36px] rounded-lg bg-cream-light flex items-center justify-center text-coffee-medium hover:bg-cream-medium">
@@ -53,7 +124,7 @@ function ItemForm({ initial, onSave, onClose }) {
           </button>
         </div>
 
-        <div className="p-5 space-y-4">
+        <div className="p-5 space-y-4 overflow-y-auto flex-1">
           {field('Tên món *', 'name', 'text', 'VD: Caramel Macchiato')}
           <div className="grid grid-cols-2 gap-3">
             {field('Giá (đ) *', 'price', 'number', '55000')}
@@ -76,13 +147,74 @@ function ItemForm({ initial, onSave, onClose }) {
                 onError={e => { e.target.style.display = 'none'; }} />
             </div>
           )}
+
+          {/* Recipe Configuration */}
+          <div className="border-t border-cream-medium/20 pt-4 mt-2">
+            <h4 className="font-display font-bold text-coffee-dark text-sm mb-3 flex items-center gap-1.5">
+              <ChefHat size={16} className="text-coffee-accent" />
+              Định lượng Nguyên liệu (Hao phí)
+            </h4>
+
+            {recipeItems.length > 0 ? (
+              <div className="space-y-2 mb-3">
+                {recipeItems.map(item => (
+                  <div key={item.inventoryId} className="flex items-center gap-2 bg-cream-light/40 p-2 rounded-xl border border-cream-medium/20">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-semibold text-coffee-dark truncate">{item.name}</p>
+                      <p className="text-[10px] text-coffee-light">Đơn vị: {item.unit}</p>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        type="number"
+                        step="any"
+                        value={item.qty}
+                        onChange={e => handleQtyChange(item.inventoryId, e.target.value)}
+                        placeholder="Số lượng"
+                        className="w-20 px-2 py-1 text-xs border border-cream-medium/30 rounded-lg text-right focus:outline-none focus:ring-1 focus:ring-coffee-accent"
+                        min="0"
+                      />
+                      <span className="text-xs text-coffee-medium font-medium min-w-[30px]">{item.unit}</span>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveIngredient(item.inventoryId)}
+                        className="p-1 rounded-lg bg-red-50 text-red-500 hover:bg-red-100 transition-colors"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-coffee-light italic mb-3">Món này chưa được thiết lập định lượng.</p>
+            )}
+
+            {availableIngredients.length > 0 ? (
+              <div className="relative">
+                <select
+                  onChange={handleAddIngredient}
+                  value=""
+                  className="w-full bg-cream-light/60 hover:bg-cream-medium/40 text-coffee-medium text-xs font-semibold px-3 py-2 rounded-xl border border-cream-medium/30 transition-all cursor-pointer focus:outline-none"
+                >
+                  <option value="" disabled>+ Chọn nguyên liệu để định lượng...</option>
+                  {availableIngredients.map(inv => (
+                    <option key={inv.id} value={inv.id}>
+                      {inv.icon} {inv.name} ({inv.unit})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : (
+              <p className="text-xs text-coffee-light/80 italic text-center">Đã sử dụng hết tất cả nguyên liệu trong kho.</p>
+            )}
+          </div>
         </div>
 
-        <div className="px-5 py-4 border-t border-cream-medium/40 flex gap-3">
+        <div className="px-5 py-4 border-t border-cream-medium/40 flex gap-3 shrink-0">
           <button onClick={onClose} className="min-h-[44px] flex-1 btn-secondary">Hủy</button>
           <button onClick={handleSubmit} className="min-h-[44px] flex-1 btn-primary flex items-center justify-center gap-2">
             <Check size={16} />
-            {initial ? 'Lưu thay đổi' : 'Thêm món'}
+            {initial && initial.id ? 'Lưu thay đổi' : 'Thêm món'}
           </button>
         </div>
       </div>
@@ -93,6 +225,7 @@ function ItemForm({ initial, onSave, onClose }) {
 // ── Main page ────────────────────────────────────────────────────────────────
 export default function MenuManagementPage() {
   const { menuList, addItem, updateItem, removeItem, toggleHidden } = useMenu();
+  const { saveRecipe } = useInventory();
   const [search, setSearch] = useState('');
   const [filterCat, setFilterCat] = useState('Tất cả');
   const [editTarget, setEditTarget] = useState(null);  // item being edited
@@ -105,19 +238,25 @@ export default function MenuManagementPage() {
     return matchCat && matchSearch;
   });
 
-  const handleAdd = (form) => {
-    addItem(form);
+  const handleAdd = async (form, recipeIngredients) => {
+    const createdProduct = await addItem(form);
+    if (createdProduct && createdProduct.id && recipeIngredients && recipeIngredients.length > 0) {
+      await saveRecipe(createdProduct.id, recipeIngredients);
+    }
     setShowAdd(false);
   };
 
-  const handleEdit = (form) => {
-    updateItem(editTarget.id, {
+  const handleEdit = async (form, recipeIngredients) => {
+    await updateItem(editTarget.id, {
       name: form.name,
       price: Number(form.price),
       category: form.category,
       description: form.description,
       image: form.image,
     });
+    if (recipeIngredients) {
+      await saveRecipe(editTarget.id, recipeIngredients);
+    }
     setEditTarget(null);
   };
 
@@ -260,6 +399,7 @@ export default function MenuManagementPage() {
       {editTarget && (
         <ItemForm
           initial={{
+            id: editTarget.id,
             name: editTarget.name,
             price: String(editTarget.price),
             category: editTarget.category,

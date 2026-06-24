@@ -122,7 +122,6 @@ export default function POSPage() {
   const { showNotification, notification } = useUI();
   const { addOrder } = useOrderHistory();
   const { visibleMenu } = useMenu();
-  const { deductStock } = useInventory();
   const { currentUser } = useAuth();
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -242,10 +241,6 @@ export default function POSPage() {
   };
 
   const handleFinishCheckout = () => {
-    // Deduct ingredients from inventory
-    if (pendingOrder?.items?.length) {
-      deductStock(pendingOrder.items);
-    }
     // Set table to dirty if applicable
     if (activeTableId) {
       updateTableStatus(activeTableId, 'dirty');

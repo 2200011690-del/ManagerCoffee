@@ -1,14 +1,17 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import {
   TrendingUp, TrendingDown, Minus as MinusIcon, ShoppingBag, Users, DollarSign,
   Target, Clock, Award, ChevronRight, FileText, Search, Download, Trash2,
   CheckCircle, Banknote, CreditCard, X, AlertTriangle, Package, RefreshCw,
-  Plus, Edit, Truck, Sliders, History, BookOpen, Save, PlusCircle, Check
+  Plus, Edit, Truck, Sliders, History, BookOpen, Save, PlusCircle, Check,
+  Tag, MapPin, User
 } from 'lucide-react';
 import { dashboardData } from '../data/coffeeData';
 import { useOrderHistory } from '../context/OrderHistoryContext';
 import { useInventory } from '../context/InventoryContext';
 import { useMenu } from '../context/MenuContext';
+import { useTable } from '../context/TableContext';
+import { api } from '../api';
 
 // ---- Mini Bar Chart ----
 function MiniBarChart({ data }) {
@@ -368,8 +371,9 @@ function InventoryRow({ item, pct, isLow, isCritical, onRestock }) {
 
 // ---- Main Dashboard ----
 export default function DashboardPage() {
-  const { today, weeklyRevenue, topItems, recentOrders, shifts, thisWeek } = dashboardData;
-  const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'history' | 'inventory'
+  const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'history' | 'inventory' | 'customers' | 'vouchers' | 'tables'
+  const [liveDashboardData, setLiveDashboardData] = useState(null);
+
   const { 
     inventory, lowStockItems, resetInventory,
     suppliers, transactions, createIngredient, updateIngredient, deleteIngredient,
@@ -377,6 +381,84 @@ export default function DashboardPage() {
     fetchRecipe, saveRecipe, fetchTransactions, fetchSuppliers
   } = useInventory();
   const { menuList } = useMenu();
+  const { tables: tablesList, createTable, updateTable, deleteTable, fetchTables } = useTable();
+
+  // SaaS states
+  const [vouchersList, setVouchersList] = useState([]);
+  const [customersList, setCustomersList] = useState([]);
+
+  // Search/Filters for SaaS tabs
+  const [custSearch, setCustSearch] = useState('');
+  const [vouchSearch, setVouchSearch] = useState('');
+  const [tabSearch, setTabSearch] = useState('');
+
+  // Modals for SaaS tabs
+  const [showAddCust, setShowAddCust] = useState(false);
+  const [showEditCust, setShowEditCust] = useState(false);
+  const [selectedCust, setSelectedCust] = useState(null);
+
+  const [showAddVouch, setShowAddVouch] = useState(false);
+  const [showEditVouch, setShowEditVouch] = useState(false);
+  const [selectedVouch, setSelectedVouch] = useState(null);
+
+  const [showAddTable, setShowAddTable] = useState(false);
+  const [showEditTable, setShowEditTable] = useState(false);
+  const [selectedTableConfig, setSelectedTableConfig] = useState(null);
+
+  // Form states for SaaS tabs
+  const [custForm, setCustForm] = useState({ name: '', phone: '', points: 0, tier: 'SILVER' });
+  const [vouchForm, setVouchForm] = useState({ code: '', type: 'FIXED', value: '', minOrderValue: '', maxDiscount: '', expiryDate: '', isActive: true });
+  const [tableConfigForm, setTableConfigForm] = useState({ name: '', zone: 'Tầng trệt', capacity: 2 });
+
+  // Fetch handlers
+  const fetchDashboardData = useCallback(async () => {
+    try {
+      const data = await api.get('/dashboard');
+      setLiveDashboardData(data);
+    } catch (err) {
+      console.error(err);
+    }
+  }, []);
+
+  const fetchVouchers = useCallback(async () => {
+    try {
+      const data = await api.get('/vouchers');
+      setVouchersList(data);
+    } catch (err) {
+      console.error(err);
+    }
+  }, []);
+
+  const fetchCustomers = useCallback(async () => {
+    try {
+      const data = await api.get('/customers');
+      setCustomersList(data);
+    } catch (err) {
+      console.error(err);
+    }
+  }, []);
+
+  // Unified loader
+  useEffect(() => {
+    if (activeTab === 'overview') {
+      fetchDashboardData();
+    } else if (activeTab === 'vouchers') {
+      fetchVouchers();
+    } else if (activeTab === 'customers') {
+      fetchCustomers();
+    } else if (activeTab === 'tables') {
+      fetchTables();
+    }
+  }, [activeTab, fetchDashboardData, fetchVouchers, fetchCustomers, fetchTables]);
+
+  const currentDashboard = liveDashboardData || {
+    today: dashboardData.today,
+    weeklyRevenue: dashboardData.weeklyRevenue,
+    topItems: dashboardData.topItems,
+    recentOrders: dashboardData.recentOrders,
+    thisWeek: dashboardData.thisWeek
+  };
+  const { today, weeklyRevenue, topItems, recentOrders, thisWeek } = currentDashboard;
 
   // Sub-tabs inside inventory
   const [invSubTab, setInvSubTab] = useState('stock'); // 'stock' | 'recipes' | 'history' | 'suppliers'
@@ -542,6 +624,142 @@ export default function DashboardPage() {
     }
   };
 
+  // Handlers for Customers
+  const handleAddCust = async (e) => {
+    e.preventDefault();
+    try {
+      await api.post('/customers', {
+        name: custForm.name,
+        phone: custForm.phone,
+        points: Number(custForm.points) || 0,
+        tier: custForm.tier
+      });
+      setShowAddCust(false);
+      setCustForm({ name: '', phone: '', points: 0, tier: 'SILVER' });
+      fetchCustomers();
+    } catch (err) {
+      alert('Không thể tạo khách hàng: ' + (err.response?.data?.error || err.message));
+    }
+  };
+
+  const handleSaveEditCust = async (e) => {
+    e.preventDefault();
+    try {
+      await api.put(`/customers/${selectedCust.id}`, {
+        name: custForm.name,
+        phone: custForm.phone,
+        points: Number(custForm.points) || 0,
+        tier: custForm.tier
+      });
+      setShowEditCust(false);
+      fetchCustomers();
+    } catch (err) {
+      alert('Không thể sửa khách hàng: ' + (err.response?.data?.error || err.message));
+    }
+  };
+
+  const handleDeleteCust = async (id) => {
+    if (window.confirm("Bạn có chắc chắn muốn xóa khách hàng này?")) {
+      try {
+        await api.delete(`/customers/${id}`);
+        fetchCustomers();
+      } catch (err) {
+        alert('Không thể xóa: ' + (err.response?.data?.error || err.message));
+      }
+    }
+  };
+
+  // Handlers for Vouchers
+  const handleAddVouch = async (e) => {
+    e.preventDefault();
+    try {
+      await api.post('/vouchers', {
+        code: vouchForm.code,
+        type: vouchForm.type,
+        value: Number(vouchForm.value),
+        minOrderValue: Number(vouchForm.minOrderValue) || 0,
+        maxDiscount: vouchForm.maxDiscount ? Number(vouchForm.maxDiscount) : null,
+        expiryDate: vouchForm.expiryDate || null,
+        isActive: vouchForm.isActive
+      });
+      setShowAddVouch(false);
+      setVouchForm({ code: '', type: 'FIXED', value: '', minOrderValue: '', maxDiscount: '', expiryDate: '', isActive: true });
+      fetchVouchers();
+    } catch (err) {
+      alert('Không thể tạo mã giảm giá: ' + (err.response?.data?.error || err.message));
+    }
+  };
+
+  const handleSaveEditVouch = async (e) => {
+    e.preventDefault();
+    try {
+      await api.put(`/vouchers/${selectedVouch.id}`, {
+        code: vouchForm.code,
+        type: vouchForm.type,
+        value: Number(vouchForm.value),
+        minOrderValue: Number(vouchForm.minOrderValue) || 0,
+        maxDiscount: vouchForm.maxDiscount ? Number(vouchForm.maxDiscount) : null,
+        expiryDate: vouchForm.expiryDate || null,
+        isActive: vouchForm.isActive
+      });
+      setShowEditVouch(false);
+      fetchVouchers();
+    } catch (err) {
+      alert('Không thể sửa mã giảm giá: ' + (err.response?.data?.error || err.message));
+    }
+  };
+
+  const handleDeleteVouch = async (id) => {
+    if (window.confirm("Bạn có chắc chắn muốn xóa mã giảm giá này?")) {
+      try {
+        await api.delete(`/vouchers/${id}`);
+        fetchVouchers();
+      } catch (err) {
+        alert('Không thể xóa: ' + (err.response?.data?.error || err.message));
+      }
+    }
+  };
+
+  // Handlers for Dining Tables
+  const handleAddTable = async (e) => {
+    e.preventDefault();
+    try {
+      await createTable({
+        name: tableConfigForm.name,
+        zone: tableConfigForm.zone,
+        capacity: Number(tableConfigForm.capacity) || 2
+      });
+      setShowAddTable(false);
+      setTableConfigForm({ name: '', zone: 'Tầng trệt', capacity: 2 });
+    } catch (err) {
+      alert('Không thể tạo bàn mới: ' + (err.response?.data?.error || err.message));
+    }
+  };
+
+  const handleSaveEditTable = async (e) => {
+    e.preventDefault();
+    try {
+      await updateTable(selectedTableConfig.id, {
+        name: tableConfigForm.name,
+        zone: tableConfigForm.zone,
+        capacity: Number(tableConfigForm.capacity) || 2
+      });
+      setShowEditTable(false);
+    } catch (err) {
+      alert('Không thể sửa bàn: ' + (err.response?.data?.error || err.message));
+    }
+  };
+
+  const handleDeleteTable = async (id) => {
+    if (window.confirm("Bạn có chắc chắn muốn xóa bàn ăn này khỏi sơ đồ?")) {
+      try {
+        await deleteTable(id);
+      } catch (err) {
+        alert('Không thể xóa bàn: ' + (err.response?.data?.error || err.message));
+      }
+    }
+  };
+
   const progressPct = Math.min((today.revenue / today.target) * 100, 100).toFixed(0);
 
   return (
@@ -580,7 +798,7 @@ export default function DashboardPage() {
               <FileText size={14} />
               Hóa đơn
             </button>
-            <button
+             <button
               onClick={() => setActiveTab('inventory')}
               className={`min-h-[40px] px-4 py-2 rounded-lg text-sm font-semibold transition-all flex items-center gap-1.5 ${
                 activeTab === 'inventory'
@@ -596,6 +814,42 @@ export default function DashboardPage() {
                   {lowStockItems.length}
                 </span>
               )}
+            </button>
+            <button
+              onClick={() => setActiveTab('customers')}
+              className={`min-h-[40px] px-4 py-2 rounded-lg text-sm font-semibold transition-all flex items-center gap-1.5 ${
+                activeTab === 'customers'
+                  ? 'text-white shadow-coffee'
+                  : 'text-coffee-medium hover:text-coffee-dark'
+              }`}
+              style={activeTab === 'customers' ? { background: 'linear-gradient(135deg, #A76D42, #C8956C)' } : {}}
+            >
+              <Users size={14} />
+              Khách hàng
+            </button>
+            <button
+              onClick={() => setActiveTab('vouchers')}
+              className={`min-h-[40px] px-4 py-2 rounded-lg text-sm font-semibold transition-all flex items-center gap-1.5 ${
+                activeTab === 'vouchers'
+                  ? 'text-white shadow-coffee'
+                  : 'text-coffee-medium hover:text-coffee-dark'
+              }`}
+              style={activeTab === 'vouchers' ? { background: 'linear-gradient(135deg, #A76D42, #C8956C)' } : {}}
+            >
+              <Tag size={14} />
+              Khuyến mãi
+            </button>
+            <button
+              onClick={() => setActiveTab('tables')}
+              className={`min-h-[40px] px-4 py-2 rounded-lg text-sm font-semibold transition-all flex items-center gap-1.5 ${
+                activeTab === 'tables'
+                  ? 'text-white shadow-coffee'
+                  : 'text-coffee-medium hover:text-coffee-dark'
+              }`}
+              style={activeTab === 'tables' ? { background: 'linear-gradient(135deg, #A76D42, #C8956C)' } : {}}
+            >
+              <MapPin size={14} />
+              Phòng/Bàn
             </button>
           </div>
         </div>
@@ -1852,6 +2106,810 @@ export default function DashboardPage() {
                       </button>
                     </div>
                   </div>
+                </div>
+              </div>
+            )}
+
+            {/* ===== CUSTOMERS CRM TAB ===== */}
+            {activeTab === 'customers' && (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between flex-wrap gap-3">
+                  <div className="relative w-full max-w-sm">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                    <input
+                      type="text"
+                      placeholder="Tìm khách hàng (tên, SĐT)..."
+                      value={custSearch}
+                      onChange={e => setCustSearch(e.target.value)}
+                      className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                  </div>
+                  <button
+                    onClick={() => {
+                      setCustForm({ name: '', phone: '', points: 0, tier: 'SILVER' });
+                      setShowAddCust(true);
+                    }}
+                    className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors flex items-center gap-1.5"
+                  >
+                    <Plus size={16} />
+                    Thêm khách hàng mới
+                  </button>
+                </div>
+
+                <div className="overflow-x-auto rounded-xl border border-gray-150 bg-white">
+                  <table className="w-full text-sm text-left">
+                    <thead>
+                      <tr className="bg-gray-50 border-b border-gray-150">
+                        <th className="px-4 py-3 font-semibold text-gray-700">Tên khách hàng</th>
+                        <th className="px-4 py-3 font-semibold text-gray-700">Số điện thoại</th>
+                        <th className="px-4 py-3 font-semibold text-gray-700 text-right">Điểm tích lũy</th>
+                        <th className="px-4 py-3 font-semibold text-gray-700 text-center">Hạng thành viên</th>
+                        <th className="px-4 py-3 font-semibold text-gray-700 text-center">Hành động</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {customersList
+                        .filter(c => c.name.toLowerCase().includes(custSearch.toLowerCase()) || c.phone.includes(custSearch))
+                        .map(c => (
+                          <tr key={c.id} className="hover:bg-gray-50/50 transition-colors">
+                            <td className="px-4 py-3.5">
+                              <div className="flex items-center gap-2">
+                                <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 font-bold flex items-center justify-center text-sm">
+                                  {c.name[0].toUpperCase()}
+                                </div>
+                                <span className="font-semibold text-gray-800">{c.name}</span>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3.5 text-gray-650 font-mono">{c.phone}</td>
+                            <td className="px-4 py-3.5 text-right font-bold text-gray-900">{c.points} điểm</td>
+                            <td className="px-4 py-3.5 text-center">
+                              {c.tier === 'DIAMOND' ? (
+                                <span className="bg-purple-100 text-purple-700 border border-purple-200 text-xs px-2.5 py-1 rounded-full font-bold">💎 Kim cương</span>
+                              ) : c.tier === 'GOLD' ? (
+                                <span className="bg-amber-100 text-amber-700 border border-amber-250 text-xs px-2.5 py-1 rounded-full font-bold">👑 Vàng</span>
+                              ) : (
+                                <span className="bg-gray-100 text-gray-600 border border-gray-200 text-xs px-2.5 py-1 rounded-full font-semibold">Bạc</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-3.5 text-center">
+                              <div className="flex items-center justify-center gap-2">
+                                <button
+                                  onClick={() => {
+                                    setSelectedCust(c);
+                                    setCustForm({ name: c.name, phone: c.phone, points: c.points, tier: c.tier });
+                                    setShowEditCust(true);
+                                  }}
+                                  className="p-1 hover:bg-gray-100 rounded text-blue-600"
+                                  title="Chỉnh sửa điểm/thông tin"
+                                >
+                                  <Edit size={15} />
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteCust(c.id)}
+                                  className="p-1 hover:bg-gray-100 rounded text-red-600"
+                                  title="Xóa khách hàng"
+                                >
+                                  <Trash2 size={15} />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      {customersList.length === 0 && (
+                        <tr>
+                          <td colSpan="5" className="text-center py-12 text-gray-400">Chưa có khách hàng nào đăng ký</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* ===== VOUCHERS PROMOTIONS TAB ===== */}
+            {activeTab === 'vouchers' && (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between flex-wrap gap-3">
+                  <div className="relative w-full max-w-sm">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                    <input
+                      type="text"
+                      placeholder="Tìm kiếm mã giảm giá..."
+                      value={vouchSearch}
+                      onChange={e => setVouchSearch(e.target.value)}
+                      className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                  </div>
+                  <button
+                    onClick={() => {
+                      setVouchForm({ code: '', type: 'FIXED', value: '', minOrderValue: '', maxDiscount: '', expiryDate: '', isActive: true });
+                      setShowAddVouch(true);
+                    }}
+                    className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors flex items-center gap-1.5"
+                  >
+                    <Plus size={16} />
+                    Tạo chiến dịch mã giảm giá
+                  </button>
+                </div>
+
+                <div className="overflow-x-auto rounded-xl border border-gray-150 bg-white">
+                  <table className="w-full text-sm text-left">
+                    <thead>
+                      <tr className="bg-gray-50 border-b border-gray-150">
+                        <th className="px-4 py-3 font-semibold text-gray-700">Mã khuyến mãi</th>
+                        <th className="px-4 py-3 font-semibold text-gray-700">Loại giảm giá</th>
+                        <th className="px-4 py-3 font-semibold text-gray-700 text-right">Mức giảm</th>
+                        <th className="px-4 py-3 font-semibold text-gray-700 text-right">Đơn hàng tối thiểu</th>
+                        <th className="px-4 py-3 font-semibold text-gray-700 text-right">Mức giảm tối đa</th>
+                        <th className="px-4 py-3 font-semibold text-gray-700 text-center">Hạn sử dụng</th>
+                        <th className="px-4 py-3 font-semibold text-gray-700 text-center">Trạng thái</th>
+                        <th className="px-4 py-3 font-semibold text-gray-700 text-center">Thao tác</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {vouchersList
+                        .filter(v => v.code.toLowerCase().includes(vouchSearch.toLowerCase()))
+                        .map(v => {
+                          const isExpired = v.expiryDate && new Date(v.expiryDate) < new Date();
+                          return (
+                            <tr key={v.id} className={`hover:bg-gray-50/50 transition-colors ${!v.isActive || isExpired ? 'opacity-60 bg-gray-50/40' : ''}`}>
+                              <td className="px-4 py-3.5">
+                                <span className="font-mono font-bold bg-blue-50 text-blue-700 border border-blue-200 px-2.5 py-1 rounded text-xs">
+                                  {v.code}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3.5 text-gray-600">
+                                {v.type === 'PERCENT' ? 'Giảm theo phần trăm (%)' : 'Giảm tiền mặt trực tiếp'}
+                              </td>
+                              <td className="px-4 py-3.5 text-right font-bold text-gray-900">
+                                {v.type === 'PERCENT' ? `${v.value}%` : `${v.value.toLocaleString('vi-VN')}đ`}
+                              </td>
+                              <td className="px-4 py-3.5 text-right text-gray-650">
+                                {v.minOrderValue.toLocaleString('vi-VN')}đ
+                              </td>
+                              <td className="px-4 py-3.5 text-right text-gray-650">
+                                {v.maxDiscount ? `${v.maxDiscount.toLocaleString('vi-VN')}đ` : 'Không giới hạn'}
+                              </td>
+                              <td className="px-4 py-3.5 text-center text-gray-500 text-xs">
+                                {v.expiryDate ? new Date(v.expiryDate).toLocaleDateString('vi-VN') : 'Vĩnh viễn'}
+                              </td>
+                              <td className="px-4 py-3.5 text-center">
+                                {isExpired ? (
+                                  <span className="text-xs bg-red-100 text-red-750 px-2 py-0.5 rounded font-bold border border-red-200">Hết hạn</span>
+                                ) : v.isActive ? (
+                                  <span className="text-xs bg-green-50 text-green-700 px-2 py-0.5 rounded font-bold border border-green-200">Đang chạy</span>
+                                ) : (
+                                  <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded font-bold border border-gray-250">Tắt</span>
+                                )}
+                              </td>
+                              <td className="px-4 py-3.5 text-center">
+                                <div className="flex items-center justify-center gap-2">
+                                  <button
+                                    onClick={() => {
+                                      setSelectedVouch(v);
+                                      setVouchForm({
+                                        code: v.code,
+                                        type: v.type,
+                                        value: v.value,
+                                        minOrderValue: v.minOrderValue,
+                                        maxDiscount: v.maxDiscount || '',
+                                        expiryDate: v.expiryDate ? v.expiryDate.split('T')[0] : '',
+                                        isActive: v.isActive
+                                      });
+                                      setShowEditVouch(true);
+                                    }}
+                                    className="p-1 hover:bg-gray-100 rounded text-blue-600"
+                                    title="Sửa"
+                                  >
+                                    <Edit size={15} />
+                                  </button>
+                                  <button
+                                    onClick={() => handleDeleteVouch(v.id)}
+                                    className="p-1 hover:bg-gray-100 rounded text-red-650"
+                                    title="Xóa"
+                                  >
+                                    <Trash2 size={15} />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      {vouchersList.length === 0 && (
+                        <tr>
+                          <td colSpan="8" className="text-center py-12 text-gray-400">Chưa tạo mã giảm giá nào</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* ===== DINING TABLES SETTINGS TAB ===== */}
+            {activeTab === 'tables' && (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between flex-wrap gap-3">
+                  <div className="relative w-full max-w-sm">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                    <input
+                      type="text"
+                      placeholder="Tìm bàn ăn..."
+                      value={tabSearch}
+                      onChange={e => setTabSearch(e.target.value)}
+                      className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                  </div>
+                  <button
+                    onClick={() => {
+                      setTableConfigForm({ name: '', zone: 'Tầng trệt', capacity: 2 });
+                      setShowAddTable(true);
+                    }}
+                    className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors flex items-center gap-1.5"
+                  >
+                    <Plus size={16} />
+                    Thêm bàn mới
+                  </button>
+                </div>
+
+                <div className="overflow-x-auto rounded-xl border border-gray-150 bg-white">
+                  <table className="w-full text-sm text-left">
+                    <thead>
+                      <tr className="bg-gray-50 border-b border-gray-150">
+                        <th className="px-4 py-3 font-semibold text-gray-700">Tên bàn</th>
+                        <th className="px-4 py-3 font-semibold text-gray-700">Khu vực phân bổ</th>
+                        <th className="px-4 py-3 font-semibold text-gray-700 text-center">Sức chứa khách</th>
+                        <th className="px-4 py-3 font-semibold text-gray-700 text-center">Trạng thái bán hàng</th>
+                        <th className="px-4 py-3 font-semibold text-gray-700 text-center">Hành động</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {tablesList
+                        .filter(t => t.name.toLowerCase().includes(tabSearch.toLowerCase()))
+                        .map(t => (
+                          <tr key={t.id} className="hover:bg-gray-50/50 transition-colors">
+                            <td className="px-4 py-3.5 font-bold text-gray-800">{t.name}</td>
+                            <td className="px-4 py-3.5">
+                              <span className="inline-flex items-center gap-1 text-xs text-gray-600 bg-gray-100 px-2 py-1 rounded-md font-medium">
+                                <MapPin size={11} className="text-gray-400" />
+                                {t.zone}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3.5 text-center text-gray-900 font-semibold">{t.capacity} chỗ ngồi</td>
+                            <td className="px-4 py-3.5 text-center">
+                              {t.status === 'occupied' ? (
+                                <span className="bg-pink-150 text-pink-700 text-[11px] px-2 py-0.5 rounded font-bold border border-pink-200">Có khách</span>
+                              ) : t.status === 'dirty' ? (
+                                <span className="bg-yellow-100 text-yellow-700 text-[11px] px-2 py-0.5 rounded font-bold border border-yellow-250">Chưa dọn</span>
+                              ) : (
+                                <span className="bg-green-50 text-green-700 text-[11px] px-2 py-0.5 rounded font-bold border border-green-200">Bàn trống</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-3.5 text-center">
+                              <div className="flex items-center justify-center gap-2">
+                                <button
+                                  onClick={() => {
+                                    setSelectedTableConfig(t);
+                                    setTableConfigForm({ name: t.name, zone: t.zone, capacity: t.capacity });
+                                    setShowEditTable(true);
+                                  }}
+                                  className="p-1 hover:bg-gray-100 rounded text-blue-600"
+                                  title="Sửa bàn"
+                                >
+                                  <Edit size={14} />
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteTable(t.id)}
+                                  className="p-1 hover:bg-gray-100 rounded text-red-650"
+                                  title="Xóa bàn"
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      {tablesList.length === 0 && (
+                        <tr>
+                          <td colSpan="5" className="text-center py-12 text-gray-400">Không tìm thấy bàn nào trong sơ đồ</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* MODAL: THÊM KHÁCH HÀNG CRM */}
+            {showAddCust && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 backdrop-blur-sm p-4 animate-fade-in">
+                <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
+                  <div className="flex items-center justify-between border-b border-gray-100 pb-3 mb-4">
+                    <h3 className="font-bold text-coffee-dark text-lg">Tạo hồ sơ khách hàng mới</h3>
+                    <button onClick={() => setShowAddCust(false)} className="p-1 text-gray-400 hover:bg-gray-100 rounded-full">
+                      <X size={18} />
+                    </button>
+                  </div>
+                  <form onSubmit={handleAddCust} className="space-y-4">
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 mb-1">Tên khách hàng *</label>
+                      <input
+                        type="text"
+                        required
+                        value={custForm.name}
+                        onChange={e => setCustForm(prev => ({ ...prev, name: e.target.value }))}
+                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        placeholder="VD: Anh Hoàng Anh..."
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 mb-1">Số điện thoại *</label>
+                      <input
+                        type="text"
+                        required
+                        value={custForm.phone}
+                        onChange={e => setCustForm(prev => ({ ...prev, phone: e.target.value }))}
+                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        placeholder="VD: 0912xxxxxx"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700 mb-1">Điểm tích lũy ban đầu</label>
+                        <input
+                          type="number"
+                          value={custForm.points}
+                          onChange={e => setCustForm(prev => ({ ...prev, points: Number(e.target.value) || 0 }))}
+                          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          min="0"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700 mb-1">Hạng thành viên</label>
+                        <select
+                          value={custForm.tier}
+                          onChange={e => setCustForm(prev => ({ ...prev, tier: e.target.value }))}
+                          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
+                        >
+                          <option value="SILVER">Bạc (Silver)</option>
+                          <option value="GOLD">Vàng (Gold)</option>
+                          <option value="DIAMOND">Kim cương (Diamond)</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div className="flex gap-2 justify-end pt-3 border-t border-gray-100">
+                      <button
+                        type="button"
+                        onClick={() => setShowAddCust(false)}
+                        className="px-4 py-2 border border-gray-200 text-gray-600 rounded-lg text-sm hover:bg-gray-50 font-semibold"
+                      >
+                        Hủy
+                      </button>
+                      <button
+                        type="submit"
+                        className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 font-semibold"
+                      >
+                        Lưu hồ sơ
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            )}
+
+            {/* MODAL: SỬA KHÁCH HÀNG CRM */}
+            {showEditCust && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 backdrop-blur-sm p-4 animate-fade-in">
+                <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
+                  <div className="flex items-center justify-between border-b border-gray-100 pb-3 mb-4">
+                    <h3 className="font-bold text-coffee-dark text-lg">Chỉnh sửa hồ sơ khách hàng</h3>
+                    <button onClick={() => setShowEditCust(false)} className="p-1 text-gray-400 hover:bg-gray-100 rounded-full">
+                      <X size={18} />
+                    </button>
+                  </div>
+                  <form onSubmit={handleSaveEditCust} className="space-y-4">
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 mb-1">Tên khách hàng *</label>
+                      <input
+                        type="text"
+                        required
+                        value={custForm.name}
+                        onChange={e => setCustForm(prev => ({ ...prev, name: e.target.value }))}
+                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 mb-1">Số điện thoại *</label>
+                      <input
+                        type="text"
+                        required
+                        value={custForm.phone}
+                        onChange={e => setCustForm(prev => ({ ...prev, phone: e.target.value }))}
+                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700 mb-1">Điểm tích lũy</label>
+                        <input
+                          type="number"
+                          value={custForm.points}
+                          onChange={e => setCustForm(prev => ({ ...prev, points: Number(e.target.value) || 0 }))}
+                          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          min="0"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700 mb-1">Hạng thành viên</label>
+                        <select
+                          value={custForm.tier}
+                          onChange={e => setCustForm(prev => ({ ...prev, tier: e.target.value }))}
+                          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
+                        >
+                          <option value="SILVER">Bạc (Silver)</option>
+                          <option value="GOLD">Vàng (Gold)</option>
+                          <option value="DIAMOND">Kim cương (Diamond)</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div className="flex gap-2 justify-end pt-3 border-t border-gray-100">
+                      <button
+                        type="button"
+                        onClick={() => setShowEditCust(false)}
+                        className="px-4 py-2 border border-gray-200 text-gray-600 rounded-lg text-sm hover:bg-gray-50 font-semibold"
+                      >
+                        Hủy
+                      </button>
+                      <button
+                        type="submit"
+                        className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 font-semibold"
+                      >
+                        Lưu thay đổi
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            )}
+
+            {/* MODAL: THÊM MỚI VOUCHER */}
+            {showAddVouch && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 backdrop-blur-sm p-4 animate-fade-in">
+                <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
+                  <div className="flex items-center justify-between border-b border-gray-100 pb-3 mb-4">
+                    <h3 className="font-bold text-coffee-dark text-lg">Tạo mã giảm giá mới</h3>
+                    <button onClick={() => setShowAddVouch(false)} className="p-1 text-gray-400 hover:bg-gray-100 rounded-full">
+                      <X size={18} />
+                    </button>
+                  </div>
+                  <form onSubmit={handleAddVouch} className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700 mb-1">Mã giảm giá *</label>
+                        <input
+                          type="text"
+                          required
+                          value={vouchForm.code}
+                          onChange={e => setVouchForm(prev => ({ ...prev, code: e.target.value.toUpperCase() }))}
+                          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono tracking-wider"
+                          placeholder="VD: GIAM20K"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700 mb-1">Loại ưu đãi</label>
+                        <select
+                          value={vouchForm.type}
+                          onChange={e => setVouchForm(prev => ({ ...prev, type: e.target.value }))}
+                          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
+                        >
+                          <option value="FIXED">Giảm tiền mặt (đ)</option>
+                          <option value="PERCENT">Giảm phần trăm (%)</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700 mb-1">Giá trị giảm *</label>
+                        <input
+                          type="number"
+                          required
+                          value={vouchForm.value}
+                          onChange={e => setVouchForm(prev => ({ ...prev, value: e.target.value }))}
+                          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          placeholder={vouchForm.type === 'PERCENT' ? 'VD: 15 (%)' : 'VD: 20000 (đ)'}
+                          min="1"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700 mb-1">Đơn hàng tối thiểu (đ)</label>
+                        <input
+                          type="number"
+                          value={vouchForm.minOrderValue}
+                          onChange={e => setVouchForm(prev => ({ ...prev, minOrderValue: e.target.value }))}
+                          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          placeholder="VD: 50000"
+                          min="0"
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700 mb-1">Mức giảm tối đa (đ)</label>
+                        <input
+                          type="number"
+                          value={vouchForm.maxDiscount}
+                          onChange={e => setVouchForm(prev => ({ ...prev, maxDiscount: e.target.value }))}
+                          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          placeholder="Bỏ trống nếu không giới hạn"
+                          min="0"
+                          disabled={vouchForm.type === 'FIXED'}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700 mb-1">Ngày hết hạn</label>
+                        <input
+                          type="date"
+                          value={vouchForm.expiryDate}
+                          onChange={e => setVouchForm(prev => ({ ...prev, expiryDate: e.target.value }))}
+                          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        />
+                      </div>
+                    </div>
+                    <div className="flex gap-2 justify-end pt-3 border-t border-gray-100">
+                      <button
+                        type="button"
+                        onClick={() => setShowAddVouch(false)}
+                        className="px-4 py-2 border border-gray-200 text-gray-600 rounded-lg text-sm hover:bg-gray-50 font-semibold"
+                      >
+                        Hủy
+                      </button>
+                      <button
+                        type="submit"
+                        className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 font-semibold"
+                      >
+                        Tạo khuyến mãi
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            )}
+
+            {/* MODAL: SỬA VOUCHER */}
+            {showEditVouch && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 backdrop-blur-sm p-4 animate-fade-in">
+                <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
+                  <div className="flex items-center justify-between border-b border-gray-100 pb-3 mb-4">
+                    <h3 className="font-bold text-coffee-dark text-lg">Cập nhật mã giảm giá</h3>
+                    <button onClick={() => setShowEditVouch(false)} className="p-1 text-gray-400 hover:bg-gray-100 rounded-full">
+                      <X size={18} />
+                    </button>
+                  </div>
+                  <form onSubmit={handleSaveEditVouch} className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700 mb-1">Mã giảm giá *</label>
+                        <input
+                          type="text"
+                          required
+                          value={vouchForm.code}
+                          onChange={e => setVouchForm(prev => ({ ...prev, code: e.target.value.toUpperCase() }))}
+                          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono tracking-wider"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700 mb-1">Loại ưu đãi</label>
+                        <select
+                          value={vouchForm.type}
+                          onChange={e => setVouchForm(prev => ({ ...prev, type: e.target.value }))}
+                          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
+                        >
+                          <option value="FIXED">Giảm tiền mặt (đ)</option>
+                          <option value="PERCENT">Giảm phần trăm (%)</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700 mb-1">Giá trị giảm *</label>
+                        <input
+                          type="number"
+                          required
+                          value={vouchForm.value}
+                          onChange={e => setVouchForm(prev => ({ ...prev, value: e.target.value }))}
+                          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700 mb-1">Đơn hàng tối thiểu (đ)</label>
+                        <input
+                          type="number"
+                          value={vouchForm.minOrderValue}
+                          onChange={e => setVouchForm(prev => ({ ...prev, minOrderValue: e.target.value }))}
+                          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700 mb-1">Mức giảm tối đa (đ)</label>
+                        <input
+                          type="number"
+                          value={vouchForm.maxDiscount}
+                          onChange={e => setVouchForm(prev => ({ ...prev, maxDiscount: e.target.value }))}
+                          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          disabled={vouchForm.type === 'FIXED'}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700 mb-1">Ngày hết hạn</label>
+                        <input
+                          type="date"
+                          value={vouchForm.expiryDate}
+                          onChange={e => setVouchForm(prev => ({ ...prev, expiryDate: e.target.value }))}
+                          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        />
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id="isActiveEdit"
+                        checked={vouchForm.isActive}
+                        onChange={e => setVouchForm(prev => ({ ...prev, isActive: e.target.checked }))}
+                        className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4"
+                      />
+                      <label htmlFor="isActiveEdit" className="text-sm font-semibold text-gray-700">Kích hoạt hoạt động</label>
+                    </div>
+                    <div className="flex gap-2 justify-end pt-3 border-t border-gray-100">
+                      <button
+                        type="button"
+                        onClick={() => setShowEditVouch(false)}
+                        className="px-4 py-2 border border-gray-200 text-gray-600 rounded-lg text-sm hover:bg-gray-50 font-semibold"
+                      >
+                        Hủy
+                      </button>
+                      <button
+                        type="submit"
+                        className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 font-semibold"
+                      >
+                        Lưu cập nhật
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            )}
+
+            {/* MODAL: THÊM MỚI BÀN ĂN */}
+            {showAddTable && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 backdrop-blur-sm p-4 animate-fade-in">
+                <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
+                  <div className="flex items-center justify-between border-b border-gray-100 pb-3 mb-4">
+                    <h3 className="font-bold text-coffee-dark text-lg">Thêm bàn ăn vào sơ đồ</h3>
+                    <button onClick={() => setShowAddTable(false)} className="p-1 text-gray-400 hover:bg-gray-100 rounded-full">
+                      <X size={18} />
+                    </button>
+                  </div>
+                  <form onSubmit={handleAddTable} className="space-y-4">
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 mb-1">Tên bàn ăn *</label>
+                      <input
+                        type="text"
+                        required
+                        value={tableConfigForm.name}
+                        onChange={e => setTableConfigForm(prev => ({ ...prev, name: e.target.value }))}
+                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        placeholder="VD: Bàn 12, Bàn VIP 3..."
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700 mb-1">Khu vực xếp bàn *</label>
+                        <select
+                          value={tableConfigForm.zone}
+                          onChange={e => setTableConfigForm(prev => ({ ...prev, zone: e.target.value }))}
+                          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
+                        >
+                          <option value="Tầng trệt">Tầng trệt</option>
+                          <option value="Lầu 1">Lầu 1</option>
+                          <option value="Sân vườn">Sân vườn</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700 mb-1">Sức chứa khách (ghế) *</label>
+                        <input
+                          type="number"
+                          required
+                          value={tableConfigForm.capacity}
+                          onChange={e => setTableConfigForm(prev => ({ ...prev, capacity: Number(e.target.value) || 2 }))}
+                          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          min="1"
+                        />
+                      </div>
+                    </div>
+                    <div className="flex gap-2 justify-end pt-3 border-t border-gray-100">
+                      <button
+                        type="button"
+                        onClick={() => setShowAddTable(false)}
+                        className="px-4 py-2 border border-gray-200 text-gray-600 rounded-lg text-sm hover:bg-gray-50 font-semibold"
+                      >
+                        Hủy
+                      </button>
+                      <button
+                        type="submit"
+                        className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 font-semibold"
+                      >
+                        Tạo bàn mới
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            )}
+
+            {/* MODAL: SỬA BÀN ĂN */}
+            {showEditTable && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 backdrop-blur-sm p-4 animate-fade-in">
+                <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
+                  <div className="flex items-center justify-between border-b border-gray-100 pb-3 mb-4">
+                    <h3 className="font-bold text-coffee-dark text-lg">Chỉnh sửa thông tin bàn</h3>
+                    <button onClick={() => setShowEditTable(false)} className="p-1 text-gray-400 hover:bg-gray-100 rounded-full">
+                      <X size={18} />
+                    </button>
+                  </div>
+                  <form onSubmit={handleSaveEditTable} className="space-y-4">
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 mb-1">Tên bàn ăn *</label>
+                      <input
+                        type="text"
+                        required
+                        value={tableConfigForm.name}
+                        onChange={e => setTableConfigForm(prev => ({ ...prev, name: e.target.value }))}
+                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700 mb-1">Khu vực xếp bàn *</label>
+                        <select
+                          value={tableConfigForm.zone}
+                          onChange={e => setTableConfigForm(prev => ({ ...prev, zone: e.target.value }))}
+                          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
+                        >
+                          <option value="Tầng trệt">Tầng trệt</option>
+                          <option value="Lầu 1">Lầu 1</option>
+                          <option value="Sân vườn">Sân vườn</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700 mb-1">Sức chứa khách (ghế) *</label>
+                        <input
+                          type="number"
+                          required
+                          value={tableConfigForm.capacity}
+                          onChange={e => setTableConfigForm(prev => ({ ...prev, capacity: Number(e.target.value) || 2 }))}
+                          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          min="1"
+                        />
+                      </div>
+                    </div>
+                    <div className="flex gap-2 justify-end pt-3 border-t border-gray-100">
+                      <button
+                        type="button"
+                        onClick={() => setShowEditTable(false)}
+                        className="px-4 py-2 border border-gray-200 text-gray-600 rounded-lg text-sm hover:bg-gray-50 font-semibold"
+                      >
+                        Hủy
+                      </button>
+                      <button
+                        type="submit"
+                        className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 font-semibold"
+                      >
+                        Lưu cập nhật
+                      </button>
+                    </div>
+                  </form>
                 </div>
               </div>
             )}

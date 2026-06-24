@@ -45,7 +45,47 @@ export function TableProvider({ children }) {
     }
   }, []);
 
-  const value = { tables, updateTableStatus, loading };
+  const createTable = useCallback(async (data) => {
+    try {
+      const newTable = await api.post('/tables', data);
+      await fetchTables();
+      return newTable;
+    } catch (err) {
+      console.error(err);
+      throw err;
+    }
+  }, []);
+
+  const updateTable = useCallback(async (id, data) => {
+    try {
+      const updated = await api.put(`/tables/${id}`, data);
+      await fetchTables();
+      return updated;
+    } catch (err) {
+      console.error(err);
+      throw err;
+    }
+  }, []);
+
+  const deleteTable = useCallback(async (id) => {
+    try {
+      await api.delete(`/tables/${id}`);
+      await fetchTables();
+    } catch (err) {
+      console.error(err);
+      throw err;
+    }
+  }, []);
+
+  const value = { 
+    tables, 
+    updateTableStatus, 
+    createTable, 
+    updateTable, 
+    deleteTable, 
+    fetchTables,
+    loading 
+  };
 
   return <TableContext.Provider value={value}>{children}</TableContext.Provider>;
 }
