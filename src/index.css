@@ -1,0 +1,167 @@
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Inter:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  *, *::before, *::after {
+    box-sizing: border-box;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-cream-warm text-coffee-dark font-sans;
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #FAF7F2;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #D4C4AE;
+    border-radius: 9999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #A76D42;
+  }
+}
+
+@layer components {
+  /* Glassmorphism Card */
+  .glass-card {
+    @apply bg-white/70 backdrop-blur-md border border-white/50 rounded-2xl shadow-glass;
+  }
+
+  .glass-card-dark {
+    @apply backdrop-blur-md border border-white/10 rounded-2xl;
+    background: rgba(44, 27, 20, 0.6);
+  }
+
+  /* Button Variants */
+  .btn-primary {
+    @apply bg-accent-gradient text-white font-semibold px-5 py-2.5 rounded-xl 
+           shadow-coffee transition-all duration-200 
+           hover:shadow-coffee-lg hover:-translate-y-0.5 active:translate-y-0
+           focus:outline-none focus:ring-2 focus:ring-coffee-accent/50;
+  }
+
+  .btn-secondary {
+    @apply bg-cream-medium text-coffee-dark font-medium px-5 py-2.5 rounded-xl 
+           border border-cream-dark transition-all duration-200
+           hover:bg-cream-dark hover:shadow-card active:scale-95
+           focus:outline-none focus:ring-2 focus:ring-coffee-accent/30;
+  }
+
+  .btn-ghost {
+    @apply text-coffee-medium font-medium px-4 py-2 rounded-xl 
+           transition-all duration-200 hover:bg-cream-light hover:text-coffee-dark
+           focus:outline-none;
+  }
+
+  .btn-danger {
+    @apply bg-red-50 text-red-700 font-medium px-4 py-2 rounded-xl 
+           border border-red-200 transition-all duration-200
+           hover:bg-red-100 hover:shadow-md active:scale-95;
+  }
+
+  /* Menu Item Card */
+  .menu-card {
+    @apply bg-white rounded-2xl shadow-card border border-cream-medium/50 
+           overflow-hidden cursor-pointer transition-all duration-200
+           hover:shadow-card-hover hover:-translate-y-1;
+  }
+
+  /* Status Badges */
+  .badge-available {
+    @apply bg-status-available text-status-availableText border border-status-availableBorder
+           text-xs font-semibold px-2.5 py-1 rounded-full;
+  }
+
+  .badge-occupied {
+    @apply bg-status-occupied text-status-occupiedText border border-status-occupiedBorder
+           text-xs font-semibold px-2.5 py-1 rounded-full;
+  }
+
+  .badge-dirty {
+    @apply bg-status-dirty text-status-dirtyText border border-status-dirtyBorder
+           text-xs font-semibold px-2.5 py-1 rounded-full;
+  }
+
+  /* Sidebar Nav Item */
+  .nav-item {
+    @apply flex items-center gap-3 px-4 py-3 rounded-xl font-medium
+           transition-all duration-200 cursor-pointer text-sm;
+  }
+
+  .nav-item-active {
+    @apply bg-white/15 text-white shadow-sm;
+  }
+
+  .nav-item-inactive {
+    @apply text-white/60 hover:bg-white/10 hover:text-white/90;
+  }
+
+  /* Input Fields */
+  .input-field {
+    @apply w-full bg-cream-light border border-cream-dark rounded-xl px-4 py-2.5
+           text-coffee-dark placeholder-coffee-light/60 text-sm
+           focus:outline-none focus:ring-2 focus:ring-coffee-accent/40 focus:border-coffee-accent
+           transition-all duration-200;
+  }
+
+  /* Table Status Cards */
+  .table-card-available {
+    @apply bg-status-available border-2 border-status-availableBorder text-status-availableText;
+  }
+
+  .table-card-occupied {
+    @apply bg-status-occupied border-2 border-status-occupiedBorder text-status-occupiedText;
+  }
+
+  .table-card-dirty {
+    @apply bg-status-dirty border-2 border-status-dirtyBorder text-status-dirtyText;
+  }
+
+  /* Stat Card */
+  .stat-card {
+    @apply bg-white rounded-2xl p-6 shadow-card border border-cream-medium/30
+           transition-all duration-200 hover:shadow-card-hover;
+  }
+
+  /* Divider */
+  .divider {
+    @apply border-t border-cream-medium;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .animation-delay-100 {
+    animation-delay: 100ms;
+  }
+
+  .animation-delay-200 {
+    animation-delay: 200ms;
+  }
+
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+}

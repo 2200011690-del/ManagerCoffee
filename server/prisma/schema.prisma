@@ -1,0 +1,142 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Store {
+  id        String   @id @default(cuid())
+  name      String
+  code      String   @unique // e.g. espresso-lab
+  address   String?
+  phone     String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  users      User[]
+  products   Product[]
+  tables     Table[]
+  orders     Order[]
+  customers  Customer[]
+  vouchers   Voucher[]
+  inventories Inventory[]
+}
+
+model User {
+  id      String  @id @default(cuid())
+  storeId String
+  store   Store   @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  pin     String  
+  name    String
+  role    String  // "admin" or "staff"
+  orders  Order[]
+
+  @@unique([storeId, pin])
+}
+
+model Product {
+  id          String  @id @default(cuid())
+  storeId     String
+  store       Store   @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  name        String
+  price       Float
+  category    String
+  description String?
+  image       String?
+  popular     Boolean @default(false)
+  prepTime    String? @default("5 phút")
+  hidden      Boolean @default(false)
+}
+
+model Table {
+  id            String  @id @default(cuid())
+  storeId       String
+  store         Store   @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  name          String
+  zone          String
+  capacity      Int
+  status        String  @default("available") // "available", "occupied", "dirty"
+  occupiedSince String?
+}
+
+model Order {
+  id             String      @id @default(cuid())
+  storeId        String
+  store          Store       @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  orderNumber    String      
+  tableId        String?
+  tableName      String
+  subtotal       Float
+  vatAmount      Float
+  total          Float
+  paymentMethod  String      // "cash" or "card"
+  status         String      @default("paid") // "pending", "paid", "cancelled"
+  time           String
+  date           String
+  timestamp      DateTime    @default(now())
+  items          OrderItem[]
+
+  customerId     String?
+  customer       Customer?   @relation(fields: [customerId], references: [id])
+  voucherCode    String?
+  discountAmount Float?      @default(0)
+  employeeId     String?
+  employee       User?       @relation(fields: [employeeId], references: [id])
+
+  @@unique([storeId, orderNumber])
+}
+
+model OrderItem {
+  id       String  @id @default(cuid())
+  orderId  String
+  order    Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  name     String
+  price    Float
+  qty      Int
+  sugar    String?
+  ice      String?
+  note     String?
+}
+
+model Inventory {
+  id       String  @id @default(cuid())
+  storeId  String
+  store    Store   @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  name     String
+  unit     String
+  qty      Float
+  minQty   Float
+  icon     String?
+}
+
+model Customer {
+  id        String   @id @default(cuid())
+  storeId   String
+  store     Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  name      String
+  phone     String   
+  points    Int      @default(0)
+  tier      String   @default("SILVER") // SILVER, GOLD, DIAMOND
+  createdAt DateTime @default(now())
+  orders    Order[]
+
+  @@unique([storeId, phone])
+}
+
+model Voucher {
+  id            String    @id @default(cuid())
+  storeId       String
+  store         Store     @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  code          String    
+  type          String    // PERCENT, FIXED
+  value         Float
+  minOrderValue Float     @default(0)
+  maxDiscount   Float?
+  expiryDate    DateTime?
+  isActive      Boolean   @default(true)
+
+  @@unique([storeId, code])
+}
