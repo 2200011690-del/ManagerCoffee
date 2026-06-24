@@ -11,7 +11,7 @@ export function MenuProvider({ children }) {
   const fetchMenu = async () => {
     try {
       const data = await api.get('/products');
-      setMenuList(data);
+      setMenuList(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error('Failed to fetch menu:', err);
     } finally {

@@ -11,7 +11,7 @@ export function OrderHistoryProvider({ children }) {
   const fetchOrders = async () => {
     try {
       const data = await api.get('/orders');
-      setOrderHistory(data);
+      setOrderHistory(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error(err);
     } finally {

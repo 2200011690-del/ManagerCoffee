@@ -11,7 +11,7 @@ export function TableProvider({ children }) {
   const fetchTables = async () => {
     try {
       const data = await api.get('/tables');
-      setTables(data);
+      setTables(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error(err);
     } finally {
