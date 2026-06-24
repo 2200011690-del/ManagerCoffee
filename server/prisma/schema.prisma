@@ -23,6 +23,8 @@ model Store {
   customers  Customer[]
   vouchers   Voucher[]
   inventories Inventory[]
+  suppliers   Supplier[]
+  transactions StockTransaction[]
 }
 
 model User {
@@ -49,6 +51,7 @@ model Product {
   popular     Boolean @default(false)
   prepTime    String? @default("5 phút")
   hidden      Boolean @default(false)
+  recipes     RecipeItem[]
 }
 
 model Table {
@@ -110,6 +113,49 @@ model Inventory {
   qty      Float
   minQty   Float
   icon     String?
+
+  recipes      RecipeItem[]
+  transactions StockTransaction[]
+}
+
+model RecipeItem {
+  id          String    @id @default(cuid())
+  productId   String
+  product     Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  inventoryId String
+  inventory   Inventory @relation(fields: [inventoryId], references: [id], onDelete: Cascade)
+  qty         Float
+
+  @@unique([productId, inventoryId])
+}
+
+model Supplier {
+  id        String   @id @default(cuid())
+  storeId   String
+  store     Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  name      String
+  phone     String?
+  email     String?
+  address   String?
+  createdAt DateTime @default(now())
+  
+  transactions StockTransaction[]
+}
+
+model StockTransaction {
+  id          String    @id @default(cuid())
+  storeId     String
+  store       Store     @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  inventoryId String
+  inventory   Inventory @relation(fields: [inventoryId], references: [id], onDelete: Cascade)
+  type        String    // "IMPORT", "EXPORT", "ADJUST", "SALE"
+  qtyChange   Float
+  balance     Float
+  cost        Float?
+  supplierId  String?
+  supplier    Supplier? @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  note        String?
+  createdAt   DateTime  @default(now())
 }
 
 model Customer {

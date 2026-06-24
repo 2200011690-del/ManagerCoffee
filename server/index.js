@@ -310,42 +310,38 @@ app.post('/api/orders/checkout', async (req, res) => {
     broadcast('tableUpdated', table, storeId);
   }
 
-  const ITEM_RECIPES = {
-    'cf-001': { arabica: 20 },
-    'cf-002': { arabica: 18, milk_fresh: 120 },
-    'cf-003': { robusta: 15, milk_cond: 30 },
-    'cf-004': { arabica: 18, milk_fresh: 150, sugar: 10 },
-    'cf-005': { arabica: 25 },
-    'cf-006': { arabica: 18 },
-    'tea-001': { tea_leaves: 5, sugar: 8 },
-    'tea-002': { matcha_pwd: 5, milk_oat: 150 },
-    'tea-003': { tea_leaves: 5, sugar: 10 },
-    'tea-004': { tea_leaves: 5, milk_fresh: 100, boba: 30 },
-    'tea-005': { tea_leaves: 5 },
-    'cake-001': { cream: 20 },
-    'cake-002': { arabica: 10, cream: 40, sugar: 15 },
-    'cake-003': { sugar: 20 },
-    'cake-004': { cream: 50, sugar: 25 },
-    'cake-005': { sugar: 20, cream: 30 },
-  };
-
-  const deductions = {};
-  for (const c of cart) {
-    const recipe = ITEM_RECIPES[c.id] || {};
-    for (const [ingId, amount] of Object.entries(recipe)) {
-      deductions[ingId] = (deductions[ingId] || 0) + amount * c.qty;
-    }
-  }
-
-  for (const [ingId, amount] of Object.entries(deductions)) {
-    // Because inventory id is not the code, but wait - in seed we used `name` for inventory but we don't know the generated ID!
-    // Ah, previous logic assumed `id` was `ingId`. Let's just update safely if exists.
-    try {
-      await prisma.inventory.updateMany({
-        where: { id: ingId, storeId },
-        data: { qty: { decrement: amount } }
+  // Deduct ingredients from database recipes
+  try {
+    for (const c of cart) {
+      const recipeItems = await prisma.recipeItem.findMany({
+        where: { productId: c.id },
+        include: { inventory: true }
       });
-    } catch(e) {}
+      
+      for (const recipe of recipeItems) {
+        const amount = recipe.qty * c.qty;
+        
+        // Decrement inventory qty
+        const updatedInventory = await prisma.inventory.update({
+          where: { id: recipe.inventoryId },
+          data: { qty: { decrement: amount } }
+        });
+        
+        // Create SALE transaction
+        await prisma.stockTransaction.create({
+          data: {
+            storeId,
+            inventoryId: recipe.inventoryId,
+            type: 'SALE',
+            qtyChange: -amount,
+            balance: updatedInventory.qty,
+            note: `Bán hàng - HĐ ${orderNumber} (${c.name} x${c.qty})`
+          }
+        });
+      }
+    }
+  } catch (err) {
+    console.error('Error deducting inventory:', err);
   }
 
   broadcast('orderCreated', order, storeId);
@@ -355,9 +351,407 @@ app.post('/api/orders/checkout', async (req, res) => {
 });
 
 // 5. Inventory
+const INITIAL_INVENTORY = [
+  { name: 'Cà phê Arabica', unit: 'kg', qty: 25.5, minQty: 5, icon: '☕' },
+  { name: 'Cà phê Robusta', unit: 'kg', qty: 12.0, minQty: 5, icon: '☕' },
+  { name: 'Sữa tươi', unit: 'lít', qty: 45.0, minQty: 10, icon: '🥛' },
+  { name: 'Sữa đặc', unit: 'lon', qty: 24.0, minQty: 10, icon: '🥫' },
+  { name: 'Trà đen', unit: 'kg', qty: 8.5, minQty: 2, icon: '🍃' },
+  { name: 'Đường cát', unit: 'kg', qty: 30.0, minQty: 10, icon: '🍚' },
+  { name: 'Bột Matcha', unit: 'kg', qty: 2.5, minQty: 1, icon: '🍵' },
+];
+
+const INITIAL_SUPPLIERS = [
+  { name: 'Cty Sữa Cát Tường', phone: '0912888999', email: 'cattuong@milk.vn', address: 'KCN Sóng Thần, Bình Dương' },
+  { name: 'Nhà phân phối Cà phê Hải Hà', phone: '0903111222', email: 'haihacoffee@gmail.com', address: '45 Lê Văn Sỹ, Q.3, TP.HCM' },
+  { name: 'Chợ Đầu Mối Bình Điền (Đường & Trà)', phone: '0987654321', email: 'binhdienmarket@hcm.gov.vn', address: 'Quận 8, TP.HCM' },
+];
+
+const RECIPE_SEEDS = {
+  'Cà phê Đen': { 'Cà phê Arabica': 0.02 },
+  'Cà phê Sữa': { 'Cà phê Arabica': 0.018, 'Sữa đặc': 0.03 },
+  'Bạc xỉu': { 'Cà phê Robusta': 0.015, 'Sữa tươi': 0.1, 'Sữa đặc': 0.03 },
+  'Cold Brew': { 'Cà phê Arabica': 0.025 },
+  'Americano': { 'Cà phê Arabica': 0.018 },
+  'Latte': { 'Cà phê Arabica': 0.018, 'Sữa tươi': 0.15 },
+  'Trà Đào Cam Sả': { 'Trà đen': 0.005, 'Đường cát': 0.008 },
+  'Trà Matcha Latte': { 'Bột Matcha': 0.005, 'Sữa tươi': 0.15 },
+  'Trà Olong Sen': { 'Trà đen': 0.005, 'Đường cát': 0.01 },
+  'Hồng Trà Trân Châu': { 'Trà đen': 0.005, 'Sữa tươi': 0.1, 'Đường cát': 0.01 },
+  'Trà Vải': { 'Trà đen': 0.005 },
+};
+
 app.get('/api/inventory', async (req, res) => {
-  const items = await prisma.inventory.findMany({ where: { storeId: req.storeId } });
+  const items = await prisma.inventory.findMany({ 
+    where: { storeId: req.storeId },
+    orderBy: { name: 'asc' }
+  });
   res.json(items);
+});
+
+// Create new ingredient
+app.post('/api/inventory', async (req, res) => {
+  const storeId = req.storeId;
+  const { name, unit, qty, minQty, icon } = req.body;
+  try {
+    const item = await prisma.inventory.create({
+      data: {
+        storeId,
+        name,
+        unit,
+        qty: Number(qty) || 0,
+        minQty: Number(minQty) || 0,
+        icon: icon || '☕'
+      }
+    });
+
+    // Record initial import if qty > 0
+    if (qty > 0) {
+      await prisma.stockTransaction.create({
+        data: {
+          storeId,
+          inventoryId: item.id,
+          type: 'IMPORT',
+          qtyChange: Number(qty),
+          balance: Number(qty),
+          note: 'Khởi tạo tồn kho ban đầu'
+        }
+      });
+    }
+
+    broadcast('inventoryUpdated', await prisma.inventory.findMany({ where: { storeId }, orderBy: { name: 'asc' } }), storeId);
+    res.json(item);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Update ingredient
+app.put('/api/inventory/:id', async (req, res) => {
+  const storeId = req.storeId;
+  const { id } = req.params;
+  const { name, unit, minQty, icon } = req.body;
+  try {
+    const item = await prisma.inventory.update({
+      where: { id, storeId },
+      data: {
+        name,
+        unit,
+        minQty: Number(minQty) || 0,
+        icon
+      }
+    });
+    broadcast('inventoryUpdated', await prisma.inventory.findMany({ where: { storeId }, orderBy: { name: 'asc' } }), storeId);
+    res.json(item);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Delete ingredient
+app.delete('/api/inventory/:id', async (req, res) => {
+  const storeId = req.storeId;
+  const { id } = req.params;
+  try {
+    await prisma.inventory.delete({
+      where: { id, storeId }
+    });
+    broadcast('inventoryUpdated', await prisma.inventory.findMany({ where: { storeId }, orderBy: { name: 'asc' } }), storeId);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Import stock (Nhập hàng)
+app.post('/api/inventory/import', async (req, res) => {
+  const storeId = req.storeId;
+  const { inventoryId, qty, cost, supplierId, note } = req.body;
+  try {
+    const ingredient = await prisma.inventory.findUnique({
+      where: { id: inventoryId }
+    });
+    if (!ingredient) return res.status(404).json({ error: 'Nguyên liệu không tồn tại' });
+
+    const newQty = ingredient.qty + Number(qty);
+    const updated = await prisma.inventory.update({
+      where: { id: inventoryId },
+      data: { qty: newQty }
+    });
+
+    // Create Stock Transaction
+    const transaction = await prisma.stockTransaction.create({
+      data: {
+        storeId,
+        inventoryId,
+        type: 'IMPORT',
+        qtyChange: Number(qty),
+        balance: newQty,
+        cost: cost ? Number(cost) : null,
+        supplierId: supplierId || null,
+        note: note || 'Nhập hàng từ nhà cung cấp'
+      },
+      include: {
+        inventory: true,
+        supplier: true
+      }
+    });
+
+    broadcast('inventoryUpdated', await prisma.inventory.findMany({ where: { storeId }, orderBy: { name: 'asc' } }), storeId);
+    res.json(transaction);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Adjust stock (Kiểm kho)
+app.post('/api/inventory/adjust', async (req, res) => {
+  const storeId = req.storeId;
+  const { inventoryId, actualQty, note } = req.body;
+  try {
+    const ingredient = await prisma.inventory.findUnique({
+      where: { id: inventoryId }
+    });
+    if (!ingredient) return res.status(404).json({ error: 'Nguyên liệu không tồn tại' });
+
+    const oldQty = ingredient.qty;
+    const diff = Number(actualQty) - oldQty;
+
+    await prisma.inventory.update({
+      where: { id: inventoryId },
+      data: { qty: Number(actualQty) }
+    });
+
+    const transaction = await prisma.stockTransaction.create({
+      data: {
+        storeId,
+        inventoryId,
+        type: 'ADJUST',
+        qtyChange: diff,
+        balance: Number(actualQty),
+        note: note || 'Cân đối kiểm kho'
+      },
+      include: {
+        inventory: true
+      }
+    });
+
+    broadcast('inventoryUpdated', await prisma.inventory.findMany({ where: { storeId }, orderBy: { name: 'asc' } }), storeId);
+    res.json(transaction);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Reset Inventory to default seeded values
+app.post('/api/inventory/reset', async (req, res) => {
+  const storeId = req.storeId;
+  try {
+    await prisma.stockTransaction.deleteMany({ where: { storeId } });
+    await prisma.recipeItem.deleteMany({ where: { product: { storeId } } });
+    await prisma.inventory.deleteMany({ where: { storeId } });
+    await prisma.supplier.deleteMany({ where: { storeId } });
+    
+    const suppliersMap = {};
+    for (const s of INITIAL_SUPPLIERS) {
+      const supplier = await prisma.supplier.create({ data: { ...s, storeId } });
+      suppliersMap[s.name] = supplier.id;
+    }
+
+    const inventoryMap = {};
+    for (const inv of INITIAL_INVENTORY) {
+      const existingInv = await prisma.inventory.create({ data: { ...inv, storeId } });
+      
+      let supplierId = null;
+      if (inv.name.includes('Sữa')) {
+        supplierId = suppliersMap['Cty Sữa Cát Tường'];
+      } else if (inv.name.includes('Cà phê')) {
+        supplierId = suppliersMap['Nhà phân phối Cà phê Hải Hà'];
+      } else {
+        supplierId = suppliersMap['Chợ Đầu Mối Bình Điền (Đường & Trà)'];
+      }
+
+      await prisma.stockTransaction.create({
+        data: {
+          storeId,
+          inventoryId: existingInv.id,
+          type: 'IMPORT',
+          qtyChange: inv.qty,
+          balance: inv.qty,
+          cost: inv.name.includes('Cà phê') ? 140000 : inv.name.includes('Sữa tươi') ? 28000 : 15000,
+          supplierId,
+          note: 'Khởi tạo tồn kho ban đầu khi reset'
+        }
+      });
+      inventoryMap[inv.name] = existingInv.id;
+    }
+
+    const products = await prisma.product.findMany({ where: { storeId } });
+    const productsMap = {};
+    for (const p of products) {
+      productsMap[p.name] = p.id;
+    }
+
+    for (const [prodName, ingredients] of Object.entries(RECIPE_SEEDS)) {
+      const productId = productsMap[prodName];
+      if (!productId) continue;
+
+      for (const [ingName, qtyValue] of Object.entries(ingredients)) {
+        const inventoryId = inventoryMap[ingName];
+        if (!inventoryId) continue;
+
+        await prisma.recipeItem.create({
+          data: {
+            productId,
+            inventoryId,
+            qty: qtyValue
+          }
+        });
+      }
+    }
+
+    broadcast('inventoryUpdated', await prisma.inventory.findMany({ where: { storeId }, orderBy: { name: 'asc' } }), storeId);
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Get stock transaction history
+app.get('/api/inventory/transactions', async (req, res) => {
+  const storeId = req.storeId;
+  try {
+    const transactions = await prisma.stockTransaction.findMany({
+      where: { storeId },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        inventory: true,
+        supplier: true
+      }
+    });
+    res.json(transactions);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Suppliers APIs
+app.get('/api/suppliers', async (req, res) => {
+  const storeId = req.storeId;
+  try {
+    const suppliers = await prisma.supplier.findMany({
+      where: { storeId },
+      orderBy: { name: 'asc' },
+      include: {
+        _count: {
+          select: { transactions: true }
+        }
+      }
+    });
+    res.json(suppliers);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/suppliers', async (req, res) => {
+  const storeId = req.storeId;
+  const { name, phone, email, address } = req.body;
+  try {
+    const supplier = await prisma.supplier.create({
+      data: {
+        storeId,
+        name,
+        phone,
+        email,
+        address
+      }
+    });
+    res.json(supplier);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.put('/api/suppliers/:id', async (req, res) => {
+  const storeId = req.storeId;
+  const { id } = req.params;
+  const { name, phone, email, address } = req.body;
+  try {
+    const supplier = await prisma.supplier.update({
+      where: { id, storeId },
+      data: {
+        name,
+        phone,
+        email,
+        address
+      }
+    });
+    res.json(supplier);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.delete('/api/suppliers/:id', async (req, res) => {
+  const storeId = req.storeId;
+  const { id } = req.params;
+  try {
+    await prisma.supplier.delete({
+      where: { id, storeId }
+    });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Product Recipe APIs
+app.get('/api/products/:productId/recipe', async (req, res) => {
+  const { productId } = req.params;
+  try {
+    const recipeItems = await prisma.recipeItem.findMany({
+      where: { productId },
+      include: {
+        inventory: true
+      }
+    });
+    res.json(recipeItems);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.put('/api/products/:productId/recipe', async (req, res) => {
+  const { productId } = req.params;
+  const { ingredients } = req.body; // array of { inventoryId, qty }
+  try {
+    // Delete existing recipe items
+    await prisma.recipeItem.deleteMany({
+      where: { productId }
+    });
+
+    // Create new recipe items
+    const created = [];
+    for (const ing of ingredients) {
+      if (Number(ing.qty) <= 0) continue;
+      const item = await prisma.recipeItem.create({
+        data: {
+          productId,
+          inventoryId: ing.inventoryId,
+          qty: Number(ing.qty)
+        },
+        include: {
+          inventory: true
+        }
+      });
+      created.push(item);
+    }
+    res.json(created);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
 });
 
 // 6. Dashboard Analytics
