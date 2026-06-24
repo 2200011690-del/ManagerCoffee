@@ -458,7 +458,7 @@ export default function DashboardPage() {
     recentOrders: dashboardData.recentOrders,
     thisWeek: dashboardData.thisWeek
   };
-  const { today, weeklyRevenue, topItems, recentOrders, thisWeek } = currentDashboard;
+  const { today, weeklyRevenue, topItems, recentOrders, thisWeek, shifts = dashboardData.shifts } = currentDashboard;
 
   // Sub-tabs inside inventory
   const [invSubTab, setInvSubTab] = useState('stock'); // 'stock' | 'recipes' | 'history' | 'suppliers'
