@@ -9,7 +9,7 @@ dotenv.config();
 
 const allowedOrigins = process.env.CORS_ORIGIN 
   ? process.env.CORS_ORIGIN.split(',') 
-  : '*';
+  : true; // true reflects the origin to support credentials
 
 const app = express();
 const httpServer = createServer(app);
