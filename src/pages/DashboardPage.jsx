@@ -15,12 +15,13 @@ import { api } from '../api';
 
 // ---- Mini Bar Chart ----
 function MiniBarChart({ data }) {
-  const maxRevenue = Math.max(...data.map(d => d.revenue));
-  const todayIndex = data.length - 1;
+  const safeData = Array.isArray(data) ? data : [];
+  const maxRevenue = safeData.length > 0 ? Math.max(...safeData.map(d => d.revenue || 0)) || 1 : 1;
+  const todayIndex = safeData.length - 1;
   return (
     <div className="flex items-end gap-1.5 h-24">
-      {data.map((d, i) => {
-        const height = (d.revenue / maxRevenue) * 100;
+      {safeData.map((d, i) => {
+        const height = ((d.revenue || 0) / maxRevenue) * 100;
         const isToday = i === todayIndex;
         return (
           <div key={d.day} className="flex-1 flex flex-col items-center gap-1">
@@ -69,8 +70,8 @@ function StatCard({ icon: Icon, label, value, sub, color, trend }) {
 
 // ---- Top Item Row ----
 function TopItemRow({ item, rank }) {
-  const trendColor = item.trend === 'up' ? 'text-green-500' : item.trend === 'down' ? 'text-red-400' : 'text-gray-400';
-  const TrendIcon = item.trend === 'up' ? TrendingUp : item.trend === 'down' ? TrendingDown : MinusIcon;
+  const trendColor = item?.trend === 'up' ? 'text-green-500' : item?.trend === 'down' ? 'text-red-400' : 'text-gray-400';
+  const TrendIcon = item?.trend === 'up' ? TrendingUp : item?.trend === 'down' ? TrendingDown : MinusIcon;
   return (
     <div className="flex items-center gap-4 py-3 border-b border-cream-medium/40 last:border-0">
       <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${rank <= 3 ? 'text-white' : 'bg-cream-light text-coffee-light'}`}
@@ -78,11 +79,11 @@ function TopItemRow({ item, rank }) {
         {rank}
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-semibold text-coffee-dark truncate">{item.name}</p>
-        <p className="text-xs text-coffee-light">{item.sold} ly đã bán</p>
+        <p className="text-sm font-semibold text-coffee-dark truncate">{item?.name || 'N/A'}</p>
+        <p className="text-xs text-coffee-light">{(item?.sold !== undefined ? item.sold : item?.qty) || 0} ly đã bán</p>
       </div>
       <div className="text-right flex-shrink-0">
-        <p className="text-sm font-bold text-coffee-accent">{item.revenue.toLocaleString('vi-VN')}đ</p>
+        <p className="text-sm font-bold text-coffee-accent">{(item?.revenue ?? 0).toLocaleString('vi-VN')}đ</p>
         <div className={`flex items-center justify-end gap-0.5 text-xs ${trendColor}`}>
           <TrendIcon size={11} />
         </div>
@@ -452,14 +453,53 @@ export default function DashboardPage() {
     }
   }, [activeTab, fetchDashboardData, fetchVouchers, fetchCustomers, fetchTables]);
 
-  const currentDashboard = liveDashboardData || {
+  // Validate and parse the dashboard data safely to prevent crashes (e.g., if API fails, returns HTML, or has missing fields)
+  const isDataValid = liveDashboardData && 
+    typeof liveDashboardData === 'object' && 
+    liveDashboardData.today && 
+    liveDashboardData.thisWeek &&
+    Array.isArray(liveDashboardData.weeklyRevenue) && 
+    Array.isArray(liveDashboardData.topItems) && 
+    Array.isArray(liveDashboardData.recentOrders);
+
+  const rawDashboard = isDataValid ? liveDashboardData : {
     today: dashboardData.today,
     weeklyRevenue: dashboardData.weeklyRevenue,
     topItems: dashboardData.topItems,
     recentOrders: dashboardData.recentOrders,
     thisWeek: dashboardData.thisWeek
   };
-  const { today, weeklyRevenue, topItems, recentOrders, thisWeek, shifts = dashboardData.shifts } = currentDashboard;
+
+  const { 
+    today: rawToday = {}, 
+    weeklyRevenue: rawWeeklyRevenue = [], 
+    topItems: rawTopItems = [], 
+    recentOrders: rawRecentOrders = [], 
+    thisWeek: rawThisWeek = {}, 
+    shifts: rawShifts = dashboardData.shifts 
+  } = rawDashboard;
+
+  // Safe structures to avoid any format/type mismatch crashes
+  const today = {
+    revenue: 0,
+    target: 5000000,
+    orders: 0,
+    avgOrderValue: 0,
+    customers: 0,
+    ...rawToday
+  };
+
+  const thisWeek = {
+    revenue: 0,
+    orders: 0,
+    growth: 0,
+    ...rawThisWeek
+  };
+
+  const weeklyRevenue = Array.isArray(rawWeeklyRevenue) ? rawWeeklyRevenue : [];
+  const topItems = Array.isArray(rawTopItems) ? rawTopItems : [];
+  const recentOrders = Array.isArray(rawRecentOrders) ? rawRecentOrders : [];
+  const shifts = Array.isArray(rawShifts) ? rawShifts : [];
 
   // Sub-tabs inside inventory
   const [invSubTab, setInvSubTab] = useState('stock'); // 'stock' | 'recipes' | 'history' | 'suppliers'
@@ -761,7 +801,7 @@ export default function DashboardPage() {
     }
   };
 
-  const progressPct = Math.min((today.revenue / today.target) * 100, 100).toFixed(0);
+  const progressPct = (today.target && today.target > 0) ? Math.min((today.revenue / today.target) * 100, 100).toFixed(0) : '0';
 
   return (
     <div className="h-full overflow-y-auto bg-cream-warm">
