@@ -102,6 +102,7 @@ function OrderHistoryTab() {
     const q = searchQuery.toLowerCase();
     return orderHistory.filter(o =>
       o.id.toLowerCase().includes(q) ||
+      (o.orderNumber && o.orderNumber.toLowerCase().includes(q)) ||
       o.tableName.toLowerCase().includes(q) ||
       o.date.includes(q)
     );
@@ -111,7 +112,7 @@ function OrderHistoryTab() {
     if (orderHistory.length === 0) return;
     const header = 'Mã HĐ,Ngày,Giờ,Bàn,Tổng tiền,Hình thức,Số món\n';
     const rows = orderHistory.map(o =>
-      `"${o.id}","${o.date}","${o.time}","${o.tableName}","${o.total}","${o.paymentMethod === 'cash' ? 'Tiền mặt' : 'Thẻ/QR'}","${o.items.reduce((s, i) => s + i.qty, 0)}"`
+      `"${o.orderNumber || o.id}","${o.date}","${o.time}","${o.tableName}","${o.total}","${o.paymentMethod === 'cash' ? 'Tiền mặt' : 'Thẻ/QR'}","${o.items.reduce((s, i) => s + i.qty, 0)}"`
     ).join('\n');
     const blob = new Blob(['\uFEFF' + header + rows], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -181,7 +182,7 @@ function OrderHistoryTab() {
                 {filtered.map(order => (
                   <tr key={order.timestamp} className="border-b border-cream-medium/30 hover:bg-cream-light/50 transition-colors">
                     <td className="px-4 py-3">
-                      <span className="font-mono font-bold text-coffee-accent text-xs bg-coffee-accent/10 px-2 py-1 rounded-lg">{order.id}</span>
+                      <span className="font-mono font-bold text-coffee-accent text-xs bg-coffee-accent/10 px-2 py-1 rounded-lg">{order.orderNumber || order.id}</span>
                     </td>
                     <td className="px-4 py-3 font-medium text-coffee-dark">{order.tableName}</td>
                     <td className="px-4 py-3 text-coffee-light hidden sm:table-cell">
@@ -233,7 +234,7 @@ function OrderHistoryTab() {
             <div className="px-5 py-4 border-b border-cream-medium/40 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <CheckCircle size={18} className="text-green-500" />
-                <h3 className="font-display font-bold text-coffee-dark">Chi tiết {detailOrder.id}</h3>
+                <h3 className="font-display font-bold text-coffee-dark">Chi tiết {detailOrder.orderNumber || detailOrder.id}</h3>
               </div>
               <button onClick={() => setDetailOrder(null)}
                 className="min-w-[36px] min-h-[36px] rounded-lg bg-cream-light flex items-center justify-center text-coffee-medium hover:bg-cream-medium">
@@ -968,12 +969,12 @@ export default function DashboardPage() {
                 {recentOrders.map(order => (
                   <div key={order.id} className="flex items-center justify-between py-3 border-b border-cream-medium/40 last:border-0">
                     <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-xl bg-cream-light flex items-center justify-center text-coffee-medium text-xs font-bold">
-                        {order.id}
+                      <div className="min-w-[48px] px-1.5 h-9 rounded-xl bg-cream-light flex items-center justify-center text-coffee-medium text-[11px] font-bold">
+                        {order.orderNumber || order.id}
                       </div>
                       <div>
-                        <p className="text-sm font-semibold text-coffee-dark">{order.table}</p>
-                        <p className="text-xs text-coffee-light">{order.items} món · {order.time}</p>
+                        <p className="text-sm font-semibold text-coffee-dark">{order.tableName || order.table}</p>
+                        <p className="text-xs text-coffee-light">{(order.itemsCount !== undefined) ? order.itemsCount : order.items} món · {order.time}</p>
                       </div>
                     </div>
                     <div className="text-right">
