@@ -92,11 +92,14 @@ function TopItemRow({ item, rank }) {
   );
 }
 
-// ---- Order History Table ----
 function OrderHistoryTab() {
-  const { orderHistory, clearHistory } = useOrderHistory();
+  const { orderHistory, fetchOrders, clearHistory } = useOrderHistory();
   const [searchQuery, setSearchQuery] = useState('');
   const [detailOrder, setDetailOrder] = useState(null);
+
+  useEffect(() => {
+    fetchOrders();
+  }, []);
 
   const filtered = useMemo(() => {
     if (!searchQuery.trim()) return orderHistory;
@@ -452,6 +455,17 @@ export default function DashboardPage() {
       fetchTables();
     }
   }, [activeTab, fetchDashboardData, fetchVouchers, fetchCustomers, fetchTables]);
+
+  // Lazy loader for inventory subtabs
+  useEffect(() => {
+    if (activeTab === 'inventory') {
+      if (invSubTab === 'suppliers') {
+        fetchSuppliers();
+      } else if (invSubTab === 'history') {
+        fetchTransactions();
+      }
+    }
+  }, [activeTab, invSubTab, fetchSuppliers, fetchTransactions]);
 
   // Validate and parse the dashboard data safely to prevent crashes (e.g., if API fails, returns HTML, or has missing fields)
   const isDataValid = liveDashboardData && 

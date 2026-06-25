@@ -6,9 +6,10 @@ const OrderHistoryContext = createContext(null);
 
 export function OrderHistoryProvider({ children }) {
   const [orderHistory, setOrderHistory] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
 
   const fetchOrders = async () => {
+    setLoading(true);
     try {
       const data = await api.get('/orders');
       setOrderHistory(Array.isArray(data) ? data : []);
@@ -20,8 +21,6 @@ export function OrderHistoryProvider({ children }) {
   };
 
   useEffect(() => {
-    fetchOrders();
-
     const handleOrderCreated = (order) => {
       setOrderHistory(prev => [order, ...prev]);
     };
@@ -44,7 +43,7 @@ export function OrderHistoryProvider({ children }) {
     // optional logic to clear history on backend if needed
   }, []);
 
-  const value = { orderHistory, addOrder, clearHistory, loading };
+  const value = { orderHistory, fetchOrders, addOrder, clearHistory, loading };
 
   return (
     <OrderHistoryContext.Provider value={value}>

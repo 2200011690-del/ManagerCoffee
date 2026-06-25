@@ -43,17 +43,14 @@ export function InventoryProvider({ children }) {
 
   useEffect(() => {
     fetchInventory();
-    fetchSuppliers();
-    fetchTransactions();
 
     const handleInventoryUpdated = (updatedInventory) => {
       setInventory(updatedInventory);
-      fetchTransactions(); // Refresh transactions log as well
     };
 
     socket.on('inventoryUpdated', handleInventoryUpdated);
     return () => socket.off('inventoryUpdated', handleInventoryUpdated);
-  }, [fetchInventory, fetchSuppliers, fetchTransactions]);
+  }, [fetchInventory]);
 
   const createIngredient = useCallback(async (data) => {
     try {
