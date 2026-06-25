@@ -14,6 +14,12 @@ model Store {
   code      String   @unique // e.g. espresso-lab
   address   String?
   phone     String?
+  logo      String?
+  vatRate   Float    @default(0.08) // 8% VAT
+  pointsRate Float   @default(0.1)  // 10% of total = points
+  currency  String   @default("VNĐ")
+  printHeader String? // Custom header text for receipts
+  printFooter String? // Custom footer text for receipts
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
 
@@ -28,6 +34,8 @@ model Store {
   transactions StockTransaction[]
   attendances Attendance[]
   cashShifts  CashShift[]
+  returnOrders ReturnOrder[]
+  heldOrders   HeldOrder[]
 }
 
 model User {
@@ -80,8 +88,8 @@ model Order {
   subtotal       Float
   vatAmount      Float
   total          Float
-  paymentMethod  String      // "cash" or "card"
-  status         String      @default("paid") // "pending", "paid", "cancelled"
+  paymentMethod  String      // "cash", "card", "mixed"
+  status         String      @default("paid") // "pending", "paid", "cancelled", "returned"
   time           String
   date           String
   timestamp      DateTime    @default(now())
@@ -93,6 +101,15 @@ model Order {
   discountAmount Float?      @default(0)
   employeeId     String?
   employee       User?       @relation(fields: [employeeId], references: [id])
+
+  // Phase 1: Flexible discount fields
+  orderDiscount     Float?    @default(0)  // Discount value on entire order
+  orderDiscountType String?   // "PERCENT" or "FIXED"
+  discountReason    String?   // Reason for discount (anti-fraud)
+
+  // Relations
+  returnOrders   ReturnOrder[]
+  payments       OrderPayment[]
 
   @@unique([storeId, orderNumber])
 }
@@ -107,6 +124,10 @@ model OrderItem {
   sugar    String?
   ice      String?
   note     String?
+  // Phase 1: Per-item discount
+  discount      Float?  @default(0)  // Discount amount on this item
+  discountType  String? // "PERCENT" or "FIXED"
+  returnedQty   Int     @default(0)  // Quantity returned
 }
 
 model Inventory {
@@ -221,4 +242,69 @@ model CashShift {
   discrepancy  Float?
   notes        String?
   status       String    @default("open") // "open", "closed"
+}
+
+// Phase 1: Return/Refund
+model ReturnOrder {
+  id            String       @id @default(cuid())
+  storeId       String
+  store         Store        @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  orderId       String
+  order         Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  returnNumber  String       // e.g. #TH001
+  reason        String
+  refundAmount  Float
+  refundMethod  String       // "cash", "card", "store_credit"
+  employeeId    String?
+  status        String       @default("completed") // "completed", "cancelled"
+  createdAt     DateTime     @default(now())
+  items         ReturnItem[]
+}
+
+model ReturnItem {
+  id            String      @id @default(cuid())
+  returnOrderId String
+  returnOrder   ReturnOrder @relation(fields: [returnOrderId], references: [id], onDelete: Cascade)
+  orderItemName String
+  price         Float
+  qty           Int
+  reason        String?
+}
+
+// Phase 1: Hold Order (Pending)
+model HeldOrder {
+  id          String          @id @default(cuid())
+  storeId     String
+  store       Store           @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  tableId     String?
+  tableName   String          @default("Mang về")
+  note        String?
+  employeeId  String?
+  employeeName String?
+  customerId  String?
+  createdAt   DateTime        @default(now())
+  items       HeldOrderItem[]
+}
+
+model HeldOrderItem {
+  id          String    @id @default(cuid())
+  heldOrderId String
+  heldOrder   HeldOrder @relation(fields: [heldOrderId], references: [id], onDelete: Cascade)
+  productId   String?
+  name        String
+  price       Float
+  qty         Int
+  sugar       String?
+  ice         String?
+  note        String?
+}
+
+// Phase 1: Split Payment
+model OrderPayment {
+  id            String  @id @default(cuid())
+  orderId       String
+  order         Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  method        String  // "cash", "card", "transfer", "momo", "zalopay"
+  amount        Float
+  reference     String? // Transaction reference if applicable
 }

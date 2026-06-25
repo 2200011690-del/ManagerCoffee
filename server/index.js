@@ -462,7 +462,10 @@ app.get('/api/orders', async (req, res) => {
 app.post('/api/orders/checkout', async (req, res) => {
   const { 
     tableId, tableName, cart, subtotal, vatAmount, total, paymentMethod,
-    customerId, voucherCode, discountAmount, employeeId
+    customerId, voucherCode, discountAmount, employeeId,
+    // Phase 1: New discount & payment fields
+    orderDiscount, orderDiscountType, discountReason,
+    payments // Array of { method, amount, reference? } for split payment
   } = req.body;
   const storeId = req.storeId;
   
@@ -482,13 +485,17 @@ app.post('/api/orders/checkout', async (req, res) => {
       subtotal,
       vatAmount,
       total,
-      paymentMethod,
+      paymentMethod: payments && payments.length > 1 ? 'mixed' : paymentMethod,
       time: timeStr,
       date: dateStr,
       customerId,
       voucherCode,
       discountAmount,
       employeeId,
+      // Phase 1: Discount fields
+      orderDiscount: orderDiscount || 0,
+      orderDiscountType: orderDiscountType || null,
+      discountReason: discountReason || null,
       items: {
         create: cart.map(item => ({
           name: item.name,
@@ -496,15 +503,32 @@ app.post('/api/orders/checkout', async (req, res) => {
           qty: item.qty,
           sugar: item.sugar,
           ice: item.ice,
-          note: item.note
+          note: item.note,
+          // Phase 1: Per-item discount
+          discount: item.discount || 0,
+          discountType: item.discountType || null
         }))
-      }
+      },
+      // Phase 1: Split payment records
+      ...(payments && payments.length > 0 ? {
+        payments: {
+          create: payments.map(p => ({
+            method: p.method,
+            amount: Number(p.amount) || 0,
+            reference: p.reference || null
+          }))
+        }
+      } : {})
     },
-    include: { items: true, employee: true }
+    include: { items: true, employee: true, payments: true }
   });
 
-  // Update active shift if payment method is cash
-  if (paymentMethod === 'cash' && employeeId) {
+  // Update active shift if payment includes cash
+  const cashAmount = payments
+    ? payments.filter(p => p.method === 'cash').reduce((s, p) => s + (Number(p.amount) || 0), 0)
+    : (paymentMethod === 'cash' ? total : 0);
+
+  if (cashAmount > 0 && employeeId) {
     try {
       const activeShift = await prisma.cashShift.findFirst({
         where: { storeId, userId: employeeId, status: 'open' }
@@ -513,8 +537,8 @@ app.post('/api/orders/checkout', async (req, res) => {
         await prisma.cashShift.update({
           where: { id: activeShift.id },
           data: {
-            cashSales: { increment: total },
-            expectedCash: { increment: total }
+            cashSales: { increment: cashAmount },
+            expectedCash: { increment: cashAmount }
           }
         });
       }
@@ -1246,6 +1270,246 @@ app.delete('/api/tables/:id', async (req, res) => {
     // In a real websocket setup, we can broadcast tableDeletion.
     // For now we just return success.
     res.json({ success: true });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// ===== PHASE 1 APIs =====
+
+// 10. Return / Refund
+app.post('/api/orders/:orderId/return', async (req, res) => {
+  const storeId = req.storeId;
+  const { orderId } = req.params;
+  const { items, reason, refundMethod, employeeId } = req.body;
+  // items: [{ orderItemName, price, qty, reason? }]
+  try {
+    const order = await prisma.order.findUnique({
+      where: { id: orderId },
+      include: { items: true }
+    });
+    if (!order || order.storeId !== storeId) {
+      return res.status(404).json({ error: 'Không tìm thấy hóa đơn' });
+    }
+
+    const refundAmount = items.reduce((sum, it) => sum + (it.price * it.qty), 0);
+
+    // Generate return number
+    const returnCount = await prisma.returnOrder.count({ where: { storeId } });
+    const returnNumber = `#TH${1001 + returnCount}`;
+
+    const returnOrder = await prisma.returnOrder.create({
+      data: {
+        storeId,
+        orderId,
+        returnNumber,
+        reason: reason || 'Khách trả hàng',
+        refundAmount,
+        refundMethod: refundMethod || 'cash',
+        employeeId,
+        items: {
+          create: items.map(it => ({
+            orderItemName: it.orderItemName,
+            price: it.price,
+            qty: it.qty,
+            reason: it.reason || null
+          }))
+        }
+      },
+      include: { items: true, order: true }
+    });
+
+    // Update original order item returnedQty
+    for (const returnItem of items) {
+      const orderItem = order.items.find(oi => oi.name === returnItem.orderItemName);
+      if (orderItem) {
+        await prisma.orderItem.update({
+          where: { id: orderItem.id },
+          data: { returnedQty: { increment: returnItem.qty } }
+        });
+      }
+    }
+
+    // Restore inventory (reverse SALE deduction)
+    try {
+      for (const returnItem of items) {
+        const originalCartItem = order.items.find(oi => oi.name === returnItem.orderItemName);
+        if (!originalCartItem) continue;
+        // Find product by name to get recipes
+        const product = await prisma.product.findFirst({
+          where: { storeId, name: returnItem.orderItemName }
+        });
+        if (!product) continue;
+        const recipeItems = await prisma.recipeItem.findMany({
+          where: { productId: product.id },
+          include: { inventory: true }
+        });
+        for (const recipe of recipeItems) {
+          const restoreAmount = recipe.qty * returnItem.qty;
+          const updatedInventory = await prisma.inventory.update({
+            where: { id: recipe.inventoryId },
+            data: { qty: { increment: restoreAmount } }
+          });
+          await prisma.stockTransaction.create({
+            data: {
+              storeId,
+              inventoryId: recipe.inventoryId,
+              type: 'ADJUST',
+              qtyChange: restoreAmount,
+              balance: updatedInventory.qty,
+              note: `Hoàn kho - Trả hàng ${returnNumber} (${returnItem.orderItemName} x${returnItem.qty})`
+            }
+          });
+        }
+      }
+    } catch (err) {
+      console.error('Error restoring inventory on return:', err);
+    }
+
+    // Refund cash from active shift if applicable
+    if (refundMethod === 'cash' && employeeId) {
+      try {
+        const activeShift = await prisma.cashShift.findFirst({
+          where: { storeId, userId: employeeId, status: 'open' }
+        });
+        if (activeShift) {
+          await prisma.cashShift.update({
+            where: { id: activeShift.id },
+            data: {
+              cashSales: { decrement: refundAmount },
+              expectedCash: { decrement: refundAmount }
+            }
+          });
+        }
+      } catch (err) {
+        console.error('Error updating shift on return:', err);
+      }
+    }
+
+    broadcast('inventoryUpdated', await prisma.inventory.findMany({ where: { storeId } }), storeId);
+    res.json(returnOrder);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Get return history
+app.get('/api/returns', async (req, res) => {
+  try {
+    const returns = await prisma.returnOrder.findMany({
+      where: { storeId: req.storeId },
+      orderBy: { createdAt: 'desc' },
+      include: { items: true, order: true }
+    });
+    res.json(returns);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// 11. Held Orders (Đơn tạm giữ)
+app.get('/api/held-orders', async (req, res) => {
+  try {
+    const heldOrders = await prisma.heldOrder.findMany({
+      where: { storeId: req.storeId },
+      orderBy: { createdAt: 'desc' },
+      include: { items: true }
+    });
+    res.json(heldOrders);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/held-orders', async (req, res) => {
+  const storeId = req.storeId;
+  const { tableId, tableName, note, employeeId, employeeName, customerId, items } = req.body;
+  try {
+    const heldOrder = await prisma.heldOrder.create({
+      data: {
+        storeId,
+        tableId,
+        tableName: tableName || 'Mang về',
+        note,
+        employeeId,
+        employeeName,
+        customerId,
+        items: {
+          create: items.map(item => ({
+            productId: item.id || null,
+            name: item.name,
+            price: item.price,
+            qty: item.qty,
+            sugar: item.sugar || null,
+            ice: item.ice || null,
+            note: item.note || null
+          }))
+        }
+      },
+      include: { items: true }
+    });
+    res.json(heldOrder);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.delete('/api/held-orders/:id', async (req, res) => {
+  const storeId = req.storeId;
+  const { id } = req.params;
+  try {
+    await prisma.heldOrder.delete({
+      where: { id, storeId }
+    });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// 12. Store Settings
+app.get('/api/store/settings', async (req, res) => {
+  try {
+    const store = await prisma.store.findUnique({
+      where: { id: req.storeId }
+    });
+    if (!store) return res.status(404).json({ error: 'Cửa hàng không tồn tại' });
+    res.json(store);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.put('/api/store/settings', async (req, res) => {
+  const { name, address, phone, logo, vatRate, pointsRate, currency, printHeader, printFooter } = req.body;
+  try {
+    const store = await prisma.store.update({
+      where: { id: req.storeId },
+      data: {
+        name, address, phone, logo,
+        vatRate: vatRate !== undefined ? Number(vatRate) : undefined,
+        pointsRate: pointsRate !== undefined ? Number(pointsRate) : undefined,
+        currency, printHeader, printFooter
+      }
+    });
+    res.json(store);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// 13. Search order by number (for return flow)
+app.get('/api/orders/search/:orderNumber', async (req, res) => {
+  try {
+    const order = await prisma.order.findFirst({
+      where: {
+        storeId: req.storeId,
+        orderNumber: req.params.orderNumber
+      },
+      include: { items: true, employee: true, customer: true, returnOrders: { include: { items: true } } }
+    });
+    if (!order) return res.status(404).json({ error: 'Không tìm thấy hóa đơn' });
+    res.json(order);
   } catch (err) {
     res.status(400).json({ error: err.message });
   }

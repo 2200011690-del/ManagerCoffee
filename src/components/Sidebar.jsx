@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Coffee, LayoutGrid, BarChart3, ChefHat, ChevronRight, Wifi, LogOut, Shield, Users, ShoppingBag, Clock } from 'lucide-react';
+import { Coffee, LayoutGrid, BarChart3, ChefHat, ChevronRight, Wifi, LogOut, Shield, Users, ShoppingBag, Clock, Settings } from 'lucide-react';
 import { useUI } from '../context/UIContext';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
@@ -12,6 +12,7 @@ const ALL_NAV_ITEMS = [
   { id: 'dashboard', label: 'Báo cáo',      icon: BarChart3,   subtitle: 'Analytics',    roles: ['admin'] },
   { id: 'menu',      label: 'Quản lý Menu', icon: ChefHat,     subtitle: 'Menu & CRUD',  roles: ['admin'] },
   { id: 'employees', label: 'Nhân sự',      icon: Users,       subtitle: 'Employee',     roles: ['admin'] },
+  { id: 'settings',  label: 'Cài đặt',      icon: Settings,    subtitle: 'Settings',     roles: ['admin'] },
 ];
 
 export default function Sidebar() {

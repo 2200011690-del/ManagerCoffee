@@ -29,7 +29,7 @@ export function AuthProvider({ children }) {
     try {
       const user = await api.post('/auth/login', { pin });
       user.allowedViews = user.role === 'admin' 
-        ? ['pos', 'tables', 'dashboard', 'menu', 'employees'] 
+        ? ['pos', 'tables', 'dashboard', 'menu', 'employees', 'settings'] 
         : ['pos', 'tables'];
         
       setCurrentUser(user);

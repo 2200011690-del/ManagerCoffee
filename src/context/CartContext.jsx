@@ -52,7 +52,12 @@ export function CartProvider({ children }) {
   const cart = tableCarts[cartKey] ?? [];
 
   const VAT_RATE = 0.08;
-  const subtotal = cart.reduce((sum, item) => sum + item.price * item.qty, 0);
+  // Calculate subtotal considering per-item discounts
+  const subtotal = cart.reduce((sum, item) => {
+    const itemTotal = item.price * item.qty;
+    const discount = item.discount || 0;
+    return sum + (itemTotal - discount);
+  }, 0);
   const vatAmount = Math.round(subtotal * VAT_RATE);
   const total = subtotal + vatAmount;
   const cartCount = cart.reduce((sum, item) => sum + item.qty, 0);
@@ -142,10 +147,20 @@ export function CartProvider({ children }) {
     syncCartToBackend(targetKey, []);
   }, []);
 
+  const applyItemDiscount = useCallback((cartItemId, discountAmount, discountType) => {
+    const newCart = cart.map(item => 
+      item.cartItemId === cartItemId
+        ? { ...item, discount: discountAmount, discountType }
+        : item
+    );
+    syncCartToBackend(cartKey, newCart);
+  }, [cart, cartKey]);
+
   const value = {
     cart, subtotal, vatAmount, total, cartCount,
     tableCarts, activeTableId, setSelectedTable, setTakeaway, tableHasCart,
     addToCart, removeFromCart, updateQty, clearCart, clearCurrentCart,
+    applyItemDiscount,
     loading
   };
 

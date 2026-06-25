@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from 'react';
 import {
   Search, ShoppingCart, Trash2, CreditCard, Banknote, Receipt, Tag,
   LayoutGrid, X, ArrowLeftRight, User, Gift, SplitSquareVertical, CheckCircle,
-  Lock, Unlock, Clock, AlertTriangle
+  Lock, Unlock, Clock, AlertTriangle, Pause, RotateCcw, Percent, Layers
 } from 'lucide-react';
 import { categories } from '../data/coffeeData';
 import { useMenu } from '../context/MenuContext';
@@ -18,6 +18,9 @@ import CartItem from '../components/pos/CartItem';
 import ProductGrid from '../components/pos/ProductGrid';
 import ThermalBillModal from '../components/pos/ThermalBillModal';
 import SplitBillModal from '../components/pos/SplitBillModal';
+import ReturnOrderModal from '../components/pos/ReturnOrderModal';
+import HeldOrdersPanel from '../components/pos/HeldOrdersPanel';
+import SplitPaymentModal from '../components/pos/SplitPaymentModal';
 
 // ---- Table Picker Panel ----
 function TablePickerPanel({ onClose }) {
@@ -117,7 +120,8 @@ export default function POSPage() {
   const {
     cart, subtotal, vatAmount, total, cartCount,
     addToCart, removeFromCart, updateQty, clearCart, clearCurrentCart,
-    activeTableId, setSelectedTable, setTakeaway, tableHasCart, tableCarts
+    activeTableId, setSelectedTable, setTakeaway, tableHasCart, tableCarts,
+    applyItemDiscount
   } = useCart();
   const { tables, updateTableStatus } = useTable();
   const { showNotification, notification } = useUI();
@@ -134,6 +138,16 @@ export default function POSPage() {
   const [showSplitBill, setShowSplitBill] = useState(false);
   const [pendingOrder, setPendingOrder] = useState(null);
   const [paymentMethod, setPaymentMethod] = useState('cash');
+
+  // Phase 1 states
+  const [showReturnModal, setShowReturnModal] = useState(false);
+  const [showHeldOrders, setShowHeldOrders] = useState(false);
+  const [showSplitPayment, setShowSplitPayment] = useState(false);
+  const [orderDiscountValue, setOrderDiscountValue] = useState('');
+  const [orderDiscountType, setOrderDiscountType] = useState('PERCENT');
+  const [showOrderDiscount, setShowOrderDiscount] = useState(false);
+  const [orderDiscountAmount, setOrderDiscountAmount] = useState(0);
+  const [discountReason, setDiscountReason] = useState('');
 
   // Cash Shift Handover states
   const [activeShift, setActiveShift] = useState(null);
@@ -281,10 +295,11 @@ export default function POSPage() {
     }
   };
 
-  const finalTotal = total - discountAmount > 0 ? total - discountAmount : 0;
+  const totalDiscount = discountAmount + orderDiscountAmount;
+  const finalTotal = total - totalDiscount > 0 ? total - totalDiscount : 0;
 
   // ---- Checkout Handlers ----
-  const handleConfirmPayment = async () => {
+  const handleConfirmPayment = async (splitPayments = null) => {
     // Build order object
     const tableName = activeTableId ? (activeTable?.name ?? activeTableId) : 'Mang về';
     const newOrder = await addOrder({
@@ -294,15 +309,76 @@ export default function POSPage() {
       subtotal,
       vatAmount,
       total: finalTotal,
-      paymentMethod,
+      paymentMethod: splitPayments ? 'mixed' : paymentMethod,
       customerId: customer?.id,
       voucherCode: appliedVoucher?.code,
-      discountAmount,
-      employeeId: currentUser?.id
+      discountAmount: totalDiscount,
+      employeeId: currentUser?.id,
+      // Phase 1 fields
+      orderDiscount: orderDiscountAmount,
+      orderDiscountType: orderDiscountAmount > 0 ? orderDiscountType : null,
+      discountReason: discountReason || null,
+      payments: splitPayments || null
     });
     setPendingOrder(newOrder);
     setShowPayConfirm(false);
+    setShowSplitPayment(false);
     setShowThermal(true);
+  };
+
+  // Hold current order
+  const handleHoldOrder = async () => {
+    if (cart.length === 0) return;
+    try {
+      const tableName = activeTableId ? (activeTable?.name ?? activeTableId) : 'Mang về';
+      await api.post('/held-orders', {
+        tableId: activeTableId,
+        tableName,
+        note: '',
+        employeeId: currentUser?.id,
+        employeeName: currentUser?.name,
+        customerId: customer?.id,
+        items: cart
+      });
+      clearCurrentCart(activeTableId);
+      showNotification('Đã lưu đơn tạm giữ!', 'success');
+    } catch (err) {
+      showNotification('Lỗi khi giữ đơn', 'error');
+    }
+  };
+
+  // Recall held order
+  const handleRecallHeldOrder = (held) => {
+    // Load items back to cart
+    held.items.forEach(item => {
+      addToCart(
+        { id: item.productId, name: item.name, price: item.price },
+        item.sugar || '100% đường',
+        item.ice || '100% đá',
+        item.note || ''
+      );
+    });
+    setShowHeldOrders(false);
+    showNotification('Đã thu hồi đơn tạm giữ!', 'success');
+  };
+
+  // Apply order-level discount
+  const handleApplyOrderDiscount = () => {
+    const val = Number(orderDiscountValue);
+    if (!val || val <= 0) {
+      setOrderDiscountAmount(0);
+      setShowOrderDiscount(false);
+      return;
+    }
+    let amount = 0;
+    if (orderDiscountType === 'PERCENT') {
+      amount = Math.round(total * (val / 100));
+    } else {
+      amount = val;
+    }
+    if (amount > total) amount = total;
+    setOrderDiscountAmount(amount);
+    setShowOrderDiscount(false);
   };
 
   const handleFinishCheckout = () => {
@@ -513,7 +589,7 @@ export default function POSPage() {
           ) : (
             <div>
               {cart.map(item => (
-                <CartItem key={item.cartItemId} item={item} onRemove={removeFromCart} onUpdateQty={updateQty} />
+                <CartItem key={item.cartItemId} item={item} onRemove={removeFromCart} onUpdateQty={updateQty} onApplyDiscount={applyItemDiscount} />
               ))}
             </div>
           )}
@@ -562,9 +638,19 @@ export default function POSPage() {
                 <span>{subtotal.toLocaleString('vi-VN')}đ</span>
               </div>
               {discountAmount > 0 && (
-                <div className="flex justify-between text-sm text-coffee-accent font-medium">
-                  <span>Giảm giá ({appliedVoucher?.code})</span>
+                <div className="flex justify-between text-sm text-green-600 font-medium">
+                  <span>Voucher ({appliedVoucher?.code})</span>
                   <span>-{discountAmount.toLocaleString('vi-VN')}đ</span>
+                </div>
+              )}
+              {orderDiscountAmount > 0 && (
+                <div className="flex justify-between text-sm text-green-600 font-medium">
+                  <span className="flex items-center gap-1">
+                    <Percent size={12} />
+                    Giảm giá đơn
+                    <button onClick={() => { setOrderDiscountAmount(0); setOrderDiscountValue(''); setDiscountReason(''); }} className="text-red-400 text-[10px] hover:underline ml-1">Xóa</button>
+                  </span>
+                  <span>-{orderDiscountAmount.toLocaleString('vi-VN')}đ</span>
                 </div>
               )}
               <div className="flex justify-between text-sm text-coffee-medium">
@@ -604,12 +690,54 @@ export default function POSPage() {
               </button>
             </div>
 
+            {/* Action buttons row 1: Discount + Hold */}
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowOrderDiscount(true)}
+                className="flex-1 min-h-[38px] flex items-center justify-center gap-1 rounded-xl text-xs font-semibold border-2 border-green-200 text-green-700 bg-green-50 hover:bg-green-100 transition-all"
+              >
+                <Percent size={13} />
+                Giảm giá đơn
+              </button>
+              <button
+                onClick={handleHoldOrder}
+                className="flex-1 min-h-[38px] flex items-center justify-center gap-1 rounded-xl text-xs font-semibold border-2 border-amber-200 text-amber-700 bg-amber-50 hover:bg-amber-100 transition-all"
+              >
+                <Pause size={13} />
+                Giữ đơn
+              </button>
+              <button
+                onClick={() => setShowHeldOrders(true)}
+                className="min-w-[38px] min-h-[38px] flex items-center justify-center rounded-xl border-2 border-amber-200 text-amber-700 bg-amber-50 hover:bg-amber-100 transition-all"
+                title="Xem đơn tạm giữ"
+              >
+                <Layers size={13} />
+              </button>
+            </div>
+
+            {/* Action buttons row 2: Split Bill + Return + Checkout */}
             <div className="flex gap-2">
               <button
                 onClick={() => setShowSplitBill(true)}
-                className="flex-1 min-h-[44px] btn-secondary flex items-center justify-center gap-1.5 text-sm"
+                className="flex-1 min-h-[44px] btn-secondary flex items-center justify-center gap-1.5 text-xs"
               >
                 Tách đơn
+              </button>
+              <button
+                onClick={() => setShowReturnModal(true)}
+                className="flex-1 min-h-[44px] flex items-center justify-center gap-1.5 text-xs font-semibold border-2 border-red-200 text-red-600 bg-red-50 hover:bg-red-100 rounded-xl transition-all"
+              >
+                <RotateCcw size={13} />
+                Trả hàng
+              </button>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowSplitPayment(true)}
+                className="flex-1 min-h-[44px] btn-secondary flex items-center justify-center gap-1.5 text-xs"
+              >
+                <Layers size={14} />
+                TT kết hợp
               </button>
               <button
                 onClick={() => setShowPayConfirm(true)}
@@ -661,13 +789,19 @@ export default function POSPage() {
                 <span>Tạm tính</span>
                 <span>{subtotal.toLocaleString('vi-VN')}đ</span>
               </div>
+              {totalDiscount > 0 && (
+                <div className="flex justify-between text-sm text-green-600 font-medium">
+                  <span>Giảm giá</span>
+                  <span>-{totalDiscount.toLocaleString('vi-VN')}đ</span>
+                </div>
+              )}
               <div className="flex justify-between text-sm text-coffee-medium">
                 <span>VAT 8%</span>
                 <span>+{vatAmount.toLocaleString('vi-VN')}đ</span>
               </div>
               <div className="border-t border-cream-dark pt-2 flex justify-between font-bold text-coffee-dark text-lg">
                 <span>Tổng</span>
-                <span className="text-coffee-accent">{total.toLocaleString('vi-VN')}đ</span>
+                <span className="text-coffee-accent">{finalTotal.toLocaleString('vi-VN')}đ</span>
               </div>
             </div>
             <div className="flex gap-3">
@@ -872,6 +1006,114 @@ export default function POSPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* ===== Phase 1 Modals ===== */}
+
+      {/* Order-level Discount Popup */}
+      {showOrderDiscount && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in"
+          style={{ background: 'rgba(26,15,10,0.55)', backdropFilter: 'blur(5px)' }}>
+          <div className="bg-white rounded-3xl shadow-coffee-lg w-full max-w-sm p-6 animate-slide-up">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <div className="w-10 h-10 rounded-xl bg-green-50 flex items-center justify-center">
+                  <Percent size={20} className="text-green-600" />
+                </div>
+                <h3 className="font-display font-bold text-coffee-dark">Giảm giá đơn hàng</h3>
+              </div>
+              <button onClick={() => setShowOrderDiscount(false)} className="min-w-[36px] min-h-[36px] rounded-lg bg-cream-light flex items-center justify-center text-coffee-medium hover:bg-cream-medium transition-colors">
+                <X size={18} />
+              </button>
+            </div>
+            
+            <div className="space-y-3">
+              <div className="flex gap-1.5">
+                <button
+                  onClick={() => setOrderDiscountType('PERCENT')}
+                  className={`flex-1 min-h-[40px] rounded-xl text-sm font-semibold transition-all border-2 ${
+                    orderDiscountType === 'PERCENT' ? 'bg-coffee-accent text-white border-coffee-accent' : 'bg-cream-light text-coffee-medium border-cream-dark'
+                  }`}
+                >
+                  % Phần trăm
+                </button>
+                <button
+                  onClick={() => setOrderDiscountType('FIXED')}
+                  className={`flex-1 min-h-[40px] rounded-xl text-sm font-semibold transition-all border-2 ${
+                    orderDiscountType === 'FIXED' ? 'bg-coffee-accent text-white border-coffee-accent' : 'bg-cream-light text-coffee-medium border-cream-dark'
+                  }`}
+                >
+                  VNĐ Tiền
+                </button>
+              </div>
+              <input
+                type="number"
+                value={orderDiscountValue}
+                onChange={e => setOrderDiscountValue(e.target.value)}
+                placeholder={orderDiscountType === 'PERCENT' ? 'Nhập % (vd: 10)' : 'Nhập số tiền giảm'}
+                className="input-field w-full min-h-[44px] font-mono text-base"
+                autoFocus
+                onKeyDown={e => e.key === 'Enter' && handleApplyOrderDiscount()}
+              />
+              <div>
+                <label className="block text-xs font-bold text-coffee-medium uppercase tracking-wider mb-1.5">
+                  Lý do giảm giá
+                </label>
+                <input
+                  type="text"
+                  value={discountReason}
+                  onChange={e => setDiscountReason(e.target.value)}
+                  placeholder="VD: Khách quen, chương trình khuyến mãi..."
+                  className="input-field w-full text-sm min-h-[40px]"
+                />
+              </div>
+              {orderDiscountValue && (
+                <div className="bg-green-50 border border-green-200 rounded-xl p-3 text-center">
+                  <p className="text-xs text-green-700">Giảm giá dự kiến:</p>
+                  <p className="text-lg font-bold text-green-700 font-mono">
+                    -{(orderDiscountType === 'PERCENT'
+                      ? Math.round(total * (Number(orderDiscountValue) / 100))
+                      : Number(orderDiscountValue)
+                    ).toLocaleString('vi-VN')}đ
+                  </p>
+                </div>
+              )}
+              <div className="flex gap-3">
+                <button onClick={() => setShowOrderDiscount(false)} className="flex-1 min-h-[44px] btn-secondary">Hủy</button>
+                <button onClick={handleApplyOrderDiscount} className="flex-1 min-h-[44px] btn-primary">Áp dụng</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Return Order Modal */}
+      {showReturnModal && (
+        <ReturnOrderModal
+          onClose={() => setShowReturnModal(false)}
+          onSuccess={() => {
+            showNotification('Trả hàng thành công!', 'success');
+            loadActiveShift();
+          }}
+        />
+      )}
+
+      {/* Held Orders Panel */}
+      {showHeldOrders && (
+        <HeldOrdersPanel
+          onClose={() => setShowHeldOrders(false)}
+          onRecall={handleRecallHeldOrder}
+          currentUser={currentUser}
+        />
+      )}
+
+      {/* Split Payment Modal */}
+      {showSplitPayment && (
+        <SplitPaymentModal
+          total={finalTotal}
+          onClose={() => setShowSplitPayment(false)}
+          onConfirm={(payments) => handleConfirmPayment(payments)}
+        />
       )}
     </div>
   );
