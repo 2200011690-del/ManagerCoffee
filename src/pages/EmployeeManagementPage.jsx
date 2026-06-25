@@ -19,6 +19,16 @@ export default function EmployeeManagementPage() {
   const [shiftLogs, setShiftLogs] = useState([]);
   const [loadingShifts, setLoadingShifts] = useState(false);
 
+  // Attendance manual edit states
+  const [isAttendanceModalOpen, setIsAttendanceModalOpen] = useState(false);
+  const [editingAttendance, setEditingAttendance] = useState(null);
+  const [attendanceFormData, setAttendanceFormData] = useState({
+    userId: '',
+    date: '',
+    clockIn: '',
+    clockOut: ''
+  });
+
   const fetchUsers = async () => {
     setLoading(true);
     try {
@@ -52,6 +62,73 @@ export default function EmployeeManagementPage() {
       setError('Không thể tải lịch sử bàn giao ca');
     } finally {
       setLoadingShifts(false);
+    }
+  };
+
+  const openAddAttendance = () => {
+    setEditingAttendance(null);
+    const today = new Date().toISOString().split('T')[0];
+    setAttendanceFormData({
+      userId: users[0]?.id || '',
+      date: today,
+      clockIn: new Date().toISOString().slice(0, 16),
+      clockOut: ''
+    });
+    setIsAttendanceModalOpen(true);
+  };
+
+  const openEditAttendance = (log) => {
+    setEditingAttendance(log);
+    
+    const toLocalDateTimeString = (dateStr) => {
+      const d = new Date(dateStr);
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const date = String(d.getDate()).padStart(2, '0');
+      const hours = String(d.getHours()).padStart(2, '0');
+      const minutes = String(d.getMinutes()).padStart(2, '0');
+      return `${year}-${month}-${date}T${hours}:${minutes}`;
+    };
+
+    setAttendanceFormData({
+      userId: log.userId,
+      date: log.date,
+      clockIn: toLocalDateTimeString(log.clockIn),
+      clockOut: log.clockOut ? toLocalDateTimeString(log.clockOut) : ''
+    });
+    setIsAttendanceModalOpen(true);
+  };
+
+  const handleAttendanceSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    try {
+      const payload = {
+        userId: attendanceFormData.userId,
+        date: attendanceFormData.date,
+        clockIn: new Date(attendanceFormData.clockIn).toISOString(),
+        clockOut: attendanceFormData.clockOut ? new Date(attendanceFormData.clockOut).toISOString() : null
+      };
+
+      if (editingAttendance) {
+        await api.put(`/attendance/${editingAttendance.id}`, payload);
+      } else {
+        await api.post('/attendance', payload);
+      }
+      setIsAttendanceModalOpen(false);
+      fetchAttendanceLogs();
+    } catch (err) {
+      setError(err.response?.data?.error || 'Lưu chấm công thất bại');
+    }
+  };
+
+  const handleAttendanceDelete = async (id) => {
+    if (!window.confirm('Xóa ngày công chấm công này?')) return;
+    try {
+      await api.delete(`/attendance/${id}`);
+      fetchAttendanceLogs();
+    } catch (err) {
+      setError('Lỗi khi xóa ngày công');
     }
   };
 
@@ -132,6 +209,12 @@ export default function EmployeeManagementPage() {
             <button onClick={openAdd} className="btn-primary min-h-[44px] px-5 flex items-center gap-2">
               <Plus size={18} />
               Thêm nhân sự mới
+            </button>
+          )}
+          {activeTab === 'attendance' && (
+            <button onClick={openAddAttendance} className="btn-primary min-h-[44px] px-5 flex items-center gap-2">
+              <Plus size={18} />
+              Thêm ngày công
             </button>
           )}
         </div>
@@ -229,13 +312,14 @@ export default function EmployeeManagementPage() {
                       <th className="px-6 py-4 font-bold">Giờ vào (Clock In)</th>
                       <th className="px-6 py-4 font-bold">Giờ ra (Clock Out)</th>
                       <th className="px-6 py-4 font-bold">Tổng giờ làm</th>
+                      <th className="px-6 py-4 font-bold">Thao tác</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-cream-medium/10 text-sm text-coffee-dark">
                     {attendanceLogs.map((log) => (
                       <tr key={log.id} className="hover:bg-cream-light/10 transition-colors">
                         <td className="px-6 py-4.5 font-semibold flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-coffee-accent/10 text-coffee-accent flex items-center justify-center font-bold text-xs">
+                          <div className="w-8 h-8 rounded-full bg-coffee-accent/10 text-coffee-accent flex items-center justify-center font-bold text-xs flex-shrink-0">
                             {log.user.name.charAt(0).toUpperCase()}
                           </div>
                           <span>{log.user.name}</span>
@@ -258,6 +342,16 @@ export default function EmployeeManagementPage() {
                         </td>
                         <td className="px-6 py-4.5 font-mono font-bold">
                           {log.totalHours !== null ? `${log.totalHours} giờ` : '--'}
+                        </td>
+                        <td className="px-6 py-4.5">
+                          <div className="flex gap-2">
+                            <button onClick={() => openEditAttendance(log)} className="p-1 text-gray-400 hover:text-coffee-accent transition-colors">
+                              <Edit2 size={15} />
+                            </button>
+                            <button onClick={() => handleAttendanceDelete(log.id)} className="p-1 text-gray-400 hover:text-red-500 transition-colors">
+                              <Trash2 size={15} />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -390,6 +484,73 @@ export default function EmployeeManagementPage() {
               <div className="pt-2">
                 <button type="submit" className="w-full btn-primary min-h-[48px]">
                   {editingUser ? 'Lưu thay đổi' : 'Tạo tài khoản'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Attendance Modal */}
+      {isAttendanceModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
+            <div className="p-5 border-b border-gray-100 flex justify-between items-center bg-cream-light/30">
+              <h2 className="font-display font-bold text-coffee-dark text-lg">
+                {editingAttendance ? 'Sửa giờ công' : 'Thêm ngày công thủ công'}
+              </h2>
+              <button onClick={() => setIsAttendanceModalOpen(false)} className="text-gray-400 hover:text-gray-700">
+                <X size={20} />
+              </button>
+            </div>
+            <form onSubmit={handleAttendanceSubmit} className="p-5 space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-500 mb-1.5 uppercase">Nhân sự</label>
+                <select
+                  required
+                  value={attendanceFormData.userId}
+                  onChange={e => setAttendanceFormData({...attendanceFormData, userId: e.target.value})}
+                  className="input-field w-full min-h-[44px] bg-white border border-gray-250 rounded-xl px-3 text-sm focus:border-coffee-accent focus:ring-coffee-accent/20"
+                >
+                  <option value="" disabled>Chọn nhân viên...</option>
+                  {users.map(u => (
+                    <option key={u.id} value={u.id}>{u.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-500 mb-1.5 uppercase">Ngày làm việc</label>
+                <input
+                  required
+                  type="date"
+                  value={attendanceFormData.date}
+                  onChange={e => setAttendanceFormData({...attendanceFormData, date: e.target.value})}
+                  className="input-field w-full min-h-[44px]"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-500 mb-1.5 uppercase">Thời gian vào (Clock-in)</label>
+                <input
+                  required
+                  type="datetime-local"
+                  value={attendanceFormData.clockIn}
+                  onChange={e => setAttendanceFormData({...attendanceFormData, clockIn: e.target.value})}
+                  className="input-field w-full min-h-[44px]"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-500 mb-1.5 uppercase">Thời gian ra (Clock-out) - Không bắt buộc</label>
+                <input
+                  type="datetime-local"
+                  value={attendanceFormData.clockOut}
+                  onChange={e => setAttendanceFormData({...attendanceFormData, clockOut: e.target.value})}
+                  className="input-field w-full min-h-[44px]"
+                />
+              </div>
+              
+              <div className="pt-2">
+                <button type="submit" className="w-full btn-primary min-h-[48px]">
+                  {editingAttendance ? 'Lưu thay đổi' : 'Tạo ngày công'}
                 </button>
               </div>
             </form>

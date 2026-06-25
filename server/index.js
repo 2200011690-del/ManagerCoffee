@@ -205,6 +205,70 @@ app.get('/api/attendance/logs', async (req, res) => {
   }
 });
 
+// 2.1 Add manual attendance (Admin)
+app.post('/api/attendance', async (req, res) => {
+  const { userId, date, clockIn, clockOut } = req.body;
+  try {
+    let totalHours = null;
+    if (clockIn && clockOut) {
+      const diffMs = new Date(clockOut).getTime() - new Date(clockIn).getTime();
+      totalHours = Math.round((diffMs / (1000 * 60 * 60)) * 100) / 100;
+    }
+    const attendance = await prisma.attendance.create({
+      data: {
+        storeId: req.storeId,
+        userId,
+        date,
+        clockIn: new Date(clockIn),
+        clockOut: clockOut ? new Date(clockOut) : null,
+        totalHours
+      },
+      include: { user: true }
+    });
+    res.json(attendance);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// 2.2 Edit manual attendance (Admin)
+app.put('/api/attendance/:id', async (req, res) => {
+  const { userId, date, clockIn, clockOut } = req.body;
+  try {
+    let totalHours = null;
+    if (clockIn && clockOut) {
+      const diffMs = new Date(clockOut).getTime() - new Date(clockIn).getTime();
+      totalHours = Math.round((diffMs / (1000 * 60 * 60)) * 100) / 100;
+    }
+    const attendance = await prisma.attendance.update({
+      where: { id: req.params.id, storeId: req.storeId },
+      data: {
+        userId,
+        date,
+        clockIn: new Date(clockIn),
+        clockOut: clockOut ? new Date(clockOut) : null,
+        totalHours
+      },
+      include: { user: true }
+    });
+    res.json(attendance);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// 2.3 Delete attendance (Admin)
+app.delete('/api/attendance/:id', async (req, res) => {
+  try {
+    await prisma.attendance.delete({
+      where: { id: req.params.id, storeId: req.storeId }
+    });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 // 3. Check active shift
 app.get('/api/shifts/active/:userId', async (req, res) => {
   try {
