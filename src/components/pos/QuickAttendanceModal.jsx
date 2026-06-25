@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { X, Delete, CheckCircle2, Clock, ShieldAlert } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { X, Delete, CheckCircle2, Clock, ShieldAlert, Camera, CameraOff } from 'lucide-react';
 import { api } from '../../api';
 
 export default function QuickAttendanceModal({ onClose }) {
@@ -7,6 +7,38 @@ export default function QuickAttendanceModal({ onClose }) {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState(null); // { action, employeeName, totalHours, time }
+
+  // Webcam hooks
+  const videoRef = useRef(null);
+  const [hasWebcam, setHasWebcam] = useState(false);
+  const [stream, setStream] = useState(null);
+  const [flash, setFlash] = useState(false);
+
+  useEffect(() => {
+    let localStream = null;
+    navigator.mediaDevices.getUserMedia({ video: { width: 320, height: 240 } })
+      .then(s => {
+        localStream = s;
+        setStream(s);
+        setHasWebcam(true);
+      })
+      .catch(err => {
+        console.warn("Camera access denied or unavailable:", err);
+        setHasWebcam(false);
+      });
+
+    return () => {
+      if (localStream) {
+        localStream.getTracks().forEach(track => track.stop());
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (videoRef.current && stream) {
+      videoRef.current.srcObject = stream;
+    }
+  }, [stream, videoRef.current]);
 
   const handleKeyPress = (num) => {
     if (pin.length < 4) {
@@ -51,9 +83,39 @@ export default function QuickAttendanceModal({ onClose }) {
   const submitPin = async () => {
     setIsLoading(true);
     setError('');
+    
+    // Trigger shutter flash visual effect
+    setFlash(true);
+    setTimeout(() => setFlash(false), 200);
+
+    // Capture photo from video stream
+    let imageBase64 = null;
+    if (hasWebcam && videoRef.current) {
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = 320;
+        canvas.height = 240;
+        const ctx = canvas.getContext('2d');
+        // Mirror photo for natural selfie layout
+        ctx.translate(canvas.width, 0);
+        ctx.scale(-1, 1);
+        ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
+        imageBase64 = canvas.toDataURL('image/jpeg', 0.7);
+      } catch (err) {
+        console.error("Lỗi chụp ảnh webcam:", err);
+      }
+    }
+
     try {
-      const res = await api.post('/attendance/quick', { pin });
+      const res = await api.post('/attendance/quick', { pin, image: imageBase64 });
       const time = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+      
+      // Stop webcam immediately on success
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+        setStream(null);
+      }
+
       setResult({
         action: res.action,
         employeeName: res.employeeName,
@@ -76,11 +138,16 @@ export default function QuickAttendanceModal({ onClose }) {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-fade-in">
       <div className="relative w-full max-w-sm mx-4 bg-gray-900/90 border border-gray-850 rounded-2xl shadow-2xl overflow-hidden p-6 transition-all duration-300 transform scale-100">
         
+        {/* Shutter flash overlay */}
+        {flash && (
+          <div className="absolute inset-0 bg-white z-50 animate-fade-out pointer-events-none" />
+        )}
+
         {/* Header */}
         <div className="flex items-center justify-between pb-4 border-b border-gray-800">
           <div className="flex items-center gap-2">
             <Clock className="text-primary-500 w-5 h-5" />
-            <h3 className="text-white text-base font-semibold">Điểm danh nhanh</h3>
+            <h3 className="text-white text-base font-semibold">Điểm danh khuôn mặt</h3>
           </div>
           <button 
             onClick={onClose}
@@ -92,10 +159,39 @@ export default function QuickAttendanceModal({ onClose }) {
 
         {!result ? (
           <div className="mt-5 flex flex-col items-center">
+            
+            {/* Webcam Face Scanner Bubble */}
+            <div className="relative w-28 h-28 rounded-full overflow-hidden border-2 border-primary-500/40 shadow-lg mb-4 bg-gray-950 flex items-center justify-center">
+              {hasWebcam ? (
+                <>
+                  <video 
+                    ref={videoRef} 
+                    autoPlay 
+                    playsInline 
+                    muted 
+                    className="w-full h-full object-cover scale-x-[-1]" 
+                  />
+                  <div className="absolute inset-0 border border-primary-500/20 rounded-full pointer-events-none" />
+                  {/* Glowing scan line */}
+                  <div className="absolute left-0 right-0 h-0.5 bg-primary-500 shadow-[0_0_8px_#3B82F6] animate-scan pointer-events-none" />
+                  {/* Active dot indicator */}
+                  <div className="absolute top-2 right-2 flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                  </div>
+                </>
+              ) : (
+                <div className="text-gray-500 text-center p-2">
+                  <CameraOff size={24} className="mx-auto mb-1 text-gray-600 animate-pulse-soft" />
+                  <span className="text-[9px] block">Không có camera</span>
+                </div>
+              )}
+            </div>
+
             <p className="text-gray-400 text-xs text-center mb-4">Nhập mã PIN của bạn để thực hiện ghi nhận ca làm việc</p>
             
             {/* PIN Display dots */}
-            <div className="flex justify-center gap-3.5 mb-6">
+            <div className="flex justify-center gap-3.5 mb-5">
               {[0, 1, 2, 3].map((idx) => (
                 <div
                   key={idx}
@@ -157,7 +253,7 @@ export default function QuickAttendanceModal({ onClose }) {
             {isLoading && (
               <div className="mt-4 flex items-center gap-2">
                 <div className="w-3.5 h-3.5 rounded-full border-2 border-primary-500 border-t-transparent animate-spin" />
-                <span className="text-gray-400 text-xs">Đang kiểm tra PIN...</span>
+                <span className="text-gray-400 text-xs">Đang chụp ảnh & xác thực PIN...</span>
               </div>
             )}
           </div>

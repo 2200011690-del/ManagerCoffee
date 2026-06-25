@@ -202,6 +202,8 @@ model Attendance {
   clockOut   DateTime?
   date       String    // YYYY-MM-DD
   totalHours Float?
+  imageIn    String?
+  imageOut   String?
 }
 
 model CashShift {

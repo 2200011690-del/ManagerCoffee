@@ -144,7 +144,7 @@ app.delete('/api/users/:id', async (req, res) => {
 
 // 1. Quick Clock-in/out
 app.post('/api/attendance/quick', async (req, res) => {
-  const { pin } = req.body;
+  const { pin, image } = req.body;
   try {
     const user = await prisma.user.findFirst({
       where: { storeId: req.storeId, pin }
@@ -171,7 +171,8 @@ app.post('/api/attendance/quick', async (req, res) => {
         where: { id: activeAttendance.id },
         data: {
           clockOut: clockOutTime,
-          totalHours
+          totalHours,
+          imageOut: image || null
         }
       });
       return res.json({ action: 'clockOut', employeeName: user.name, totalHours, attendance });
@@ -181,7 +182,8 @@ app.post('/api/attendance/quick', async (req, res) => {
           storeId: req.storeId,
           userId: user.id,
           clockIn: new Date(),
-          date: dateStr
+          date: dateStr,
+          imageIn: image || null
         }
       });
       return res.json({ action: 'clockIn', employeeName: user.name, attendance });

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Users, Plus, Shield, User, Trash2, Edit2, X, Clock, Calendar, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { Users, Plus, Shield, User, Trash2, Edit2, X, Clock, Calendar, AlertTriangle, CheckCircle2, Camera } from 'lucide-react';
 import { api } from '../api';
 
 export default function EmployeeManagementPage() {
@@ -325,14 +325,34 @@ export default function EmployeeManagementPage() {
                           <span>{log.user.name}</span>
                         </td>
                         <td className="px-6 py-4.5 font-mono text-gray-500">{formatDateOnly(log.date)}</td>
-                        <td className="px-6 py-4.5 text-green-600 font-mono font-semibold">
-                          {new Date(log.clockIn).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+                        <td className="px-6 py-4.5 font-mono font-semibold">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-green-600">{new Date(log.clockIn).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}</span>
+                            {log.imageIn && (
+                              <div className="relative group">
+                                <Camera size={14} className="text-primary-500 cursor-pointer hover:scale-110 transition-transform" />
+                                <div className="hidden group-hover:block absolute bottom-6 left-1/2 -translate-x-1/2 bg-gray-950 border border-gray-800 p-1 rounded-lg shadow-2xl z-50 w-24 h-24">
+                                  <img src={log.imageIn} alt="Clock In" className="w-full h-full object-cover rounded-md scale-x-[-1]" />
+                                </div>
+                              </div>
+                            )}
+                          </div>
                         </td>
                         <td className="px-6 py-4.5 font-mono">
                           {log.clockOut ? (
-                            <span className="text-amber-600 font-semibold">
-                              {new Date(log.clockOut).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
-                            </span>
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-amber-600 font-semibold">
+                                {new Date(log.clockOut).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                              {log.imageOut && (
+                                <div className="relative group">
+                                  <Camera size={14} className="text-amber-500 cursor-pointer hover:scale-110 transition-transform" />
+                                  <div className="hidden group-hover:block absolute bottom-6 left-1/2 -translate-x-1/2 bg-gray-950 border border-gray-800 p-1 rounded-lg shadow-2xl z-50 w-24 h-24">
+                                    <img src={log.imageOut} alt="Clock Out" className="w-full h-full object-cover rounded-md scale-x-[-1]" />
+                                  </div>
+                                </div>
+                              )}
+                            </div>
                           ) : (
                             <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-green-50 text-green-700 text-[10px] font-bold border border-green-200">
                               <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
