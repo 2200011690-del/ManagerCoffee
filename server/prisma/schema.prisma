@@ -1,6 +1,7 @@
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 generator client {
@@ -25,6 +26,8 @@ model Store {
   inventories Inventory[]
   suppliers   Supplier[]
   transactions StockTransaction[]
+  attendances Attendance[]
+  cashShifts  CashShift[]
 }
 
 model User {
@@ -35,6 +38,8 @@ model User {
   name    String
   role    String  // "admin" or "staff"
   orders  Order[]
+  attendances Attendance[]
+  cashShifts  CashShift[]
 
   @@unique([storeId, pin])
 }
@@ -185,4 +190,33 @@ model Voucher {
   isActive      Boolean   @default(true)
 
   @@unique([storeId, code])
+}
+
+model Attendance {
+  id         String    @id @default(cuid())
+  storeId    String
+  store      Store     @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  clockIn    DateTime  @default(now())
+  clockOut   DateTime?
+  date       String    // YYYY-MM-DD
+  totalHours Float?
+}
+
+model CashShift {
+  id           String    @id @default(cuid())
+  storeId      String
+  store        Store     @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  userId       String
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  openedAt     DateTime  @default(now())
+  closedAt     DateTime?
+  openingCash  Float
+  cashSales    Float     @default(0)
+  expectedCash Float
+  actualCash   Float?
+  discrepancy  Float?
+  notes        String?
+  status       String    @default("open") // "open", "closed"
 }

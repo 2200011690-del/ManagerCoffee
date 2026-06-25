@@ -140,6 +140,157 @@ app.delete('/api/users/:id', async (req, res) => {
   res.json({ success: true });
 });
 
+// --- ATTENDANCE & SHIFT APIs ---
+
+// 1. Quick Clock-in/out
+app.post('/api/attendance/quick', async (req, res) => {
+  const { pin } = req.body;
+  try {
+    const user = await prisma.user.findFirst({
+      where: { storeId: req.storeId, pin }
+    });
+    if (!user) {
+      return res.status(404).json({ error: 'Mã PIN không chính xác hoặc không thuộc chi nhánh này' });
+    }
+
+    const now = new Date();
+    const offset = now.getTimezoneOffset();
+    const localNow = new Date(now.getTime() - (offset * 60 * 1000));
+    const dateStr = localNow.toISOString().split('T')[0];
+
+    const activeAttendance = await prisma.attendance.findFirst({
+      where: { storeId: req.storeId, userId: user.id, clockOut: null }
+    });
+
+    if (activeAttendance) {
+      const clockOutTime = new Date();
+      const diffMs = clockOutTime.getTime() - activeAttendance.clockIn.getTime();
+      const totalHours = Math.round((diffMs / (1000 * 60 * 60)) * 100) / 100;
+      
+      const attendance = await prisma.attendance.update({
+        where: { id: activeAttendance.id },
+        data: {
+          clockOut: clockOutTime,
+          totalHours
+        }
+      });
+      return res.json({ action: 'clockOut', employeeName: user.name, totalHours, attendance });
+    } else {
+      const attendance = await prisma.attendance.create({
+        data: {
+          storeId: req.storeId,
+          userId: user.id,
+          clockIn: new Date(),
+          date: dateStr
+        }
+      });
+      return res.json({ action: 'clockIn', employeeName: user.name, attendance });
+    }
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 2. Attendance logs for admin
+app.get('/api/attendance/logs', async (req, res) => {
+  try {
+    const logs = await prisma.attendance.findMany({
+      where: { storeId: req.storeId },
+      orderBy: { clockIn: 'desc' },
+      include: { user: true }
+    });
+    res.json(logs);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 3. Check active shift
+app.get('/api/shifts/active/:userId', async (req, res) => {
+  try {
+    const activeShift = await prisma.cashShift.findFirst({
+      where: { storeId: req.storeId, userId: req.params.userId, status: 'open' }
+    });
+    res.json(activeShift || null);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 4. Open a shift
+app.post('/api/shifts/open', async (req, res) => {
+  const { userId, openingCash } = req.body;
+  try {
+    const existing = await prisma.cashShift.findFirst({
+      where: { storeId: req.storeId, userId, status: 'open' }
+    });
+    if (existing) {
+      return res.status(400).json({ error: 'Bạn đã có một ca làm việc đang mở' });
+    }
+
+    const shift = await prisma.cashShift.create({
+      data: {
+        storeId: req.storeId,
+        userId,
+        openingCash: Number(openingCash) || 0,
+        cashSales: 0,
+        expectedCash: Number(openingCash) || 0,
+        status: 'open'
+      }
+    });
+    res.json(shift);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// 5. Close a shift
+app.post('/api/shifts/close', async (req, res) => {
+  const { shiftId, actualCash, notes } = req.body;
+  try {
+    const shift = await prisma.cashShift.findUnique({
+      where: { id: shiftId }
+    });
+    if (!shift) {
+      return res.status(404).json({ error: 'Không tìm thấy ca làm việc' });
+    }
+    if (shift.status === 'closed') {
+      return res.status(400).json({ error: 'Ca làm việc này đã được đóng trước đó' });
+    }
+
+    const actual = Number(actualCash) || 0;
+    const discrepancy = actual - shift.expectedCash;
+
+    const updatedShift = await prisma.cashShift.update({
+      where: { id: shiftId },
+      data: {
+        closedAt: new Date(),
+        actualCash: actual,
+        discrepancy,
+        notes,
+        status: 'closed'
+      }
+    });
+    res.json(updatedShift);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// 6. Shift handover history logs
+app.get('/api/shifts/logs', async (req, res) => {
+  try {
+    const logs = await prisma.cashShift.findMany({
+      where: { storeId: req.storeId },
+      orderBy: { openedAt: 'desc' },
+      include: { user: true }
+    });
+    res.json(logs);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // 1.2 Customers
 app.get('/api/customers', async (req, res) => {
   const { phone } = req.query;
@@ -285,6 +436,26 @@ app.post('/api/orders/checkout', async (req, res) => {
     },
     include: { items: true, employee: true }
   });
+
+  // Update active shift if payment method is cash
+  if (paymentMethod === 'cash' && employeeId) {
+    try {
+      const activeShift = await prisma.cashShift.findFirst({
+        where: { storeId, userId: employeeId, status: 'open' }
+      });
+      if (activeShift) {
+        await prisma.cashShift.update({
+          where: { id: activeShift.id },
+          data: {
+            cashSales: { increment: total },
+            expectedCash: { increment: total }
+          }
+        });
+      }
+    } catch (err) {
+      console.error('Error updating active shift cash sales:', err);
+    }
+  }
 
   if (customerId) {
     const pointsToAdd = Math.floor(total * 0.1);

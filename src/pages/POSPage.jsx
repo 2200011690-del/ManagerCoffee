@@ -1,7 +1,8 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
   Search, ShoppingCart, Trash2, CreditCard, Banknote, Receipt, Tag,
-  LayoutGrid, X, ArrowLeftRight, User, Gift, SplitSquareVertical, CheckCircle
+  LayoutGrid, X, ArrowLeftRight, User, Gift, SplitSquareVertical, CheckCircle,
+  Lock, Unlock, Clock, AlertTriangle
 } from 'lucide-react';
 import { categories } from '../data/coffeeData';
 import { useMenu } from '../context/MenuContext';
@@ -134,6 +135,66 @@ export default function POSPage() {
   const [pendingOrder, setPendingOrder] = useState(null);
   const [paymentMethod, setPaymentMethod] = useState('cash');
 
+  // Cash Shift Handover states
+  const [activeShift, setActiveShift] = useState(null);
+  const [isLoadingShift, setIsLoadingShift] = useState(true);
+  const [showOpenShiftModal, setShowOpenShiftModal] = useState(false);
+  const [showCloseShiftModal, setShowCloseShiftModal] = useState(false);
+  const [openingCashInput, setOpeningCashInput] = useState('0');
+  const [actualCashInput, setActualCashInput] = useState('');
+  const [shiftNotes, setShiftNotes] = useState('');
+
+  const loadActiveShift = async () => {
+    if (!currentUser) return;
+    try {
+      const shift = await api.get(`/shifts/active/${currentUser.id}`);
+      setActiveShift(shift);
+      if (!shift) {
+        setShowOpenShiftModal(true);
+      }
+    } catch (err) {
+      console.error('Lỗi khi tải thông tin ca làm việc:', err);
+    } finally {
+      setIsLoadingShift(false);
+    }
+  };
+
+  useEffect(() => {
+    loadActiveShift();
+  }, [currentUser]);
+
+  const handleOpenShift = async (openingCash) => {
+    try {
+      const shift = await api.post('/shifts/open', {
+        userId: currentUser.id,
+        openingCash
+      });
+      setActiveShift(shift);
+      setShowOpenShiftModal(false);
+      showNotification('Mở ca bán hàng thành công!', 'success');
+    } catch (err) {
+      showNotification(err.response?.data?.error || 'Lỗi khi mở ca', 'error');
+    }
+  };
+
+  const handleCloseShift = async (actualCash, notes) => {
+    try {
+      await api.post('/shifts/close', {
+        shiftId: activeShift.id,
+        actualCash,
+        notes
+      });
+      setActiveShift(null);
+      setShowCloseShiftModal(false);
+      setActualCashInput('');
+      setShiftNotes('');
+      showNotification('Đóng ca và bàn giao két thành công!', 'success');
+      setShowOpenShiftModal(true);
+    } catch (err) {
+      showNotification(err.response?.data?.error || 'Lỗi khi đóng ca', 'error');
+    }
+  };
+
   // Customer & Voucher states
   const [customerPhone, setCustomerPhone] = useState('');
   const [customer, setCustomer] = useState(null);
@@ -258,6 +319,7 @@ export default function POSPage() {
     setShowThermal(false);
     setPendingOrder(null);
     showNotification('Thanh toán thành công! 🎉', 'success');
+    loadActiveShift();
   };
 
   const handleConfirmSplit = async (selectedItems, splitSubtotal, splitVatAmount, splitTotal) => {
@@ -375,6 +437,29 @@ export default function POSPage() {
 
       {/* ======== RIGHT: Cart Panel ======== */}
       <div className="w-80 xl:w-96 flex flex-col bg-white border-l border-cream-medium/50 shadow-coffee">
+        {/* Shift Control bar */}
+        {activeShift && (
+          <div className="px-5 py-2.5 bg-[#F6ECE2] border-b border-cream-medium/40 flex items-center justify-between">
+            <div className="flex items-center gap-1.5">
+              <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+              <span className="text-[11px] font-semibold text-coffee-medium">
+                Ca đang mở: {new Date(activeShift.openedAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+              </span>
+            </div>
+            <button
+              onClick={() => {
+                setActualCashInput('');
+                setShiftNotes('');
+                setShowCloseShiftModal(true);
+              }}
+              className="text-[11px] font-bold text-coffee-accent hover:text-coffee-dark hover:underline flex items-center gap-1"
+            >
+              <Clock size={11} />
+              Đóng ca & Giao két
+            </button>
+          </div>
+        )}
+
         {/* Cart Header */}
         <div className="px-5 py-3 border-b border-cream-medium/50">
           <div className="flex items-center justify-between mb-1.5">
@@ -609,6 +694,180 @@ export default function POSPage() {
           onClose={() => setShowSplitBill(false)}
           onConfirmSplit={handleConfirmSplit}
         />
+      )}
+
+      {/* Open Shift Modal */}
+      {showOpenShiftModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in"
+          style={{ background: 'rgba(26,15,10,0.7)', backdropFilter: 'blur(8px)' }}>
+          <div className="bg-white rounded-3xl shadow-coffee-lg w-full max-w-sm p-6 animate-slide-up border border-cream-medium/40">
+            <div className="text-center mb-5">
+              <div className="w-14 h-14 rounded-2xl mx-auto mb-3 flex items-center justify-center bg-coffee-accent/15 text-coffee-accent">
+                <Lock size={26} />
+              </div>
+              <h3 className="font-display font-bold text-xl text-coffee-dark">Bắt đầu ca bán hàng</h3>
+              <p className="text-coffee-light text-xs mt-1">
+                Vui lòng khai báo tiền mặt lẻ đầu ca để bắt đầu sử dụng POS
+              </p>
+            </div>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-coffee-medium uppercase tracking-wider mb-1.5">
+                  Tiền mặt đầu ca (VNĐ)
+                </label>
+                <input
+                  type="number"
+                  value={openingCashInput}
+                  onChange={e => setOpeningCashInput(e.target.value)}
+                  placeholder="Nhập số tiền..."
+                  className="input-field w-full font-mono text-base font-bold text-coffee-dark bg-cream-light/30 border-cream-medium focus:border-coffee-accent focus:ring-coffee-accent/25"
+                />
+                <p className="text-[10px] text-coffee-light mt-1">
+                  * Tiền mặt lẻ trong két dùng để thối khách hàng.
+                </p>
+              </div>
+
+              <button
+                onClick={() => handleOpenShift(Number(openingCashInput) || 0)}
+                className="w-full min-h-[44px] btn-primary flex items-center justify-center gap-2 text-base font-bold"
+              >
+                <Unlock size={18} />
+                Mở ca bán hàng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Close Shift & Handover Modal */}
+      {showCloseShiftModal && activeShift && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in"
+          style={{ background: 'rgba(26,15,10,0.7)', backdropFilter: 'blur(8px)' }}>
+          <div className="bg-white rounded-3xl shadow-coffee-lg w-full max-w-md p-6 animate-slide-up border border-cream-medium/40 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-cream-medium/40 mb-4">
+              <div className="flex items-center gap-2 text-coffee-dark font-display font-bold text-lg">
+                <Clock size={20} className="text-coffee-accent animate-pulse-soft" />
+                <h3>Chốt ca & Giao két</h3>
+              </div>
+              <button 
+                onClick={() => setShowCloseShiftModal(false)}
+                className="p-1 rounded-lg hover:bg-cream-light text-coffee-light hover:text-coffee-dark transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-2 text-xs bg-cream-light/60 p-3 rounded-2xl border border-cream-medium/20">
+                <div>
+                  <span className="text-coffee-light block">Thu ngân:</span>
+                  <span className="font-bold text-coffee-dark">{currentUser?.name}</span>
+                </div>
+                <div>
+                  <span className="text-coffee-light block">Giờ mở ca:</span>
+                  <span className="font-bold text-coffee-dark">
+                    {new Date(activeShift.openedAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} ({new Date(activeShift.openedAt).toLocaleDateString('vi-VN')})
+                  </span>
+                </div>
+              </div>
+
+              <div className="space-y-2 border-b border-cream-medium/30 pb-3">
+                <div className="flex justify-between text-xs text-coffee-medium">
+                  <span>Tiền mặt đầu ca:</span>
+                  <span className="font-mono font-semibold">{activeShift.openingCash.toLocaleString('vi-VN')}đ</span>
+                </div>
+                <div className="flex justify-between text-xs text-coffee-medium">
+                  <span>+ Doanh số tiền mặt tích lũy:</span>
+                  <span className="font-mono font-semibold text-green-600">+{activeShift.cashSales.toLocaleString('vi-VN')}đ</span>
+                </div>
+                <div className="divider my-1" />
+                <div className="flex justify-between text-sm font-bold text-coffee-dark">
+                  <span>Tiền mặt dự kiến trong két:</span>
+                  <span className="font-mono text-coffee-accent">{activeShift.expectedCash.toLocaleString('vi-VN')}đ</span>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs font-bold text-coffee-medium uppercase tracking-wider mb-1.5">
+                    Tiền mặt thực tế đếm được (VNĐ)
+                  </label>
+                  <input
+                    type="number"
+                    value={actualCashInput}
+                    onChange={e => setActualCashInput(e.target.value)}
+                    placeholder="Nhập số tiền mặt trong két..."
+                    className="input-field w-full font-mono text-base font-bold text-coffee-dark bg-cream-light/30 border-cream-medium focus:border-coffee-accent focus:ring-coffee-accent/25"
+                  />
+                </div>
+
+                {actualCashInput !== '' && (
+                  <div className={`p-3 rounded-2xl border flex items-center justify-between text-xs font-semibold ${
+                    Number(actualCashInput) - activeShift.expectedCash === 0
+                      ? 'bg-green-50 border-green-200 text-green-800'
+                      : Number(actualCashInput) - activeShift.expectedCash > 0
+                        ? 'bg-blue-50 border-blue-200 text-blue-800'
+                        : 'bg-red-50 border-red-200 text-red-800'
+                  }`}>
+                    <span>Chênh lệch két:</span>
+                    <span className="font-mono font-bold text-sm">
+                      {(Number(actualCashInput) - activeShift.expectedCash).toLocaleString('vi-VN', { signDisplay: 'always' })}đ
+                    </span>
+                  </div>
+                )}
+
+                {actualCashInput !== '' && Number(actualCashInput) - activeShift.expectedCash !== 0 && (
+                  <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-800">
+                    <AlertTriangle size={15} className="flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-bold">Lệch két tiền mặt!</p>
+                      <p className="text-[10px] leading-relaxed">
+                        Số tiền thực tế lệch {(Number(actualCashInput) - activeShift.expectedCash) > 0 ? 'thừa' : 'thiếu'} so với phần mềm. Vui lòng nhập lý do giải trình.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-xs font-bold text-coffee-medium uppercase tracking-wider mb-1.5">
+                    Ghi chú / Giải trình {actualCashInput !== '' && Number(actualCashInput) - activeShift.expectedCash !== 0 && <span className="text-red-500">*</span>}
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={shiftNotes}
+                    onChange={e => setShiftNotes(e.target.value)}
+                    placeholder="Ghi chú thối nhầm tiền, chi lẻ hoặc các lý do chênh lệch..."
+                    className="input-field w-full text-xs"
+                    required={actualCashInput !== '' && Number(actualCashInput) - activeShift.expectedCash !== 0}
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={() => setShowCloseShiftModal(false)}
+                  className="min-h-[44px] flex-1 btn-secondary"
+                >
+                  Quay lại
+                </button>
+                <button
+                  onClick={() => {
+                    const isLethal = actualCashInput !== '' && Number(actualCashInput) - activeShift.expectedCash !== 0;
+                    if (isLethal && !shiftNotes.trim()) {
+                      alert('Vui lòng nhập ghi chú giải trình lý do lệch két tiền!');
+                      return;
+                    }
+                    handleCloseShift(Number(actualCashInput) || 0, shiftNotes);
+                  }}
+                  className="min-h-[44px] flex-[2] btn-primary bg-coffee-accent font-bold"
+                >
+                  Xác nhận giao két
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

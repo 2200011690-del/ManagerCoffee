@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Coffee, LayoutGrid, BarChart3, ChefHat, ChevronRight, Wifi, LogOut, Shield, Users, ShoppingBag } from 'lucide-react';
+import { Coffee, LayoutGrid, BarChart3, ChefHat, ChevronRight, Wifi, LogOut, Shield, Users, ShoppingBag, Clock } from 'lucide-react';
 import { useUI } from '../context/UIContext';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { useInventory } from '../context/InventoryContext';
+import QuickAttendanceModal from './pos/QuickAttendanceModal';
 
 const ALL_NAV_ITEMS = [
   { id: 'pos',       label: 'Bán hàng',     icon: ShoppingBag, subtitle: 'POS',          roles: ['admin', 'staff'] },
@@ -20,6 +21,7 @@ export default function Sidebar() {
   const { lowStockItems } = useInventory();
 
   const [now, setNow] = useState(new Date());
+  const [showAttendanceModal, setShowAttendanceModal] = useState(false);
   useEffect(() => {
     const interval = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(interval);
@@ -111,6 +113,13 @@ export default function Sidebar() {
           </div>
         </div>
         <button
+          onClick={() => setShowAttendanceModal(true)}
+          className="w-full min-h-[40px] flex items-center gap-2.5 px-3 py-2 rounded-lg text-sidebar-text hover:text-primary-400 hover:bg-primary-600/10 transition-all duration-150 group"
+        >
+          <Clock size={15} className="group-hover:text-primary-400" />
+          <span className="text-sm">Điểm danh nhanh</span>
+        </button>
+        <button
           onClick={logout}
           className="w-full min-h-[40px] flex items-center gap-2.5 px-3 py-2 rounded-lg text-sidebar-text hover:text-red-400 hover:bg-red-500/10 transition-all duration-150 group"
         >
@@ -118,6 +127,9 @@ export default function Sidebar() {
           <span className="text-sm">Đăng xuất</span>
         </button>
       </div>
+      {showAttendanceModal && (
+        <QuickAttendanceModal onClose={() => setShowAttendanceModal(false)} />
+      )}
     </aside>
   );
 }
