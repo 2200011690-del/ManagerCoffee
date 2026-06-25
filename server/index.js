@@ -1515,6 +1515,251 @@ app.get('/api/orders/search/:orderNumber', async (req, res) => {
   }
 });
 
+// ===== PHASE 2 REPORT APIs =====
+
+// 14. Báo cáo Nhân sự (Staff Analytics)
+app.get('/api/reports/employees', async (req, res) => {
+  const storeId = req.storeId;
+  const { startDate, endDate } = req.query;
+  try {
+    const users = await prisma.user.findMany({
+      where: { storeId },
+      select: { id: true, name: true, role: true }
+    });
+    
+    const dateFilter = {};
+    if (startDate) dateFilter.gte = new Date(startDate);
+    if (endDate) dateFilter.lte = new Date(endDate);
+
+    const reports = [];
+    for (const user of users) {
+      const orders = await prisma.order.findMany({
+        where: {
+          storeId,
+          employeeId: user.id,
+          status: 'paid',
+          ...(startDate || endDate ? { timestamp: dateFilter } : {})
+        }
+      });
+
+      const salesTotal = orders.reduce((sum, o) => sum + o.total, 0);
+      const ordersCount = orders.length;
+      const avgOrderValue = ordersCount > 0 ? Math.round(salesTotal / ordersCount) : 0;
+
+      reports.push({
+        id: user.id,
+        name: user.name,
+        role: user.role,
+        salesTotal,
+        ordersCount,
+        avgOrderValue
+      });
+    }
+    res.json(reports);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 15. Báo cáo Peak Hours (Time Analysis)
+app.get('/api/reports/time-analysis', async (req, res) => {
+  const storeId = req.storeId;
+  const { startDate, endDate } = req.query;
+  try {
+    const dateFilter = {};
+    if (startDate) dateFilter.gte = new Date(startDate);
+    if (endDate) dateFilter.lte = new Date(endDate);
+
+    const orders = await prisma.order.findMany({
+      where: {
+        storeId,
+        status: 'paid',
+        ...(startDate || endDate ? { timestamp: dateFilter } : {})
+      }
+    });
+
+    // 1. Hourly Sales (0h - 23h)
+    const hourlySales = Array.from({ length: 24 }, (_, i) => ({
+      hour: `${i}h`,
+      revenue: 0,
+      orders: 0
+    }));
+
+    // 2. Day of Week Sales (T2, T3, T4, T5, T6, T7, CN)
+    const DAYS_MAP = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
+    const dailySales = DAYS_MAP.map(day => ({ day, revenue: 0, orders: 0 }));
+
+    // 3. Monthly Sales
+    const MONTHS_MAP = Array.from({ length: 12 }, (_, i) => `Tháng ${i + 1}`);
+    const monthlySales = MONTHS_MAP.map(month => ({ month, revenue: 0, orders: 0 }));
+
+    orders.forEach(o => {
+      const d = new Date(o.timestamp);
+      
+      // Hour
+      const hr = d.getHours();
+      if (hr >= 0 && hr < 24) {
+        hourlySales[hr].revenue += o.total;
+        hourlySales[hr].orders += 1;
+      }
+
+      // Day of Week
+      const dayIdx = d.getDay();
+      dailySales[dayIdx].revenue += o.total;
+      dailySales[dayIdx].orders += 1;
+
+      // Month
+      const m = d.getMonth();
+      if (m >= 0 && m < 12) {
+        monthlySales[m].revenue += o.total;
+        monthlySales[m].orders += 1;
+      }
+    });
+
+    res.json({
+      hourlySales,
+      dailySales,
+      monthlySales
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 16. Báo cáo Lãi/Lỗ P&L (Profit & Loss)
+app.get('/api/reports/profit-loss', async (req, res) => {
+  const storeId = req.storeId;
+  const { startDate, endDate } = req.query;
+  try {
+    const dateFilter = {};
+    if (startDate) dateFilter.gte = new Date(startDate);
+    if (endDate) dateFilter.lte = new Date(endDate);
+
+    const orders = await prisma.order.findMany({
+      where: {
+        storeId,
+        status: 'paid',
+        ...(startDate || endDate ? { timestamp: dateFilter } : {})
+      },
+      include: {
+        items: true
+      }
+    });
+
+    // Fetch all products of the store with their recipe items
+    const products = await prisma.product.findMany({
+      where: { storeId },
+      include: {
+        recipes: true
+      }
+    });
+    
+    // Map product name to its recipes
+    const productRecipesMap = new Map();
+    products.forEach(p => {
+      productRecipesMap.set(p.name, p.recipes);
+    });
+
+    // Fetch all inventories to resolve units/names
+    const inventories = await prisma.inventory.findMany({
+      where: { storeId }
+    });
+    const inventoryMap = new Map(inventories.map(i => [i.id, i]));
+
+    // Fetch all stock transactions of type IMPORT for this store in one query
+    const stockTransactions = await prisma.stockTransaction.findMany({
+      where: {
+        storeId,
+        type: 'IMPORT',
+        cost: { not: null }
+      }
+    });
+
+    // Group transactions by inventoryId to compute weighted average cost
+    const transactionGroups = {};
+    stockTransactions.forEach(tx => {
+      if (!transactionGroups[tx.inventoryId]) {
+        transactionGroups[tx.inventoryId] = [];
+      }
+      transactionGroups[tx.inventoryId].push(tx);
+    });
+
+    // Cache computed average cost per inventoryId
+    const averageCostCache = {};
+    const getWeightedAverageCostFast = (inventoryId) => {
+      if (averageCostCache[inventoryId] !== undefined) {
+        return averageCostCache[inventoryId];
+      }
+
+      const txs = transactionGroups[inventoryId] || [];
+      if (txs.length === 0) {
+        const ingredient = inventoryMap.get(inventoryId);
+        if (ingredient) {
+          if (ingredient.name.includes('Cà phê')) return 140000;
+          if (ingredient.name.includes('Sữa tươi')) return 28000;
+          if (ingredient.name.includes('Sữa đặc')) return 15000;
+          if (ingredient.name.includes('Trà')) return 40000;
+          if (ingredient.name.includes('Đường')) return 15000;
+          if (ingredient.name.includes('Matcha')) return 250000;
+        }
+        return 20000;
+      }
+      const totalCost = txs.reduce((sum, tx) => sum + (tx.qtyChange * tx.cost), 0);
+      const totalQty = txs.reduce((sum, tx) => sum + tx.qtyChange, 0);
+      const cost = totalQty > 0 ? totalCost / totalQty : 20000;
+      averageCostCache[inventoryId] = cost;
+      return cost;
+    };
+
+    let totalRevenue = 0;
+    let totalCogs = 0;
+    const ingredientConsumption = {};
+
+    for (const order of orders) {
+      totalRevenue += order.total;
+
+      for (const item of order.items) {
+        const recipes = productRecipesMap.get(item.name) || [];
+
+        for (const recipe of recipes) {
+          const avgCost = getWeightedAverageCostFast(recipe.inventoryId);
+          const qtyConsumed = recipe.qty * item.qty;
+          const costConsumed = qtyConsumed * avgCost;
+
+          totalCogs += costConsumed;
+
+          // Log ingredient consumption
+          if (!ingredientConsumption[recipe.inventoryId]) {
+            const ing = inventoryMap.get(recipe.inventoryId);
+            ingredientConsumption[recipe.inventoryId] = {
+              name: ing?.name || 'Nguyên liệu',
+              unit: ing?.unit || 'đơn vị',
+              qty: 0,
+              cost: 0
+            };
+          }
+          ingredientConsumption[recipe.inventoryId].qty += qtyConsumed;
+          ingredientConsumption[recipe.inventoryId].cost += costConsumed;
+        }
+      }
+    }
+
+    const grossProfit = totalRevenue - totalCogs;
+    const profitMargin = totalRevenue > 0 ? (grossProfit / totalRevenue) * 100 : 0;
+
+    res.json({
+      revenue: totalRevenue,
+      cogs: totalCogs,
+      grossProfit,
+      profitMargin,
+      ingredients: Object.values(ingredientConsumption)
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
 const PORT = process.env.PORT || 5000;
 httpServer.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);

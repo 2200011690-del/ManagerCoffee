@@ -392,6 +392,20 @@ export default function DashboardPage() {
   const [vouchersList, setVouchersList] = useState([]);
   const [customersList, setCustomersList] = useState([]);
 
+  // Detailed Reports states
+  const [reportFilter, setReportFilter] = useState('7days');
+  const [reportStartDate, setReportStartDate] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 7);
+    return d.toISOString().split('T')[0];
+  });
+  const [reportEndDate, setReportEndDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [reportsTab, setReportsTab] = useState('staff'); // 'staff' | 'time' | 'profit'
+  const [staffReports, setStaffReports] = useState([]);
+  const [timeReports, setTimeReports] = useState(null);
+  const [profitLossReport, setProfitLossReport] = useState(null);
+  const [loadingReports, setLoadingReports] = useState(false);
+
   // Search/Filters for SaaS tabs
   const [custSearch, setCustSearch] = useState('');
   const [vouchSearch, setVouchSearch] = useState('');
@@ -414,6 +428,39 @@ export default function DashboardPage() {
   const [custForm, setCustForm] = useState({ name: '', phone: '', points: 0, tier: 'SILVER' });
   const [vouchForm, setVouchForm] = useState({ code: '', type: 'FIXED', value: '', minOrderValue: '', maxDiscount: '', expiryDate: '', isActive: true });
   const [tableConfigForm, setTableConfigForm] = useState({ name: '', zone: 'Tầng trệt', capacity: 2 });
+
+  // Sub-tabs inside inventory
+  const [invSubTab, setInvSubTab] = useState('stock'); // 'stock' | 'recipes' | 'history' | 'suppliers'
+
+  // Search/Filters
+  const [ingQuery, setIngQuery] = useState('');
+  const [recipeQuery, setRecipeQuery] = useState('');
+  const [supplierQuery, setSupplierQuery] = useState('');
+  const [txTypeFilter, setTxTypeFilter] = useState('ALL');
+
+  // Modals state
+  const [showAddIng, setShowAddIng] = useState(false);
+  const [showEditIng, setShowEditIng] = useState(false);
+  const [selectedIng, setSelectedIng] = useState(null);
+
+  const [showImport, setShowImport] = useState(false);
+  const [showAdjust, setShowAdjust] = useState(false);
+
+  const [showAddSupplier, setShowAddSupplier] = useState(false);
+  const [showEditSupplier, setShowEditSupplier] = useState(false);
+  const [selectedSupplier, setSelectedSupplier] = useState(null);
+
+  // Recipe configuration state
+  const [showRecipeModal, setShowRecipeModal] = useState(false);
+  const [recipeProduct, setRecipeProduct] = useState(null);
+  const [recipeLines, setRecipeLines] = useState([]); // array of { inventoryId, qty }
+
+  // Modal forms fields
+  const [ingForm, setIngForm] = useState({ name: '', unit: '', qty: 0, minQty: 0, icon: '☕' });
+  const [supplierForm, setSupplierForm] = useState({ name: '', phone: '', email: '', address: '' });
+  const [importForm, setImportForm] = useState({ inventoryId: '', qty: '', cost: '', supplierId: '', note: '' });
+  const [adjustForm, setAdjustForm] = useState({ inventoryId: '', actualQty: '', note: '' });
+
 
   // Fetch handlers
   const fetchDashboardData = useCallback(async () => {
@@ -442,6 +489,60 @@ export default function DashboardPage() {
       console.error(err);
     }
   }, []);
+
+  const getReportDates = useCallback(() => {
+    let start = '';
+    let end = '';
+    const now = new Date();
+
+    if (reportFilter === 'today') {
+      const todayStr = now.toISOString().split('T')[0];
+      start = todayStr;
+      end = todayStr;
+    } else if (reportFilter === '7days') {
+      const startD = new Date();
+      startD.setDate(now.getDate() - 7);
+      start = startD.toISOString().split('T')[0];
+      end = now.toISOString().split('T')[0];
+    } else if (reportFilter === '30days') {
+      const startD = new Date();
+      startD.setDate(now.getDate() - 30);
+      start = startD.toISOString().split('T')[0];
+      end = now.toISOString().split('T')[0];
+    } else if (reportFilter === 'custom') {
+      start = reportStartDate;
+      end = reportEndDate;
+    }
+    return { start, end };
+  }, [reportFilter, reportStartDate, reportEndDate]);
+
+  const fetchDetailedReport = useCallback(async () => {
+    if (activeTab !== 'detailed_reports') return;
+    setLoadingReports(true);
+    const { start, end } = getReportDates();
+    const query = `?startDate=${start}&endDate=${end}`;
+
+    try {
+      if (reportsTab === 'staff') {
+        const data = await api.get(`/reports/employees${query}`);
+        setStaffReports(data);
+      } else if (reportsTab === 'time') {
+        const data = await api.get(`/reports/time-analysis${query}`);
+        setTimeReports(data);
+      } else if (reportsTab === 'profit') {
+        const data = await api.get(`/reports/profit-loss${query}`);
+        setProfitLossReport(data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch report:', err);
+    } finally {
+      setLoadingReports(false);
+    }
+  }, [activeTab, reportsTab, getReportDates]);
+
+  useEffect(() => {
+    fetchDetailedReport();
+  }, [fetchDetailedReport]);
 
   // Unified loader
   useEffect(() => {
@@ -515,37 +616,6 @@ export default function DashboardPage() {
   const recentOrders = Array.isArray(rawRecentOrders) ? rawRecentOrders : [];
   const shifts = Array.isArray(rawShifts) ? rawShifts : [];
 
-  // Sub-tabs inside inventory
-  const [invSubTab, setInvSubTab] = useState('stock'); // 'stock' | 'recipes' | 'history' | 'suppliers'
-
-  // Search/Filters
-  const [ingQuery, setIngQuery] = useState('');
-  const [recipeQuery, setRecipeQuery] = useState('');
-  const [supplierQuery, setSupplierQuery] = useState('');
-  const [txTypeFilter, setTxTypeFilter] = useState('ALL');
-
-  // Modals state
-  const [showAddIng, setShowAddIng] = useState(false);
-  const [showEditIng, setShowEditIng] = useState(false);
-  const [selectedIng, setSelectedIng] = useState(null);
-
-  const [showImport, setShowImport] = useState(false);
-  const [showAdjust, setShowAdjust] = useState(false);
-
-  const [showAddSupplier, setShowAddSupplier] = useState(false);
-  const [showEditSupplier, setShowEditSupplier] = useState(false);
-  const [selectedSupplier, setSelectedSupplier] = useState(null);
-
-  // Recipe configuration state
-  const [showRecipeModal, setShowRecipeModal] = useState(false);
-  const [recipeProduct, setRecipeProduct] = useState(null);
-  const [recipeLines, setRecipeLines] = useState([]); // array of { inventoryId, qty }
-
-  // Modal forms fields
-  const [ingForm, setIngForm] = useState({ name: '', unit: '', qty: 0, minQty: 0, icon: '☕' });
-  const [supplierForm, setSupplierForm] = useState({ name: '', phone: '', email: '', address: '' });
-  const [importForm, setImportForm] = useState({ inventoryId: '', qty: '', cost: '', supplierId: '', note: '' });
-  const [adjustForm, setAdjustForm] = useState({ inventoryId: '', actualQty: '', note: '' });
 
   // Initial loads
   useEffect(() => {
@@ -815,6 +885,47 @@ export default function DashboardPage() {
     }
   };
 
+  const handleExportDetailedCSV = () => {
+    let filename = '';
+    let csvContent = '\uFEFF'; // BOM to support Vietnamese Unicode in Excel
+
+    const { start, end } = getReportDates();
+
+    if (reportsTab === 'staff') {
+      filename = `bao_cao_nhan_vien_${start}_to_${end}.csv`;
+      csvContent += 'Nhân viên,Vai trò,Số hóa đơn,Doanh thu mang lại (đ),AOV (TB/Đơn đ)\n';
+      staffReports.forEach(r => {
+        csvContent += `"${r.name}","${r.role === 'admin' ? 'Quản trị' : 'Nhân viên'}","${r.ordersCount}","${r.salesTotal}","${r.avgOrderValue}"\n`;
+      });
+    } else if (reportsTab === 'time') {
+      filename = `bao_cao_khung_gio_${start}_to_${end}.csv`;
+      csvContent += 'Khung giờ,Số hóa đơn,Doanh thu (đ)\n';
+      if (timeReports && timeReports.hourlySales) {
+        timeReports.hourlySales.forEach(h => {
+          csvContent += `"${h.hour}","${h.orders}","${h.revenue}"\n`;
+        });
+      }
+    } else if (reportsTab === 'profit') {
+      filename = `bao_cao_lai_lo_${start}_to_${end}.csv`;
+      csvContent += `Doanh thu thuần (đ),Giá vốn hàng bán (COGS đ),Lợi nhuận gộp (đ),Biên lợi nhuận (%)\n`;
+      if (profitLossReport) {
+        csvContent += `"${profitLossReport.revenue}","${profitLossReport.cogs}","${profitLossReport.grossProfit}","${profitLossReport.profitMargin.toFixed(1)}%"\n\n`;
+        csvContent += `Nguyên liệu tiêu hao,Đơn vị,Số lượng tiêu hao,Chi phí hàng bán (đ)\n`;
+        profitLossReport.ingredients.forEach(i => {
+          csvContent += `"${i.name}","${i.unit}","${i.qty.toFixed(2)}","${i.cost.toFixed(0)}"\n`;
+        });
+      }
+    }
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
   const progressPct = (today.target && today.target > 0) ? Math.min((today.revenue / today.target) * 100, 100).toFixed(0) : '0';
 
   return (
@@ -905,6 +1016,18 @@ export default function DashboardPage() {
             >
               <MapPin size={14} />
               Phòng/Bàn
+            </button>
+            <button
+              onClick={() => setActiveTab('detailed_reports')}
+              className={`min-h-[40px] px-4 py-2 rounded-lg text-sm font-semibold transition-all flex items-center gap-1.5 ${
+                activeTab === 'detailed_reports'
+                  ? 'text-white shadow-coffee'
+                  : 'text-coffee-medium hover:text-coffee-dark'
+              }`}
+              style={activeTab === 'detailed_reports' ? { background: 'linear-gradient(135deg, #A76D42, #C8956C)' } : {}}
+            >
+              <TrendingUp size={14} />
+              Báo cáo chi tiết
             </button>
           </div>
         </div>
@@ -2968,6 +3091,359 @@ export default function DashboardPage() {
                 </div>
               </div>
             )}
+          </div>
+        )}
+
+        {/* ===== DETAILED REPORTS TAB ===== */}
+        {activeTab === 'detailed_reports' && (
+          <div className="space-y-6 animate-fade-in">
+            {/* Style print */}
+            <style>{`
+              @media print {
+                body * {
+                  visibility: hidden;
+                }
+                #print-report-area, #print-report-area * {
+                  visibility: visible;
+                }
+                #print-report-area {
+                  position: absolute;
+                  left: 0;
+                  top: 0;
+                  width: 100%;
+                  background: white !important;
+                  color: black !important;
+                  box-shadow: none !important;
+                  border: none !important;
+                }
+                .no-print {
+                  display: none !important;
+                }
+              }
+            `}</style>
+
+            {/* Filters and Actions Bar */}
+            <div className="no-print bg-white rounded-2xl p-4 shadow-card border border-cream-medium/30 flex flex-wrap items-center justify-between gap-4">
+              <div className="flex flex-wrap items-center gap-3">
+                {/* Date filter presets */}
+                <div className="flex bg-cream-light rounded-xl p-1 gap-1">
+                  {['today', '7days', '30days', 'custom'].map((f) => (
+                    <button
+                      key={f}
+                      onClick={() => setReportFilter(f)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                        reportFilter === f ? 'bg-coffee-accent text-white shadow-sm' : 'text-coffee-medium hover:text-coffee-dark'
+                      }`}
+                    >
+                      {f === 'today' ? 'Hôm nay' : f === '7days' ? '7 ngày qua' : f === '30days' ? '30 ngày qua' : 'Tùy chọn'}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Custom date range picker */}
+                {reportFilter === 'custom' && (
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="date"
+                      value={reportStartDate}
+                      onChange={(e) => setReportStartDate(e.target.value)}
+                      className="input-field py-1 px-2.5 text-xs font-mono min-h-[36px]"
+                    />
+                    <span className="text-xs text-coffee-medium">đến</span>
+                    <input
+                      type="date"
+                      value={reportEndDate}
+                      onChange={(e) => setReportEndDate(e.target.value)}
+                      className="input-field py-1 px-2.5 text-xs font-mono min-h-[36px]"
+                    />
+                    <button
+                      onClick={fetchDetailedReport}
+                      className="min-h-[36px] px-3 bg-coffee-accent hover:bg-amber-700 text-white rounded-lg text-xs font-bold transition-colors"
+                    >
+                      Lọc
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Export buttons */}
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleExportDetailedCSV}
+                  className="min-h-[38px] px-4 text-xs bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-xl font-bold transition-all flex items-center gap-1.5"
+                >
+                  <Download size={14} />
+                  Xuất Excel
+                </button>
+                <button
+                  onClick={() => window.print()}
+                  className="min-h-[38px] px-4 text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-xl font-bold transition-all flex items-center gap-1.5"
+                >
+                  <FileText size={14} />
+                  In / Xuất PDF
+                </button>
+              </div>
+            </div>
+
+            {/* Sub-tab selection */}
+            <div className="no-print flex border-b border-cream-medium/30">
+              {['staff', 'time', 'profit'].map((sub) => (
+                <button
+                  key={sub}
+                  onClick={() => setReportsTab(sub)}
+                  className={`pb-3 px-6 font-bold text-sm transition-all border-b-2 ${
+                    reportsTab === sub ? 'border-coffee-accent text-coffee-accent' : 'border-transparent text-coffee-medium hover:text-coffee-dark'
+                  }`}
+                >
+                  {sub === 'staff' ? 'Doanh thu nhân sự' : sub === 'time' ? 'Phân tích giờ cao điểm' : 'Báo cáo Lãi/Lỗ (P&L)'}
+                </button>
+              ))}
+            </div>
+
+            {/* Main report card */}
+            <div id="print-report-area" className="bg-white rounded-3xl p-6 shadow-card border border-cream-medium/30">
+              {/* Header info in print */}
+              <div className="hidden print:block border-b border-gray-200 pb-4 mb-6">
+                <h1 className="text-2xl font-bold text-gray-800">HỆ THỐNG QUẢN LÝ MANAGER COFFEE</h1>
+                <h2 className="text-lg font-bold text-gray-700 mt-1">
+                  {reportsTab === 'staff' ? 'BÁO CÁO DOANH THU NHÂN SỰ' : reportsTab === 'time' ? 'BÁO CÁO PHÂN TÍCH KHUNG GIỜ' : 'BÁO CÁO KẾT QUẢ HOẠT ĐỘNG KINH DOANH (P&L)'}
+                </h2>
+                <p className="text-xs text-gray-500 mt-1">
+                  Khoảng thời gian: {getReportDates().start} đến {getReportDates().end}
+                </p>
+              </div>
+
+              {loadingReports ? (
+                <div className="py-20 flex flex-col items-center justify-center gap-3">
+                  <RefreshCw className="w-8 h-8 text-coffee-medium animate-spin" />
+                  <p className="text-coffee-medium text-sm font-semibold">Đang tổng hợp dữ liệu báo cáo...</p>
+                </div>
+              ) : (
+                <>
+                  {/* 3.1 Staff Report */}
+                  {reportsTab === 'staff' && (
+                    <div className="space-y-6">
+                      <h3 className="no-print font-bold text-base text-coffee-dark">Hiệu suất và Doanh thu đóng góp của nhân viên</h3>
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        {/* Table */}
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-left text-sm border-collapse">
+                            <thead>
+                              <tr className="border-b border-cream-medium/40 text-coffee-medium font-bold text-xs uppercase bg-cream-light/30">
+                                <th className="px-4 py-3">Nhân viên</th>
+                                <th className="px-4 py-3">Vai trò</th>
+                                <th className="px-4 py-3 text-center">Số đơn</th>
+                                <th className="px-4 py-3 text-right">Tổng doanh thu</th>
+                                <th className="px-4 py-3 text-right">TB/Đơn (AOV)</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {staffReports.map(emp => (
+                                <tr key={emp.id} className="border-b border-cream-medium/20 hover:bg-cream-light/20 transition-colors">
+                                  <td className="px-4 py-3.5 font-semibold text-coffee-dark">{emp.name}</td>
+                                  <td className="px-4 py-3.5 text-xs text-coffee-light capitalize">{emp.role === 'admin' ? 'Quản trị' : 'Nhân viên'}</td>
+                                  <td className="px-4 py-3.5 text-center font-mono">{emp.ordersCount}</td>
+                                  <td className="px-4 py-3.5 text-right font-mono font-bold text-coffee-accent">{emp.salesTotal.toLocaleString('vi-VN')}đ</td>
+                                  <td className="px-4 py-3.5 text-right font-mono text-coffee-medium">{emp.avgOrderValue.toLocaleString('vi-VN')}đ</td>
+                                </tr>
+                              ))}
+                              {staffReports.length === 0 && (
+                                <tr>
+                                  <td colSpan={5} className="px-4 py-8 text-center text-coffee-medium italic">Không có dữ liệu trong thời gian này</td>
+                                </tr>
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+
+                        {/* Chart representation */}
+                        <div className="bg-cream-light/20 rounded-2xl p-5 border border-cream-medium/30 flex flex-col justify-center">
+                          <h4 className="text-xs font-bold text-coffee-medium uppercase tracking-wider mb-4">So sánh doanh thu bán hàng</h4>
+                          <div className="space-y-4">
+                            {staffReports.map(emp => {
+                              const maxSales = Math.max(...staffReports.map(e => e.salesTotal || 0)) || 1;
+                              const widthPct = Math.max(5, (emp.salesTotal / maxSales) * 100);
+                              return (
+                                <div key={emp.id} className="space-y-1">
+                                  <div className="flex justify-between text-xs font-semibold">
+                                    <span className="text-coffee-dark">{emp.name}</span>
+                                    <span className="text-coffee-accent font-bold">{emp.salesTotal.toLocaleString('vi-VN')}đ</span>
+                                  </div>
+                                  <div className="w-full h-3 bg-cream-light rounded-full overflow-hidden">
+                                    <div
+                                      className="h-full rounded-full bg-gradient-to-r from-coffee-accent to-amber-500 transition-all duration-700"
+                                      style={{ width: `${widthPct}%` }}
+                                    />
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 3.2 Time Report */}
+                  {reportsTab === 'time' && timeReports && (
+                    <div className="space-y-6">
+                      <h3 className="no-print font-bold text-base text-coffee-dark">Biểu đồ phân tích Peak Hours (Giờ cao điểm)</h3>
+                      
+                      {/* 24-Hour Custom Chart */}
+                      <div className="bg-cream-light/20 rounded-2xl p-5 border border-cream-medium/30">
+                        <div className="flex items-end justify-between h-48 gap-1 pt-6 px-2 overflow-x-auto">
+                          {timeReports.hourlySales.map((h, i) => {
+                            const maxRev = Math.max(...timeReports.hourlySales.map(hs => hs.revenue || 0)) || 1;
+                            const heightPct = Math.max(3, (h.revenue / maxRev) * 100);
+                            const isPeak = h.revenue > 0 && h.revenue === maxRev;
+                            return (
+                              <div key={h.hour} className="flex-1 flex flex-col items-center group relative min-w-[28px]">
+                                {/* Tooltip on hover */}
+                                <div className="absolute bottom-full mb-2 bg-slate-800 text-white text-[10px] py-1 px-1.5 rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
+                                  <p className="font-bold">{h.hour}</p>
+                                  <p>Đơn: {h.orders}</p>
+                                  <p>Doanh thu: {h.revenue.toLocaleString('vi-VN')}đ</p>
+                                </div>
+                                
+                                {/* Bar element */}
+                                <div
+                                  className={`w-full rounded-t-md transition-all duration-500 cursor-pointer ${
+                                    isPeak 
+                                      ? 'bg-gradient-to-t from-coffee-accent to-amber-500 shadow-md shadow-coffee-accent/20' 
+                                      : 'bg-gradient-to-t from-cream-dark to-cream-medium/70 group-hover:from-coffee-light group-hover:to-coffee-medium'
+                                  }`}
+                                  style={{ height: `${heightPct * 0.8}%`, minHeight: '4px' }}
+                                />
+                                <span className="text-[9px] text-coffee-light font-bold mt-1.5 font-mono">{h.hour}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                        <div className="flex items-center justify-center gap-4 mt-4 text-[10px] text-coffee-medium font-semibold border-t border-cream-medium/20 pt-3">
+                          <div className="flex items-center gap-1.5">
+                            <span className="w-3 h-3 rounded bg-gradient-to-t from-coffee-accent to-amber-500" />
+                            <span>Giờ cao điểm doanh thu kỷ lục</span>
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <span className="w-3 h-3 rounded bg-cream-dark" />
+                            <span>Khung giờ bán hàng thường</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Day of week & Monthly grids */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {/* Day of Week */}
+                        <div className="bg-white rounded-2xl p-5 border border-cream-medium/30">
+                          <h4 className="font-bold text-sm text-coffee-dark mb-3">Doanh thu theo Thứ</h4>
+                          <div className="space-y-2">
+                            {timeReports.dailySales.map(d => {
+                              const maxD = Math.max(...timeReports.dailySales.map(ds => ds.revenue || 0)) || 1;
+                              const widthPct = (d.revenue / maxD) * 100;
+                              return (
+                                <div key={d.day} className="flex items-center gap-3">
+                                  <span className="w-8 text-xs font-bold text-coffee-medium font-mono">{d.day}</span>
+                                  <div className="flex-1 h-3 bg-cream-light rounded-full overflow-hidden">
+                                    <div className="h-full bg-coffee-accent/70 rounded-full" style={{ width: `${widthPct}%` }} />
+                                  </div>
+                                  <span className="w-24 text-right text-xs font-bold text-coffee-dark font-mono">{d.revenue.toLocaleString('vi-VN')}đ</span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        {/* Monthly */}
+                        <div className="bg-white rounded-2xl p-5 border border-cream-medium/30">
+                          <h4 className="font-bold text-sm text-coffee-dark mb-3">Doanh thu theo Tháng</h4>
+                          <div className="max-h-60 overflow-y-auto pr-1 space-y-2">
+                            {timeReports.monthlySales.map(m => (
+                              <div key={m.month} className="flex items-center justify-between text-xs border-b border-cream-medium/20 py-2 last:border-0">
+                                <span className="font-semibold text-coffee-dark">{m.month}</span>
+                                <div className="flex items-center gap-4">
+                                  <span className="text-coffee-light font-mono">{m.orders} hóa đơn</span>
+                                  <span className="font-bold text-coffee-accent font-mono">{m.revenue.toLocaleString('vi-VN')}đ</span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 3.3 Profit & Loss Report */}
+                  {reportsTab === 'profit' && profitLossReport && (
+                    <div className="space-y-6">
+                      {/* Financial KPI Summary Cards */}
+                      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div className="bg-cream-light/30 border border-cream-medium/40 p-4 rounded-2xl">
+                          <p className="text-xs font-bold text-coffee-medium uppercase tracking-wider mb-1">Tổng doanh thu</p>
+                          <p className="text-xl font-mono font-bold text-coffee-dark">{profitLossReport.revenue.toLocaleString('vi-VN')}đ</p>
+                        </div>
+                        <div className="bg-red-50/40 border border-red-100 p-4 rounded-2xl">
+                          <p className="text-xs font-bold text-red-600 uppercase tracking-wider mb-1">Giá vốn (COGS)</p>
+                          <p className="text-xl font-mono font-bold text-red-700">-{profitLossReport.cogs.toLocaleString('vi-VN')}đ</p>
+                        </div>
+                        <div className="bg-green-50/40 border border-green-100 p-4 rounded-2xl">
+                          <p className="text-xs font-bold text-green-700 uppercase tracking-wider mb-1">Lợi nhuận gộp</p>
+                          <p className="text-xl font-mono font-bold text-green-800">{profitLossReport.grossProfit.toLocaleString('vi-VN')}đ</p>
+                        </div>
+                        <div className="bg-blue-50/40 border border-blue-100 p-4 rounded-2xl">
+                          <p className="text-xs font-bold text-blue-600 uppercase tracking-wider mb-1">Tỷ suất lãi gộp</p>
+                          <p className="text-xl font-mono font-bold text-blue-800">{profitLossReport.profitMargin.toFixed(1)}%</p>
+                        </div>
+                      </div>
+
+                      {/* Ingredient consumption analysis */}
+                      <div className="space-y-3">
+                        <div className="no-print flex items-center justify-between gap-3 flex-wrap">
+                          <h4 className="font-bold text-sm text-coffee-dark">Phân tích Chi tiết Nguyên liệu hao phí trong kỳ</h4>
+                          <div className="relative w-full max-w-xs">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
+                            <input
+                              type="text"
+                              value={ingQuery}
+                              onChange={e => setIngQuery(e.target.value)}
+                              placeholder="Tìm kiếm nguyên liệu..."
+                              className="input-field pl-9 w-full min-h-[36px] text-xs"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="overflow-x-auto border border-cream-medium/30 rounded-2xl">
+                          <table className="w-full text-left text-sm border-collapse">
+                            <thead>
+                              <tr className="border-b border-cream-medium/40 text-coffee-medium font-bold text-xs uppercase bg-cream-light/30">
+                                <th className="px-4 py-3">Nguyên liệu</th>
+                                <th className="px-4 py-3 text-right">Lượng tiêu thụ</th>
+                                <th className="px-4 py-3 text-right">Chi phí hàng bán</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {profitLossReport.ingredients
+                                .filter(i => i.name.toLowerCase().includes(ingQuery.toLowerCase()))
+                                .map(ing => (
+                                  <tr key={ing.name} className="border-b border-cream-medium/20 hover:bg-cream-light/20 transition-colors">
+                                    <td className="px-4 py-3.5 font-semibold text-coffee-dark">{ing.name}</td>
+                                    <td className="px-4 py-3.5 text-right font-mono font-semibold text-coffee-medium">{ing.qty.toFixed(2)} {ing.unit}</td>
+                                    <td className="px-4 py-3.5 text-right font-mono font-bold text-red-600">-{ing.cost.toLocaleString('vi-VN')}đ</td>
+                                  </tr>
+                                ))}
+                              {profitLossReport.ingredients.length === 0 && (
+                                <tr>
+                                  <td colSpan={3} className="px-4 py-8 text-center text-coffee-medium italic">Không có nguyên liệu tiêu thụ nào trong kỳ này</td>
+                                </tr>
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
           </div>
         )}
       </div>
