@@ -146,6 +146,10 @@ export default function POSPage() {
 
   const loadActiveShift = async () => {
     if (!currentUser) return;
+    if (currentUser.role === 'admin') {
+      setIsLoadingShift(false);
+      return;
+    }
     try {
       const shift = await api.get(`/shifts/active/${currentUser.id}`);
       setActiveShift(shift);
