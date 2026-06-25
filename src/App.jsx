@@ -12,6 +12,7 @@ import TablePage from './pages/TablePage';
 import DashboardPage from './pages/DashboardPage';
 import MenuManagementPage from './pages/MenuManagementPage';
 import EmployeeManagementPage from './pages/EmployeeManagementPage';
+import PromotionManagementPage from './pages/PromotionManagementPage';
 import StoreSettingsPage from './pages/StoreSettingsPage';
 import LockScreen from './pages/LockScreen';
 
@@ -29,6 +30,8 @@ function AppContent() {
         return canAccess('dashboard') ? <DashboardPage /> : <div className="p-8">Không có quyền truy cập</div>;
       case 'menu':
         return canAccess('menu') ? <MenuManagementPage /> : <div className="p-8">Không có quyền truy cập</div>;
+      case 'promotions':
+        return canAccess('promotions') ? <PromotionManagementPage /> : <div className="p-8">Không có quyền truy cập</div>;
       case 'employees':
         return canAccess('employees') ? <EmployeeManagementPage /> : <div className="p-8">Không có quyền truy cập</div>;
       case 'settings':

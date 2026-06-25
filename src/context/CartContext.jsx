@@ -20,8 +20,18 @@ export function CartProvider({ children }) {
   const [tableCarts, setTableCarts] = useState({});
   const [activeTableId, setActiveTableId] = useState(loadActiveTable);
   const [loading, setLoading] = useState(true);
+  const [promotions, setPromotions] = useState([]);
 
-  // Load carts from backend
+  const fetchPromotions = async () => {
+    try {
+      const data = await api.get('/promotions');
+      setPromotions(Array.isArray(data) ? data.filter(p => p.isActive) : []);
+    } catch (err) {
+      console.error('Failed to fetch promotions:', err);
+    }
+  };
+
+  // Load carts & promotions from backend
   useEffect(() => {
     const fetchCarts = async () => {
       try {
@@ -34,6 +44,7 @@ export function CartProvider({ children }) {
       }
     };
     fetchCarts();
+    fetchPromotions();
 
     const handleCartSync = (carts) => {
       setTableCarts(carts);
@@ -51,13 +62,160 @@ export function CartProvider({ children }) {
   const cartKey = activeTableId ?? TAKEAWAY_KEY;
   const cart = tableCarts[cartKey] ?? [];
 
+  const getPromoDetails = () => {
+    let appliedPromos = [];
+    let autoItemDiscounts = {}; // cartItemId -> { amount, name }
+    let comboDiscount = 0;
+    let buyXGetYDiscount = 0;
+
+    const now = new Date();
+    const currentHourMin = now.toTimeString().slice(0, 5); // "HH:MM"
+
+    // 1. Happy Hour
+    const happyHourPromos = promotions.filter(p => {
+      if (p.type !== 'HAPPY_HOUR') return false;
+      const cond = typeof p.conditions === 'string' ? JSON.parse(p.conditions) : p.conditions;
+      const inHour = currentHourMin >= cond.startHour && currentHourMin <= cond.endHour;
+      let inDate = true;
+      if (p.startDate && now < new Date(p.startDate)) inDate = false;
+      if (p.endDate && now > new Date(p.endDate)) inDate = false;
+      return inHour && inDate;
+    });
+
+    if (happyHourPromos.length > 0) {
+      const promo = happyHourPromos[0];
+      const cond = typeof promo.conditions === 'string' ? JSON.parse(promo.conditions) : promo.conditions;
+      const rew = typeof promo.rewards === 'string' ? JSON.parse(promo.rewards) : promo.rewards;
+      const discountPct = rew.discountPct || 0;
+
+      cart.forEach(item => {
+        if (!cond.productIds || cond.productIds.length === 0 || cond.productIds.includes(item.id)) {
+          const itemDiscount = Math.round(item.price * item.qty * (discountPct / 100));
+          autoItemDiscounts[item.cartItemId] = {
+            amount: itemDiscount,
+            name: promo.name
+          };
+        }
+      });
+    }
+
+    // 2. Combo
+    const comboPromos = promotions.filter(p => {
+      if (p.type !== 'COMBO') return false;
+      let inDate = true;
+      if (p.startDate && now < new Date(p.startDate)) inDate = false;
+      if (p.endDate && now > new Date(p.endDate)) inDate = false;
+      return inDate;
+    });
+
+    let availableProductQtys = {};
+    cart.forEach(item => {
+      if (!availableProductQtys[item.id]) availableProductQtys[item.id] = 0;
+      availableProductQtys[item.id] += item.qty;
+    });
+
+    comboPromos.forEach(promo => {
+      const cond = typeof promo.conditions === 'string' ? JSON.parse(promo.conditions) : promo.conditions;
+      const rew = typeof promo.rewards === 'string' ? JSON.parse(promo.rewards) : promo.rewards;
+      const comboProducts = cond.comboProducts;
+      const targetComboPrice = rew.comboPrice;
+
+      if (!comboProducts || comboProducts.length < 2) return;
+
+      let numCombos = Infinity;
+      comboProducts.forEach(cp => {
+        const available = availableProductQtys[cp.productId] || 0;
+        const combosPossible = Math.floor(available / cp.qty);
+        if (combosPossible < numCombos) {
+          numCombos = combosPossible;
+        }
+      });
+
+      if (numCombos > 0 && numCombos !== Infinity) {
+        comboProducts.forEach(cp => {
+          availableProductQtys[cp.productId] -= cp.qty * numCombos;
+        });
+
+        let normalTotalForCombo = 0;
+        comboProducts.forEach(cp => {
+          const prod = cart.find(item => item.id === cp.productId);
+          if (prod) {
+            normalTotalForCombo += prod.price * cp.qty * numCombos;
+          }
+        });
+
+        const discount = normalTotalForCombo - (targetComboPrice * numCombos);
+        if (discount > 0) {
+          comboDiscount += discount;
+          appliedPromos.push({
+            name: promo.name,
+            discount
+          });
+        }
+      }
+    });
+
+    // 3. Buy X Get Y
+    const bxgxPromos = promotions.filter(p => {
+      if (p.type !== 'BUY_X_GET_Y') return false;
+      let inDate = true;
+      if (p.startDate && now < new Date(p.startDate)) inDate = false;
+      if (p.endDate && now > new Date(p.endDate)) inDate = false;
+      return inDate;
+    });
+
+    bxgxPromos.forEach(promo => {
+      const cond = typeof promo.conditions === 'string' ? JSON.parse(promo.conditions) : promo.conditions;
+      const rew = typeof promo.rewards === 'string' ? JSON.parse(promo.rewards) : promo.rewards;
+      const buyProductId = cond.buyProductId;
+      const minQty = cond.minQty;
+      const getProductId = rew.getProductId;
+      const freeQty = rew.freeQty;
+
+      const availableBuy = availableProductQtys[buyProductId] || 0;
+      const numTriggers = Math.floor(availableBuy / minQty);
+
+      if (numTriggers > 0) {
+        const giftItemsInCart = cart.filter(item => item.id === getProductId);
+        let totalGiftQtyInCart = giftItemsInCart.reduce((sum, item) => sum + item.qty, 0);
+
+        const maxFreeQty = freeQty * numTriggers;
+        const discountableQty = Math.min(totalGiftQtyInCart, maxFreeQty);
+
+        if (discountableQty > 0) {
+          const itemPrice = giftItemsInCart[0].price;
+          const discount = itemPrice * discountableQty;
+          
+          buyXGetYDiscount += discount;
+          appliedPromos.push({
+            name: promo.name,
+            discount
+          });
+        }
+      }
+    });
+
+    return {
+      autoItemDiscounts,
+      comboDiscount,
+      buyXGetYDiscount,
+      appliedPromos
+    };
+  };
+
+  const promoDetails = getPromoDetails();
+
   const VAT_RATE = 0.08;
-  // Calculate subtotal considering per-item discounts
-  const subtotal = cart.reduce((sum, item) => {
+  const subtotalBeforeGlobalDiscounts = cart.reduce((sum, item) => {
     const itemTotal = item.price * item.qty;
-    const discount = item.discount || 0;
-    return sum + (itemTotal - discount);
+    const manualDiscount = item.discount || 0;
+    const autoDiscount = promoDetails.autoItemDiscounts[item.cartItemId]?.amount || 0;
+    const finalDiscount = manualDiscount > 0 ? manualDiscount : autoDiscount;
+    return sum + (itemTotal - finalDiscount);
   }, 0);
+
+  const globalPromoDiscount = promoDetails.comboDiscount + promoDetails.buyXGetYDiscount;
+  const subtotal = Math.max(0, subtotalBeforeGlobalDiscounts - globalPromoDiscount);
   const vatAmount = Math.round(subtotal * VAT_RATE);
   const total = subtotal + vatAmount;
   const cartCount = cart.reduce((sum, item) => sum + item.qty, 0);
@@ -161,7 +319,10 @@ export function CartProvider({ children }) {
     tableCarts, activeTableId, setSelectedTable, setTakeaway, tableHasCart,
     addToCart, removeFromCart, updateQty, clearCart, clearCurrentCart,
     applyItemDiscount,
-    loading
+    loading,
+    promotions,
+    promoDetails,
+    refreshPromotions: fetchPromotions
   };
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;

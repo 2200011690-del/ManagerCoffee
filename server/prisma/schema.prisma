@@ -36,6 +36,7 @@ model Store {
   cashShifts  CashShift[]
   returnOrders ReturnOrder[]
   heldOrders   HeldOrder[]
+  promotions     Promotion[]
 }
 
 model User {
@@ -44,10 +45,14 @@ model User {
   store   Store   @relation(fields: [storeId], references: [id], onDelete: Cascade)
   pin     String  
   name    String
-  role    String  // "admin" or "staff"
-  orders  Order[]
-  attendances Attendance[]
-  cashShifts  CashShift[]
+  role             String  // "admin" or "staff"
+  canApplyDiscount Boolean @default(true)
+  canRefund        Boolean @default(true)
+  canViewReports   Boolean @default(false)
+  maxDiscountPct   Float   @default(100.0)
+  orders           Order[]
+  attendances      Attendance[]
+  cashShifts       CashShift[]
 
   @@unique([storeId, pin])
 }
@@ -307,4 +312,19 @@ model OrderPayment {
   method        String  // "cash", "card", "transfer", "momo", "zalopay"
   amount        Float
   reference     String? // Transaction reference if applicable
+}
+
+// Phase 3: Advanced Promotions
+model Promotion {
+  id          String    @id @default(cuid())
+  storeId     String
+  store       Store     @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  name        String
+  type        String    // "HAPPY_HOUR", "COMBO", "BUY_X_GET_Y"
+  conditions  String    // JSON config string
+  rewards     String    // JSON config string
+  startDate   DateTime?
+  endDate     DateTime?
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
 }

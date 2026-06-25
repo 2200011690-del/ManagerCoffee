@@ -1759,6 +1759,106 @@ app.get('/api/reports/profit-loss', async (req, res) => {
   }
 });
 
+// --- PROMOTION APIs (Phase 3) ---
+app.get('/api/promotions', async (req, res) => {
+  try {
+    const promotions = await prisma.promotion.findMany({
+      where: { storeId: req.storeId },
+      orderBy: { createdAt: 'desc' }
+    });
+    res.json(promotions);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/promotions', async (req, res) => {
+  const { name, type, conditions, rewards, startDate, endDate, isActive } = req.body;
+  try {
+    const promotion = await prisma.promotion.create({
+      data: {
+        storeId: req.storeId,
+        name,
+        type,
+        conditions: typeof conditions === 'string' ? conditions : JSON.stringify(conditions),
+        rewards: typeof rewards === 'string' ? rewards : JSON.stringify(rewards),
+        startDate: startDate ? new Date(startDate) : null,
+        endDate: endDate ? new Date(endDate) : null,
+        isActive: isActive !== undefined ? isActive : true
+      }
+    });
+    res.json(promotion);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.put('/api/promotions/:id', async (req, res) => {
+  const { name, type, conditions, rewards, startDate, endDate, isActive } = req.body;
+  try {
+    const data = {};
+    if (name !== undefined) data.name = name;
+    if (type !== undefined) data.type = type;
+    if (conditions !== undefined) data.conditions = typeof conditions === 'string' ? conditions : JSON.stringify(conditions);
+    if (rewards !== undefined) data.rewards = typeof rewards === 'string' ? rewards : JSON.stringify(rewards);
+    if (startDate !== undefined) data.startDate = startDate ? new Date(startDate) : null;
+    if (endDate !== undefined) data.endDate = endDate ? new Date(endDate) : null;
+    if (isActive !== undefined) data.isActive = isActive;
+
+    const promotion = await prisma.promotion.update({
+      where: { id: req.params.id, storeId: req.storeId },
+      data
+    });
+    res.json(promotion);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.delete('/api/promotions/:id', async (req, res) => {
+  try {
+    await prisma.promotion.delete({
+      where: { id: req.params.id, storeId: req.storeId }
+    });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// --- CUSTOMER HISTORY API (Phase 3) ---
+app.get('/api/customers/:id/history', async (req, res) => {
+  try {
+    const orders = await prisma.order.findMany({
+      where: { storeId: req.storeId, customerId: req.params.id },
+      orderBy: { timestamp: 'desc' },
+      include: { items: true }
+    });
+
+    // Calculate top 3 frequent items
+    const itemCounts = {};
+    for (const order of orders) {
+      for (const item of order.items) {
+        if (!itemCounts[item.name]) {
+          itemCounts[item.name] = { name: item.name, count: 0, price: item.price };
+        }
+        itemCounts[item.name].count += item.qty;
+      }
+    }
+
+    const frequentItems = Object.values(itemCounts)
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 3);
+
+    res.json({
+      orders,
+      frequentItems
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 
 const PORT = process.env.PORT || 5000;
 httpServer.listen(PORT, () => {

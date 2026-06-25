@@ -11,7 +11,15 @@ export default function EmployeeManagementPage() {
   // Modals / forms
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
-  const [formData, setFormData] = useState({ name: '', pin: '', role: 'staff' });
+  const [formData, setFormData] = useState({
+    name: '',
+    pin: '',
+    role: 'staff',
+    canApplyDiscount: true,
+    canRefund: true,
+    canViewReports: false,
+    maxDiscountPct: 100
+  });
 
   // Logs state
   const [attendanceLogs, setAttendanceLogs] = useState([]);
@@ -170,13 +178,29 @@ export default function EmployeeManagementPage() {
 
   const openAdd = () => {
     setEditingUser(null);
-    setFormData({ name: '', pin: '', role: 'staff' });
+    setFormData({
+      name: '',
+      pin: '',
+      role: 'staff',
+      canApplyDiscount: true,
+      canRefund: true,
+      canViewReports: false,
+      maxDiscountPct: 100
+    });
     setIsModalOpen(true);
   };
 
   const openEdit = (u) => {
     setEditingUser(u);
-    setFormData({ name: u.name, pin: u.pin, role: u.role });
+    setFormData({
+      name: u.name,
+      pin: u.pin,
+      role: u.role,
+      canApplyDiscount: u.canApplyDiscount !== undefined ? u.canApplyDiscount : true,
+      canRefund: u.canRefund !== undefined ? u.canRefund : true,
+      canViewReports: u.canViewReports !== undefined ? u.canViewReports : false,
+      maxDiscountPct: u.maxDiscountPct !== undefined ? u.maxDiscountPct : 100
+    });
     setIsModalOpen(true);
   };
 
@@ -271,6 +295,13 @@ export default function EmployeeManagementPage() {
                           {u.role === 'admin' ? 'Quản lý' : 'Nhân viên'}
                         </span>
                       </div>
+                      {u.role === 'staff' && (
+                        <div className="mt-2.5 text-[11px] space-y-0.5 text-gray-500 border-t border-gray-100 pt-2">
+                          <div>Giảm giá: <span className="font-semibold text-gray-700">{u.canApplyDiscount ? `Tối đa ${u.maxDiscountPct}%` : 'Không'}</span></div>
+                          <div>Trả hàng: <span className="font-semibold text-gray-700">{u.canRefund ? 'Có' : 'Không'}</span></div>
+                          <div>Xem báo cáo: <span className="font-semibold text-gray-700">{u.canViewReports ? 'Có' : 'Không'}</span></div>
+                        </div>
+                      )}
                     </div>
                   </div>
                   
@@ -500,6 +531,58 @@ export default function EmployeeManagementPage() {
                   </button>
                 </div>
               </div>
+
+              {formData.role === 'staff' && (
+                <div className="space-y-2.5 border-t border-gray-100 pt-3">
+                  <span className="block text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1">Cấu hình quyền chi tiết</span>
+                  
+                  <label className="flex items-center gap-2.5 text-sm text-coffee-dark cursor-pointer font-medium">
+                    <input
+                      type="checkbox"
+                      checked={formData.canApplyDiscount}
+                      onChange={e => setFormData({...formData, canApplyDiscount: e.target.checked})}
+                      className="w-4.5 h-4.5 rounded border-gray-300 text-coffee-accent focus:ring-coffee-accent"
+                    />
+                    <span>Cho phép áp dụng giảm giá</span>
+                  </label>
+
+                  <label className="flex items-center gap-2.5 text-sm text-coffee-dark cursor-pointer font-medium">
+                    <input
+                      type="checkbox"
+                      checked={formData.canRefund}
+                      onChange={e => setFormData({...formData, canRefund: e.target.checked})}
+                      className="w-4.5 h-4.5 rounded border-gray-300 text-coffee-accent focus:ring-coffee-accent"
+                    />
+                    <span>Cho phép trả hàng / hoàn tiền</span>
+                  </label>
+
+                  <label className="flex items-center gap-2.5 text-sm text-coffee-dark cursor-pointer font-medium">
+                    <input
+                      type="checkbox"
+                      checked={formData.canViewReports}
+                      onChange={e => setFormData({...formData, canViewReports: e.target.checked})}
+                      className="w-4.5 h-4.5 rounded border-gray-300 text-coffee-accent focus:ring-coffee-accent"
+                    />
+                    <span>Cho phép xem báo cáo báo cáo</span>
+                  </label>
+
+                  {formData.canApplyDiscount && (
+                    <div className="pt-1.5">
+                      <label className="block text-xs font-bold text-gray-500 mb-1 uppercase">Giảm giá tối đa cho phép (%)</label>
+                      <input
+                        required
+                        type="number"
+                        min="0"
+                        max="100"
+                        value={formData.maxDiscountPct}
+                        onChange={e => setFormData({...formData, maxDiscountPct: Math.min(100, Math.max(0, parseFloat(e.target.value) || 0))})}
+                        className="input-field w-full min-h-[40px] text-sm"
+                        placeholder="100"
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
               
               <div className="pt-2">
                 <button type="submit" className="w-full btn-primary min-h-[48px]">

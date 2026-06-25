@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import {
   Search, ShoppingCart, Trash2, CreditCard, Banknote, Receipt, Tag,
   LayoutGrid, X, ArrowLeftRight, User, Gift, SplitSquareVertical, CheckCircle,
@@ -402,6 +402,85 @@ export default function POSPage() {
     loadActiveShift();
   };
 
+  // Customer History & Recommendation (Phase 3)
+  const [showCustomerHistoryModal, setShowCustomerHistoryModal] = useState(false);
+  const [customerHistory, setCustomerHistory] = useState(null);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+
+  const fetchCustomerHistory = async (customerId) => {
+    setLoadingHistory(true);
+    try {
+      const data = await api.get(`/customers/${customerId}/history`);
+      setCustomerHistory(data);
+    } catch (err) {
+      showNotification('Không thể tải lịch sử mua hàng', 'error');
+    } finally {
+      setLoadingHistory(false);
+    }
+  };
+
+  // Keyboard Shortcuts Hook (Phase 3)
+  const handleKeyDownRef = useRef(null);
+  handleKeyDownRef.current = (e) => {
+    const activeEl = document.activeElement;
+    if (activeEl) {
+      const tag = activeEl.tagName?.toUpperCase();
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') {
+        if (e.key === 'F9') {
+          e.preventDefault();
+          const searchInput = document.querySelector('input[placeholder="Tìm kiếm món..."]');
+          if (searchInput) {
+            searchInput.focus();
+            searchInput.select();
+          }
+        }
+        return;
+      }
+    }
+
+    if (e.key === 'F1') {
+      e.preventDefault();
+      setPaymentMethod('cash');
+      setShowPayConfirm(true);
+    } else if (e.key === 'F2') {
+      e.preventDefault();
+      setPaymentMethod('card');
+      setShowPayConfirm(true);
+    } else if (e.key === 'F3') {
+      e.preventDefault();
+      handleHoldOrder();
+    } else if (e.key === 'F9') {
+      e.preventDefault();
+      const searchInput = document.querySelector('input[placeholder="Tìm kiếm món..."]');
+      if (searchInput) {
+        searchInput.focus();
+        searchInput.select();
+      }
+    } else if (e.key === '+' || e.key === '=') {
+      if (cart.length > 0) {
+        e.preventDefault();
+        updateQty(cart[0].cartItemId, 1);
+      }
+    } else if (e.key === '-') {
+      if (cart.length > 0) {
+        e.preventDefault();
+        updateQty(cart[0].cartItemId, -1);
+      }
+    }
+  };
+
+  useEffect(() => {
+    const listener = (e) => {
+      if (handleKeyDownRef.current) {
+        handleKeyDownRef.current(e);
+      }
+    };
+    window.addEventListener('keydown', listener);
+    return () => {
+      window.removeEventListener('keydown', listener);
+    };
+  }, []);
+
   const handleConfirmSplit = async (selectedItems, splitSubtotal, splitVatAmount, splitTotal) => {
     const splitFinalTotal = splitTotal - discountAmount > 0 ? splitTotal - discountAmount : 0;
     const tableName = activeTableId ? (activeTable?.name ?? activeTableId) : 'Mang về';
@@ -513,6 +592,18 @@ export default function POSPage() {
         <div className="flex-1 overflow-y-auto px-6 pb-6">
           <ProductGrid items={filteredItems} onAddToCart={addToCart} onSelectItem={setSelectedItem} />
         </div>
+
+        {/* Phím tắt cheat-sheet */}
+        <div className="px-6 py-2 border-t border-cream-medium/40 bg-white/70 flex items-center justify-between text-[11px] text-coffee-medium flex-shrink-0">
+          <div className="flex gap-4">
+            <span><kbd className="px-1.5 py-0.5 bg-gray-150 border border-gray-300 rounded font-mono text-[10px] shadow-sm font-bold text-gray-700 bg-white mr-1">F1</kbd>Tiền mặt</span>
+            <span><kbd className="px-1.5 py-0.5 bg-gray-150 border border-gray-300 rounded font-mono text-[10px] shadow-sm font-bold text-gray-700 bg-white mr-1">F2</kbd>Thẻ / QR</span>
+            <span><kbd className="px-1.5 py-0.5 bg-gray-150 border border-gray-300 rounded font-mono text-[10px] shadow-sm font-bold text-gray-700 bg-white mr-1">F3</kbd>Giữ đơn</span>
+            <span><kbd className="px-1.5 py-0.5 bg-gray-150 border border-gray-300 rounded font-mono text-[10px] shadow-sm font-bold text-gray-700 bg-white mr-1">F9</kbd>Tìm món</span>
+            <span><kbd className="px-1.5 py-0.5 bg-gray-150 border border-gray-300 rounded font-mono text-[10px] shadow-sm font-bold text-gray-700 bg-white mr-1">+</kbd>/<kbd className="px-1.5 py-0.5 bg-gray-150 border border-gray-300 rounded font-mono text-[10px] shadow-sm font-bold text-gray-700 bg-white mx-1">-</kbd>Tăng/Giảm món đầu</span>
+          </div>
+          <span className="font-semibold text-coffee-accent hidden sm:inline">Phím tắt nhanh POS</span>
+        </div>
       </div>
 
       {/* ======== RIGHT: Cart Panel ======== */}
@@ -589,7 +680,27 @@ export default function POSPage() {
           ) : (
             <div>
               {cart.map(item => (
-                <CartItem key={item.cartItemId} item={item} onRemove={removeFromCart} onUpdateQty={updateQty} onApplyDiscount={applyItemDiscount} />
+                <CartItem 
+                  key={item.cartItemId} 
+                  item={item} 
+                  onRemove={removeFromCart} 
+                  onUpdateQty={updateQty} 
+                  onApplyDiscount={(itemId, amount, type) => {
+                    if (currentUser?.role === 'staff' && !currentUser?.canApplyDiscount) {
+                      showNotification('Nhân viên không có quyền áp dụng giảm giá', 'error');
+                      return;
+                    }
+                    
+                    const itemTotal = item.price * item.qty;
+                    const pct = itemTotal > 0 ? (amount / itemTotal) * 100 : 0;
+                    if (currentUser?.role === 'staff' && pct > currentUser?.maxDiscountPct) {
+                      showNotification(`Vượt quá hạn mức giảm giá tối đa cho phép (${currentUser.maxDiscountPct}%)`, 'error');
+                      return;
+                    }
+                    
+                    applyItemDiscount(itemId, amount, type);
+                  }} 
+                />
               ))}
             </div>
           )}
@@ -613,19 +724,44 @@ export default function POSPage() {
                 )}
               </div>
               {customer && (
-                <div className="flex justify-between text-xs bg-cream-light p-2 rounded-lg">
-                  <span className="font-bold text-coffee-dark">{customer.name} <span className="text-coffee-accent">({customer.tier})</span></span>
-                  <span className="text-coffee-medium">{customer.points} điểm</span>
+                <div className="flex items-center justify-between text-xs bg-cream-light p-2 rounded-lg">
+                  <div className="flex flex-col">
+                    <span className="font-bold text-coffee-dark">{customer.name} <span className="text-coffee-accent">({customer.tier})</span></span>
+                    <span className="text-coffee-medium">{customer.points} điểm</span>
+                  </div>
+                  <button 
+                    type="button"
+                    onClick={() => {
+                      fetchCustomerHistory(customer.id);
+                      setShowCustomerHistoryModal(true);
+                    }}
+                    className="px-2 py-1 rounded bg-coffee-accent text-white font-semibold hover:bg-coffee-dark transition-colors flex-shrink-0"
+                  >
+                    Lịch sử
+                  </button>
                 </div>
               )}
 
               <div className="flex gap-2 mt-2">
                 <div className="relative flex-1">
                   <Gift size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
-                  <input type="text" placeholder="Mã giảm giá..." value={voucherInput} onChange={e=>setVoucherInput(e.target.value)} className="input-field pl-8 min-h-[36px] text-xs w-full uppercase" disabled={appliedVoucher != null} />
+                  <input 
+                    type="text" 
+                    placeholder="Mã giảm giá..." 
+                    value={voucherInput} 
+                    onChange={e=>setVoucherInput(e.target.value)} 
+                    className="input-field pl-8 min-h-[36px] text-xs w-full uppercase" 
+                    disabled={appliedVoucher != null || (currentUser?.role === 'staff' && !currentUser?.canApplyDiscount)} 
+                  />
                 </div>
                 {!appliedVoucher ? (
-                  <button onClick={handleApplyVoucher} className="btn-secondary min-h-[36px] px-3 text-xs">Áp dụng</button>
+                  <button 
+                    onClick={handleApplyVoucher} 
+                    disabled={currentUser?.role === 'staff' && !currentUser?.canApplyDiscount}
+                    className="btn-secondary min-h-[36px] px-3 text-xs"
+                  >
+                    Áp dụng
+                  </button>
                 ) : (
                   <button onClick={() => { setAppliedVoucher(null); setVoucherInput(''); setDiscountAmount(0); }} className="btn-danger min-h-[36px] px-3 text-xs">Xóa</button>
                 )}
@@ -694,7 +830,12 @@ export default function POSPage() {
             <div className="flex gap-2">
               <button
                 onClick={() => setShowOrderDiscount(true)}
-                className="flex-1 min-h-[38px] flex items-center justify-center gap-1 rounded-xl text-xs font-semibold border-2 border-green-200 text-green-700 bg-green-50 hover:bg-green-100 transition-all"
+                disabled={currentUser?.role === 'staff' && !currentUser?.canApplyDiscount}
+                className={`flex-1 min-h-[38px] flex items-center justify-center gap-1 rounded-xl text-xs font-semibold border-2 transition-all ${
+                  currentUser?.role === 'staff' && !currentUser?.canApplyDiscount
+                    ? 'border-gray-200 text-gray-400 bg-gray-50 cursor-not-allowed'
+                    : 'border-green-200 text-green-700 bg-green-50 hover:bg-green-100'
+                }`}
               >
                 <Percent size={13} />
                 Giảm giá đơn
@@ -725,7 +866,12 @@ export default function POSPage() {
               </button>
               <button
                 onClick={() => setShowReturnModal(true)}
-                className="flex-1 min-h-[44px] flex items-center justify-center gap-1.5 text-xs font-semibold border-2 border-red-200 text-red-600 bg-red-50 hover:bg-red-100 rounded-xl transition-all"
+                disabled={currentUser?.role === 'staff' && !currentUser?.canRefund}
+                className={`flex-1 min-h-[44px] flex items-center justify-center gap-1.5 text-xs font-semibold border-2 rounded-xl transition-all ${
+                  currentUser?.role === 'staff' && !currentUser?.canRefund
+                    ? 'border-gray-200 text-gray-400 bg-gray-50 cursor-not-allowed'
+                    : 'border-red-200 text-red-600 bg-red-50 hover:bg-red-100'
+                }`}
               >
                 <RotateCcw size={13} />
                 Trả hàng
@@ -1114,6 +1260,99 @@ export default function POSPage() {
           onClose={() => setShowSplitPayment(false)}
           onConfirm={(payments) => handleConfirmPayment(payments)}
         />
+      )}
+
+      {/* Customer History Modal (Phase 3) */}
+      {showCustomerHistoryModal && customer && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/45 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[85vh] animate-slide-up border border-cream-medium/30">
+            <div className="px-6 py-4.5 border-b border-gray-100 flex justify-between items-center bg-cream-light/30">
+              <div>
+                <h3 className="font-display font-bold text-coffee-dark text-lg">Lịch sử & Gợi ý món: {customer.name}</h3>
+                <p className="text-xs text-coffee-medium">{customer.phone} · Hạng {customer.tier} · {customer.points} điểm</p>
+              </div>
+              <button onClick={() => setShowCustomerHistoryModal(false)} className="text-gray-400 hover:text-gray-700 p-1">
+                <X size={20} />
+              </button>
+            </div>
+            
+            <div className="p-6 overflow-y-auto flex-1 space-y-6">
+              {loadingHistory ? (
+                <p className="text-center py-10 text-coffee-medium">Đang tải lịch sử...</p>
+              ) : (
+                <>
+                  {/* Top 3 Favorite Items */}
+                  <div>
+                    <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2.5">Món ưa thích (Hay mua)</h4>
+                    {!customerHistory?.frequentItems || customerHistory.frequentItems.length === 0 ? (
+                      <p className="text-sm text-gray-500 italic">Chưa có lịch sử mua món nào</p>
+                    ) : (
+                      <div className="grid grid-cols-3 gap-2.5">
+                        {customerHistory.frequentItems.map((f, idx) => {
+                          const menuItem = visibleMenu.find(p => p.name === f.name);
+                          return (
+                            <button
+                              key={idx}
+                              type="button"
+                              onClick={() => {
+                                if (menuItem) {
+                                  handleAddItem(menuItem, '100% đường', '100% đá', 'Gợi ý món ưa thích');
+                                  showNotification(`Đã thêm món ưa thích: ${f.name}`, 'success');
+                                } else {
+                                  showNotification('Món ăn hiện tại không còn phục vụ', 'error');
+                                }
+                              }}
+                              className="bg-cream-light/50 border border-cream-medium/40 hover:border-coffee-accent hover:bg-cream-medium/30 p-3 rounded-2xl text-left transition-all relative group flex flex-col justify-between min-h-[90px]"
+                            >
+                              <span className="font-bold text-coffee-dark text-xs line-clamp-2 leading-tight mb-1">{f.name}</span>
+                              <div className="flex justify-between items-baseline mt-auto">
+                                <span className="text-[10px] text-gray-400">Đã mua {f.count} lần</span>
+                              </div>
+                              <span className="absolute right-2 bottom-2 opacity-0 group-hover:opacity-100 text-[9px] bg-coffee-accent text-white px-1.5 py-0.5 rounded font-bold transition-opacity">
+                                Thêm +
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Past Orders List */}
+                  <div>
+                    <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2.5">Hóa đơn mua gần đây</h4>
+                    {!customerHistory?.orders || customerHistory.orders.length === 0 ? (
+                      <p className="text-sm text-gray-500 italic">Chưa thực hiện giao dịch nào</p>
+                    ) : (
+                      <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1">
+                        {customerHistory.orders.map((ord, idx) => (
+                          <div key={idx} className="p-3 border border-gray-150 rounded-xl bg-gray-50/50 hover:bg-gray-50 transition-colors">
+                            <div className="flex justify-between items-center text-xs font-bold text-coffee-dark mb-1.5">
+                              <span>HĐ: {ord.orderNumber}</span>
+                              <span className="text-coffee-accent">{ord.total.toLocaleString()}đ</span>
+                            </div>
+                            <div className="text-[11px] text-gray-500 flex justify-between mb-2">
+                              <span>Ngày mua: {ord.date} {ord.time}</span>
+                              <span className="capitalize">Hình thức: {ord.paymentMethod === 'cash' ? 'Tiền mặt' : ord.paymentMethod === 'card' ? 'Thẻ/QR' : 'Kết hợp'}</span>
+                            </div>
+                            <div className="border-t border-dashed border-gray-200 pt-1.5 text-[11px] text-coffee-medium space-y-0.5">
+                              {ord.items.map((it, iIdx) => (
+                                <div key={iIdx} className="flex justify-between">
+                                  <span>{it.name} x{it.qty}</span>
+                                  <span>{(it.price * it.qty).toLocaleString()}đ</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

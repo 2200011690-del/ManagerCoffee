@@ -30,7 +30,7 @@ export function AuthProvider({ children }) {
       const user = await api.post('/auth/login', { pin });
       user.allowedViews = user.role === 'admin' 
         ? ['pos', 'tables', 'dashboard', 'menu', 'employees', 'settings'] 
-        : ['pos', 'tables'];
+        : (user.canViewReports ? ['pos', 'tables', 'dashboard'] : ['pos', 'tables']);
         
       setCurrentUser(user);
       setPinError('');
@@ -58,7 +58,12 @@ export function AuthProvider({ children }) {
   };
 
   const isAdmin = currentUser?.role === 'admin';
-  const canAccess = (viewId) => currentUser?.allowedViews?.includes(viewId);
+  const canAccess = (viewId) => {
+    if (!currentUser) return false;
+    if (currentUser.role === 'admin') return true;
+    if (viewId === 'dashboard') return !!currentUser.canViewReports;
+    return currentUser.allowedViews?.includes(viewId);
+  };
 
   return (
     <AuthContext.Provider value={{
