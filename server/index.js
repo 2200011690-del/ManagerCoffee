@@ -164,54 +164,6 @@ app.post('/api/auth/register-store', async (req, res) => {
       }
     });
     
-    // Tạo thêm tài khoản Nhân viên mặc định (mã PIN 2222)
-    await prisma.user.create({
-      data: {
-        storeId: store.id,
-        name: 'Nhân viên 1',
-        pin: '2222',
-        role: 'staff'
-      }
-    });
-    
-    // Khởi tạo sơ đồ bàn mặc định cho cửa hàng mới
-    const defaultTables = [
-      { name: 'Bàn 1', zone: 'Tầng trệt', capacity: 2 },
-      { name: 'Bàn 2', zone: 'Tầng trệt', capacity: 2 },
-      { name: 'Bàn 3', zone: 'Tầng trệt', capacity: 4 },
-      { name: 'Bàn 4', zone: 'Lầu 1', capacity: 4 },
-      { name: 'Bàn 5', zone: 'Sân vườn', capacity: 4 }
-    ];
-    for (const t of defaultTables) {
-      await prisma.table.create({
-        data: { ...t, storeId: store.id }
-      });
-    }
-    
-    // Khởi tạo các sản phẩm menu mặc định
-    const defaultProducts = [
-      { name: 'Cà phê Đen', price: 29000, category: 'Cà phê', popular: true, prepTime: '5 phút' },
-      { name: 'Cà phê Sữa', price: 35000, category: 'Cà phê', popular: true, prepTime: '5 phút' },
-      { name: 'Trà Đào Cam Sả', price: 45000, category: 'Trà', popular: true, prepTime: '5 phút' },
-      { name: 'Bánh Croissant', price: 35000, category: 'Bánh', popular: false, prepTime: '2 phút' }
-    ];
-    for (const p of defaultProducts) {
-      await prisma.product.create({
-        data: { ...p, storeId: store.id }
-      });
-    }
-
-    // Khởi tạo nguyên liệu kho mặc định
-    const defaultInventory = [
-      { name: 'Cà phê Arabica', unit: 'kg', qty: 10.0, minQty: 2, icon: '☕' },
-      { name: 'Sữa đặc', unit: 'lon', qty: 12.0, minQty: 3, icon: '🥫' }
-    ];
-    for (const item of defaultInventory) {
-      await prisma.inventory.create({
-        data: { ...item, storeId: store.id }
-      });
-    }
-    
     res.json({ success: true, message: 'Đăng ký cửa hàng thành công!', storeCode });
   } catch (err) {
     res.status(500).json({ error: 'Lỗi hệ thống khi đăng ký cửa hàng: ' + err.message });
