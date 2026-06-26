@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Coffee, LayoutGrid, BarChart3, ChefHat, ChevronRight, Wifi, LogOut, Shield, Users, ShoppingBag, Clock, Settings, Gift } from 'lucide-react';
+import { Coffee, LayoutGrid, BarChart3, ChefHat, ChevronRight, Wifi, WifiOff, LogOut, Shield, Users, ShoppingBag, Clock, Settings, Gift } from 'lucide-react';
 import { useUI } from '../context/UIContext';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
@@ -9,6 +9,7 @@ import QuickAttendanceModal from './pos/QuickAttendanceModal';
 const ALL_NAV_ITEMS = [
   { id: 'pos',       label: 'Bán hàng',     icon: ShoppingBag, subtitle: 'POS',          roles: ['admin', 'staff'] },
   { id: 'tables',    label: 'Sơ đồ bàn',    icon: LayoutGrid,  subtitle: 'Table Map',    roles: ['admin', 'staff'] },
+  { id: 'kitchen',   label: 'Nhà bếp',      icon: ChefHat,     subtitle: 'Kitchen',      roles: ['admin', 'staff'] },
   { id: 'dashboard', label: 'Báo cáo',      icon: BarChart3,   subtitle: 'Analytics',    roles: ['admin'] },
   { id: 'menu',      label: 'Quản lý Menu', icon: ChefHat,     subtitle: 'Menu & CRUD',  roles: ['admin'] },
   { id: 'promotions', label: 'Khuyến mãi',   icon: Gift,        subtitle: 'Promotions',   roles: ['admin'] },
@@ -24,9 +25,22 @@ export default function Sidebar() {
 
   const [now, setNow] = useState(new Date());
   const [showAttendanceModal, setShowAttendanceModal] = useState(false);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+
   useEffect(() => {
     const interval = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
   }, []);
 
   const timeStr = now.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -64,8 +78,12 @@ export default function Sidebar() {
         <div className="flex items-center justify-between">
           <p className="text-white font-mono text-base font-bold tracking-wider">{timeStr}</p>
           <div className="flex items-center gap-1">
-            <div className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse-soft" />
-            <Wifi size={11} className="text-sidebar-text" />
+            <div className={`w-1.5 h-1.5 rounded-full ${isOnline ? 'bg-green-400 animate-pulse-soft' : 'bg-orange-500 animate-pulse'}`} />
+            {isOnline ? (
+              <Wifi size={11} className="text-sidebar-text" />
+            ) : (
+              <WifiOff size={11} className="text-orange-500" />
+            )}
           </div>
         </div>
       </div>

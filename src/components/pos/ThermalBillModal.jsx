@@ -1,9 +1,8 @@
+import { useState } from 'react';
 import { Printer, CheckCircle, X } from 'lucide-react';
+import { api } from '../../api';
 
-function VietQRCode({ amount, info }) {
-  const bankId = 'MB'; // Default Bank
-  const accountNo = '123456789'; // Default Account
-  const accountName = 'CAFE MANAGER';
+function VietQRCode({ amount, info, bankId = 'MB', accountNo = '', accountName = '' }) {
   const url = `https://img.vietqr.io/image/${bankId}-${accountNo}-compact2.png?amount=${amount}&addInfo=${encodeURIComponent(info)}&accountName=${encodeURIComponent(accountName)}`;
 
   return (
@@ -20,12 +19,44 @@ function padLine(left, right, total = 32) {
   return left + ' '.repeat(Math.max(1, pad)) + right;
 }
 
-export default function ThermalBillModal({ order, onConfirm, onClose }) {
+export default function ThermalBillModal({ order, store, onConfirm, onClose }) {
+  const [printing, setPrinting] = useState(false);
+
   if (!order) return null;
 
   const now = new Date();
   const timeStr = now.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
   const dateStr = now.toLocaleDateString('vi-VN');
+
+  // Lấy thông tin ngân hàng từ store hoặc env làm dự phòng
+  const bankId = store?.bankId || 'MB';
+  const bankAccountNo = store?.bankAccountNo || '';
+  const bankAccountName = store?.bankAccountName || '';
+
+  const handlePrintAndConfirm = async () => {
+    const ip = localStorage.getItem('lan_printer_ip');
+    if (ip) {
+      setPrinting(true);
+      try {
+        await api.post('/print', {
+          ip,
+          port: 9100,
+          order,
+          store
+        });
+      } catch (err) {
+        console.error('Lỗi in LAN:', err);
+        alert((err.response?.data?.error || err.message) + '\n\nHệ thống sẽ mở hộp thoại in trình duyệt để thay thế.');
+        window.print();
+      } finally {
+        setPrinting(false);
+        onConfirm();
+      }
+    } else {
+      window.print();
+      onConfirm();
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 animate-fade-in"
@@ -50,14 +81,14 @@ export default function ThermalBillModal({ order, onConfirm, onClose }) {
 
         {/* Thermal receipt body */}
         <div className="flex-1 overflow-y-auto p-4">
-          <div className="bg-gray-50 rounded-xl p-4 border border-gray-200"
+          <div id="thermal-receipt" className="bg-gray-50 rounded-xl p-4 border border-gray-200"
             style={{ fontFamily: "'Courier New', Courier, monospace", fontSize: '11px', lineHeight: '1.6', color: '#111', letterSpacing: '0.01em' }}>
 
             {/* Shop header */}
             <div className="text-center mb-1">
-              <p className="font-bold text-base tracking-widest">ESPRESSO LAB</p>
-              <p className="text-xs">123 Nguyễn Huệ, Q.1, TP.HCM</p>
-              <p className="text-xs">Tel: 028 3822 xxxx</p>
+              <p className="font-bold text-base tracking-widest uppercase">{store?.name || 'ESPRESSO LAB'}</p>
+              <p className="text-xs">{store?.address || 'Địa chỉ quán'}</p>
+              <p className="text-xs">Tel: {store?.phone || 'Số điện thoại'}</p>
             </div>
 
             <p className="text-center text-xs my-1">{sep('=')}</p>
@@ -65,11 +96,11 @@ export default function ThermalBillModal({ order, onConfirm, onClose }) {
             {/* Order info */}
             <p className="text-center font-bold">HOÁ ĐƠN THANH TOÁN</p>
             <p className="text-center text-xs my-0.5">{sep('-')}</p>
-            <p>{padLine('Mã HĐ:', order.id)}</p>
+            <p>{padLine('Mã HĐ:', order.orderNumber || order.id)}</p>
             <p>{padLine('Ngày:', dateStr)}</p>
             <p>{padLine('Giờ:', timeStr)}</p>
             <p>{padLine('Bàn:', order.tableName)}</p>
-            <p>{padLine('Hình thức:', order.paymentMethod === 'cash' ? 'Tiền mặt' : 'Thẻ/QR')}</p>
+            <p>{padLine('Hình thức:', order.paymentMethod === 'cash' ? 'Tiền mặt' : order.paymentMethod === 'card' ? 'Chuyển khoản' : 'Thẻ/QR')}</p>
 
             <p className="my-1">{sep('-')}</p>
 
@@ -106,7 +137,7 @@ export default function ThermalBillModal({ order, onConfirm, onClose }) {
             {/* Totals */}
             <p>{padLine('Tạm tính:', order.subtotal.toLocaleString('vi-VN') + 'đ')}</p>
             {order.discountAmount > 0 && (
-              <p>{padLine(`Giảm giá (${order.voucherCode}):`, '-' + order.discountAmount.toLocaleString('vi-VN') + 'đ')}</p>
+              <p>{padLine(`Giảm giá (${order.voucherCode || 'Chiết khấu'}):`, '-' + order.discountAmount.toLocaleString('vi-VN') + 'đ')}</p>
             )}
             <p>{padLine('VAT (8%):', '+' + order.vatAmount.toLocaleString('vi-VN') + 'đ')}</p>
             <p className="font-bold text-sm">{sep('=')}</p>
@@ -114,19 +145,35 @@ export default function ThermalBillModal({ order, onConfirm, onClose }) {
             <p>{sep('=')}</p>
 
             {/* QR */}
-            <div className="flex flex-col items-center my-3">
-              <p className="text-xs mb-2 text-center">Quét QR để chuyển khoản</p>
-              <VietQRCode amount={order.total} info={`THANH TOAN ${order.tableName || 'DON HANG'}`} />
-              <p className="text-xs mt-2 text-center font-bold">MB BANK - 1234 567 89</p>
-              <p className="text-xs text-center">CAFE MANAGER</p>
-              <p className="text-xs text-center text-gray-500">ND: THANH TOAN {order.tableName || 'DON HANG'}</p>
-            </div>
+            {bankAccountNo && order.paymentMethod !== 'cash' && (
+              <div className="flex flex-col items-center my-3">
+                <p className="text-xs mb-2 text-center">Thông tin chuyển khoản</p>
+                <VietQRCode 
+                  amount={order.total} 
+                  info={order.orderNumber || order.id} 
+                  bankId={bankId}
+                  accountNo={bankAccountNo}
+                  accountName={bankAccountName}
+                />
+                <p className="text-[9px] mt-2 text-center font-bold">{bankId} - {bankAccountNo}</p>
+                <p className="text-[9px] text-center uppercase">{bankAccountName}</p>
+                <p className="text-[9px] text-center text-gray-500">ND: {order.orderNumber || order.id}</p>
+              </div>
+            )}
 
             <p>{sep('-')}</p>
             {/* Footer */}
-            <p className="text-center text-xs mt-1">Cam on quy khach!</p>
-            <p className="text-center text-xs">Hen gap lai lan sau ♥</p>
-            <p className="text-center text-xs mt-1 text-gray-400">espressolab.vn</p>
+            {store?.printHeader ? (
+              <p className="text-center text-[10px] whitespace-pre-line my-1">{store.printHeader}</p>
+            ) : (
+              <p className="text-center text-xs mt-1">Cam on quy khach!</p>
+            )}
+            {store?.printFooter ? (
+              <p className="text-center text-[10px] whitespace-pre-line my-1">{store.printFooter}</p>
+            ) : (
+              <p className="text-center text-xs">Hen gap lai lan sau ♥</p>
+            )}
+            <p className="text-center text-[9px] mt-1 text-gray-400">espressolab.vn</p>
           </div>
         </div>
 
@@ -135,10 +182,17 @@ export default function ThermalBillModal({ order, onConfirm, onClose }) {
           <button onClick={onClose} className="min-h-[44px] flex-1 btn-secondary text-sm">
             Hủy
           </button>
-          <button onClick={onConfirm}
-            className="min-h-[44px] flex-1 btn-primary flex items-center justify-center gap-2 text-sm">
-            <CheckCircle size={18} />
-            Xác nhận in & Hoàn tất
+          <button 
+            onClick={handlePrintAndConfirm}
+            disabled={printing}
+            className="min-h-[44px] flex-1 btn-primary flex items-center justify-center gap-2 text-sm disabled:opacity-50"
+          >
+            {printing ? (
+              <span className="animate-spin mr-1">⌛</span>
+            ) : (
+              <CheckCircle size={18} />
+            )}
+            {printing ? 'Đang in...' : 'Xác nhận in & Hoàn tất'}
           </button>
         </div>
       </div>

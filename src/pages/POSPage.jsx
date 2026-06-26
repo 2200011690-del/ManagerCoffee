@@ -21,6 +21,7 @@ import SplitBillModal from '../components/pos/SplitBillModal';
 import ReturnOrderModal from '../components/pos/ReturnOrderModal';
 import HeldOrdersPanel from '../components/pos/HeldOrdersPanel';
 import SplitPaymentModal from '../components/pos/SplitPaymentModal';
+import PaymentQRModal from '../components/pos/PaymentQRModal';
 
 // ---- Table Picker Panel ----
 function TablePickerPanel({ onClose }) {
@@ -148,6 +149,9 @@ export default function POSPage() {
   const [showOrderDiscount, setShowOrderDiscount] = useState(false);
   const [orderDiscountAmount, setOrderDiscountAmount] = useState(0);
   const [discountReason, setDiscountReason] = useState('');
+  
+  // Phase 2 states
+  const [showQRModal, setShowQRModal] = useState(false);
 
   // Cash Shift Handover states
   const [activeShift, setActiveShift] = useState(null);
@@ -300,30 +304,80 @@ export default function POSPage() {
 
   // ---- Checkout Handlers ----
   const handleConfirmPayment = async (splitPayments = null) => {
-    // Build order object
     const tableName = activeTableId ? (activeTable?.name ?? activeTableId) : 'Mang về';
-    const newOrder = await addOrder({
-      tableId: activeTableId,
-      tableName,
-      cart,
-      subtotal,
-      vatAmount,
-      total: finalTotal,
-      paymentMethod: splitPayments ? 'mixed' : paymentMethod,
-      customerId: customer?.id,
-      voucherCode: appliedVoucher?.code,
-      discountAmount: totalDiscount,
-      employeeId: currentUser?.id,
-      // Phase 1 fields
-      orderDiscount: orderDiscountAmount,
-      orderDiscountType: orderDiscountAmount > 0 ? orderDiscountType : null,
-      discountReason: discountReason || null,
-      payments: splitPayments || null
-    });
-    setPendingOrder(newOrder);
-    setShowPayConfirm(false);
-    setShowSplitPayment(false);
+    
+    // Nếu thanh toán chuyển khoản QR -> Tạo hóa đơn ở trạng thái PENDING trước
+    if (paymentMethod === 'card' && !splitPayments) {
+      try {
+        const newOrder = await addOrder({
+          tableId: activeTableId,
+          tableName,
+          cart,
+          subtotal,
+          vatAmount,
+          total: finalTotal,
+          paymentMethod: 'card',
+          customerId: customer?.id,
+          voucherCode: appliedVoucher?.code,
+          discountAmount: totalDiscount,
+          employeeId: currentUser?.id,
+          orderDiscount: orderDiscountAmount,
+          orderDiscountType: orderDiscountAmount > 0 ? orderDiscountType : null,
+          discountReason: discountReason || null,
+          status: 'pending' // Tạo hóa đơn pending chờ đối soát
+        });
+        setPendingOrder(newOrder);
+        setShowPayConfirm(false);
+        setShowQRModal(true); // Mở modal QR
+      } catch (err) {
+        showNotification('Lỗi khởi tạo đơn hàng thanh toán QR', 'error');
+      }
+      return;
+    }
+
+    try {
+      const newOrder = await addOrder({
+        tableId: activeTableId,
+        tableName,
+        cart,
+        subtotal,
+        vatAmount,
+        total: finalTotal,
+        paymentMethod: splitPayments ? 'mixed' : paymentMethod,
+        customerId: customer?.id,
+        voucherCode: appliedVoucher?.code,
+        discountAmount: totalDiscount,
+        employeeId: currentUser?.id,
+        orderDiscount: orderDiscountAmount,
+        orderDiscountType: orderDiscountAmount > 0 ? orderDiscountType : null,
+        discountReason: discountReason || null,
+        payments: splitPayments || null
+      });
+      setPendingOrder(newOrder);
+      setShowPayConfirm(false);
+      setShowSplitPayment(false);
+      setShowThermal(true);
+    } catch (err) {
+      showNotification('Lỗi thanh toán hóa đơn', 'error');
+    }
+  };
+
+  const handleQRSuccess = async () => {
+    try {
+      // Gọi API cập nhật trạng thái hóa đơn sang paid
+      const paidOrder = await api.put(`/orders/${pendingOrder.id}/pay`);
+      setPendingOrder(paidOrder);
+    } catch (err) {
+      // Fallback nếu webhook đã xử lý xong trước và API trả về 404
+      console.log('Order already paid via webhook.');
+    }
+    setShowQRModal(false);
     setShowThermal(true);
+  };
+
+  const handleQRCancel = () => {
+    setShowQRModal(false);
+    setPendingOrder(null);
   };
 
   // Hold current order
@@ -968,6 +1022,17 @@ export default function POSPage() {
             setShowThermal(false);
             setPendingOrder(null);
           }}
+        />
+      )}
+
+      {/* Payment QR Code Modal */}
+      {showQRModal && pendingOrder && (
+        <PaymentQRModal
+          amount={finalTotal}
+          orderNumber={pendingOrder.orderNumber}
+          onSuccess={handleQRSuccess}
+          onFail={handleQRCancel}
+          onClose={handleQRCancel}
         />
       )}
 

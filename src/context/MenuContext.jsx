@@ -11,9 +11,15 @@ export function MenuProvider({ children }) {
   const fetchMenu = async () => {
     try {
       const data = await api.get('/products');
-      setMenuList(Array.isArray(data) ? data : []);
+      const list = Array.isArray(data) ? data : [];
+      setMenuList(list);
+      localStorage.setItem('cached_menu_list', JSON.stringify(list));
     } catch (err) {
-      console.error('Failed to fetch menu:', err);
+      console.error('Failed to fetch menu, loading cached version:', err);
+      const cached = localStorage.getItem('cached_menu_list');
+      if (cached) {
+        setMenuList(JSON.parse(cached));
+      }
     } finally {
       setLoading(false);
     }

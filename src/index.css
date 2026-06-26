@@ -122,3 +122,41 @@
   .animation-delay-100 { animation-delay: 100ms; }
   .animation-delay-200 { animation-delay: 200ms; }
 }
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  #thermal-receipt, #thermal-receipt * {
+    visibility: visible;
+  }
+  #thermal-receipt {
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: 58mm !important;
+    max-width: 58mm !important;
+    margin: 0 !important;
+    padding: 10px !important;
+    border: none !important;
+    background: white !important;
+    box-shadow: none !important;
+  }
+  /* Hide background overlays and dialog borders */
+  .fixed.inset-0 {
+    background: transparent !important;
+    backdrop-filter: none !important;
+    position: absolute !important;
+  }
+  .relative.bg-white.rounded-2xl {
+    box-shadow: none !important;
+    border: none !important;
+    background: transparent !important;
+  }
+  /* Hide modal actions and header during printing */
+  .fixed.inset-0 button,
+  .fixed.inset-0 .border-t,
+  .fixed.inset-0 .border-b {
+    display: none !important;
+  }
+}

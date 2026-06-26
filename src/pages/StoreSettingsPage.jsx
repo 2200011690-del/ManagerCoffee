@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Settings, Save, Globe, Receipt, Gift, Percent, RefreshCw, CheckCircle, AlertTriangle, Image as ImageIcon } from 'lucide-react';
+import { Settings, Save, Globe, Receipt, Gift, Percent, RefreshCw, CheckCircle, AlertTriangle, CreditCard, Image as ImageIcon } from 'lucide-react';
 import { api } from '../api';
 import { useUI } from '../context/UIContext';
 
@@ -8,6 +8,8 @@ export default function StoreSettingsPage() {
   const [activeTab, setActiveTab] = useState('general'); // 'general', 'receipt', 'loyalty'
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [printerIp, setPrinterIp] = useState(localStorage.getItem('lan_printer_ip') || '');
+  const [testingPrint, setTestingPrint] = useState(false);
   const [settings, setSettings] = useState({
     name: '',
     code: '',
@@ -18,7 +20,10 @@ export default function StoreSettingsPage() {
     pointsRate: 0.1,
     currency: 'VNĐ',
     printHeader: '',
-    printFooter: ''
+    printFooter: '',
+    bankId: 'MB',
+    bankAccountNo: '',
+    bankAccountName: ''
   });
 
   const fetchSettings = async () => {
@@ -36,7 +41,10 @@ export default function StoreSettingsPage() {
           pointsRate: data.pointsRate ?? 0.1,
           currency: data.currency || 'VNĐ',
           printHeader: data.printHeader || '',
-          printFooter: data.printFooter || ''
+          printFooter: data.printFooter || '',
+          bankId: data.bankId || 'MB',
+          bankAccountNo: data.bankAccountNo || '',
+          bankAccountName: data.bankAccountName || ''
         });
       }
     } catch (err) {
@@ -59,15 +67,55 @@ export default function StoreSettingsPage() {
   };
 
   const handleSave = async (e) => {
-    e.preventDefault();
+    if (e) e.preventDefault();
     setSaving(true);
     try {
       await api.put('/store/settings', settings);
+      localStorage.setItem('lan_printer_ip', printerIp);
       showNotification('Lưu cấu hình thành công! 🎉', 'success');
     } catch (err) {
       showNotification('Lỗi khi lưu cấu hình', 'error');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleTestPrint = async (e) => {
+    if (e) e.preventDefault();
+    if (!printerIp.trim()) {
+      alert('Vui lòng nhập địa chỉ IP máy in LAN');
+      return;
+    }
+    setTestingPrint(true);
+    try {
+      await api.post('/print', {
+        ip: printerIp,
+        port: 9100,
+        store: {
+          name: settings.name || 'QUAN TEST IN',
+          address: settings.address || '123 Duong Test',
+          phone: settings.phone || '0987654321',
+          printFooter: settings.printFooter || 'Cam on da in thu!'
+        },
+        order: {
+          orderNumber: 'HD-TEST-123',
+          tableName: 'Ban Test',
+          subtotal: 50000,
+          discountAmount: 10000,
+          vatAmount: 3200,
+          total: 43200,
+          paymentMethod: 'cash',
+          items: [
+            { name: 'Ca phe Sua da', qty: 2, price: 20000, sugar: '50%', ice: 'It da' },
+            { name: 'Tra Dao Cam Sa', qty: 1, price: 10000, sugar: '100%', ice: 'Nhiều đá', note: 'It ngọt' }
+          ]
+        }
+      });
+      showNotification('Đã gửi lệnh in thử thành công! 🎉', 'success');
+    } catch (err) {
+      showNotification(err.response?.data?.error || 'Lỗi kết nối máy in LAN', 'error');
+    } finally {
+      setTestingPrint(false);
     }
   };
 
@@ -145,6 +193,32 @@ export default function StoreSettingsPage() {
           >
             <Gift size={18} />
             <span>Tích lũy & VAT</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('bank')}
+            className={`w-full min-h-[44px] flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold transition-all ${
+              activeTab === 'bank'
+                ? 'bg-coffee-accent text-white shadow-md shadow-coffee-accent/20'
+                : 'text-coffee-medium hover:bg-cream-light/80 hover:text-coffee-dark'
+            }`}
+          >
+            <CreditCard size={18} />
+            <span>Tài khoản ngân hàng</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('printer')}
+            className={`w-full min-h-[44px] flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold transition-all ${
+              activeTab === 'printer'
+                ? 'bg-coffee-accent text-white shadow-md shadow-coffee-accent/20'
+                : 'text-coffee-medium hover:bg-cream-light/80 hover:text-coffee-dark'
+            }`}
+          >
+            <Receipt size={18} />
+            <span>Thiết bị in LAN</span>
           </button>
         </div>
 
@@ -344,6 +418,88 @@ export default function StoreSettingsPage() {
                   </div>
                   <p className="text-[10px] text-coffee-medium/60 leading-relaxed">
                     Tỷ lệ đổi tổng hóa đơn sang điểm (ví dụ: 0.1 nghĩa là đơn 100,000đ được cộng 10,000 điểm).
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'bank' && (
+            <div className="space-y-6 animate-fade-in">
+              <div className="border-b border-coffee-light/10 pb-4">
+                <h2 className="text-lg font-bold text-coffee-dark">Thông tin ngân hàng nhận tiền</h2>
+                <p className="text-xs text-coffee-medium/70">Cấu hình tài khoản ngân hàng để hệ thống tự động tạo mã QR động nhận thanh toán.</p>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-coffee-medium">Tên viết tắt ngân hàng (Ví dụ: MB, VCB, ACB)</label>
+                  <input
+                    type="text"
+                    name="bankId"
+                    value={settings.bankId}
+                    onChange={handleChange}
+                    placeholder="Ví dụ: MB"
+                    className="w-full min-h-[40px] px-3.5 py-2 text-sm rounded-xl border border-coffee-light/20 focus:outline-none focus:border-coffee-accent bg-[#FCFBF8]"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-coffee-medium">Số tài khoản ngân hàng</label>
+                  <input
+                    type="text"
+                    name="bankAccountNo"
+                    value={settings.bankAccountNo}
+                    onChange={handleChange}
+                    placeholder="Nhập số tài khoản"
+                    className="w-full min-h-[40px] px-3.5 py-2 text-sm rounded-xl border border-coffee-light/20 focus:outline-none focus:border-coffee-accent bg-[#FCFBF8]"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-coffee-medium">Tên hiển thị chủ tài khoản (Không dấu)</label>
+                <input
+                  type="text"
+                  name="bankAccountName"
+                  value={settings.bankAccountName}
+                  onChange={handleChange}
+                  placeholder="Ví dụ: NGUYEN VAN A"
+                  className="w-full min-h-[40px] px-3.5 py-2 text-sm rounded-xl border border-coffee-light/20 focus:outline-none focus:border-coffee-accent bg-[#FCFBF8]"
+                />
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'printer' && (
+            <div className="space-y-6 animate-fade-in">
+              <div className="border-b border-coffee-light/10 pb-4">
+                <h2 className="text-lg font-bold text-coffee-dark">Cấu hình máy in hóa đơn LAN</h2>
+                <p className="text-xs text-coffee-medium/70">Thiết lập kết nối với máy in bill nhiệt cổng mạng LAN (ESC/POS cổng 9100) của quầy thu ngân này.</p>
+              </div>
+
+              <div className="space-y-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-coffee-medium">Địa chỉ IP Máy in LAN (Ví dụ: 192.168.1.100)</label>
+                  <div className="flex gap-3">
+                    <input
+                      type="text"
+                      value={printerIp}
+                      onChange={(e) => setPrinterIp(e.target.value)}
+                      placeholder="Nhập địa chỉ IP máy in"
+                      className="flex-1 min-h-[40px] px-3.5 py-2 text-sm rounded-xl border border-coffee-light/20 focus:outline-none focus:border-coffee-accent bg-[#FCFBF8]"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleTestPrint}
+                      disabled={testingPrint}
+                      className="min-h-[40px] px-4 bg-coffee-accent hover:bg-amber-700 text-white rounded-xl text-xs font-bold transition-all disabled:opacity-50"
+                    >
+                      {testingPrint ? 'Đang gửi...' : 'In thử hóa đơn'}
+                    </button>
+                  </div>
+                  <p className="text-[10px] text-coffee-medium/60 leading-relaxed">
+                    * Lưu ý: Máy in phải kết nối chung mạng LAN với thiết bị này. Nếu bỏ trống, hệ thống sẽ tự động in bằng hộp thoại in của trình duyệt làm phương án dự phòng.
                   </p>
                 </div>
               </div>

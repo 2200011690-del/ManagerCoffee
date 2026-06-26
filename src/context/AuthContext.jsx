@@ -24,10 +24,10 @@ export function AuthProvider({ children }) {
   const [pinError, setPinError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  const login = async (pin) => {
+  const login = async (storeCode, pin) => {
     setIsLoading(true);
     try {
-      const user = await api.post('/auth/login', { pin });
+      const user = await api.post('/auth/login', { storeCode, pin });
       user.allowedViews = user.role === 'admin' 
         ? ['pos', 'tables', 'dashboard', 'menu', 'employees', 'settings'] 
         : (user.canViewReports ? ['pos', 'tables', 'dashboard'] : ['pos', 'tables']);
@@ -42,7 +42,8 @@ export function AuthProvider({ children }) {
       
       return true;
     } catch (err) {
-      setPinError('Mã PIN không đúng. Vui lòng thử lại.');
+      const errorMsg = err.response?.data?.error || 'Mã cửa hàng hoặc mã PIN không đúng. Vui lòng thử lại.';
+      setPinError(errorMsg);
       return false;
     } finally {
       setIsLoading(false);

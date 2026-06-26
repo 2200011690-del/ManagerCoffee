@@ -4,8 +4,11 @@ import dotenv from 'dotenv';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import { PrismaClient } from '@prisma/client';
+import jwt from 'jsonwebtoken';
+import net from 'net';
 
 dotenv.config();
+const JWT_SECRET = process.env.JWT_SECRET || 'manager-coffee-super-secret-key-1234';
 
 const allowedOrigins = process.env.CORS_ORIGIN 
   ? process.env.CORS_ORIGIN.split(',') 
@@ -53,14 +56,39 @@ const broadcast = (event, data, storeId) => {
   }
 };
 
-// --- MULTI-TENANT MIDDLEWARE ---
+// --- MULTI-TENANT & AUTH MIDDLEWARE ---
 app.use((req, res, next) => {
-  if (req.path === '/api/auth/login') return next();
-  
-  const storeId = req.headers['x-store-id'];
-  if (!storeId && req.path.startsWith('/api/')) {
-    return res.status(401).json({ error: 'Missing x-store-id header' });
+  // Cho phép bỏ qua kiểm tra đăng nhập/đăng ký/webhook PayOS
+  if (
+    req.path === '/api/auth/login' || 
+    req.path === '/api/auth/register-store' ||
+    req.path === '/api/payments/payos-webhook'
+  ) {
+    return next();
   }
+  
+  let storeId = null;
+  let userPayload = null;
+  
+  const authHeader = req.headers['authorization'];
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const token = authHeader.substring(7);
+    try {
+      userPayload = jwt.verify(token, JWT_SECRET);
+      storeId = userPayload.storeId;
+      req.user = userPayload; // Đính kèm thông tin user giải mã từ token vào req
+    } catch (err) {
+      return res.status(401).json({ error: 'Phiên làm việc hết hạn hoặc không hợp lệ. Vui lòng đăng nhập lại.' });
+    }
+  } else {
+    // Fallback cho local development hoặc migration scripts
+    storeId = req.headers['x-store-id'];
+  }
+  
+  if (!storeId && req.path.startsWith('/api/')) {
+    return res.status(401).json({ error: 'Thiếu thông tin xác thực (JWT Token hoặc x-store-id)' });
+  }
+  
   req.storeId = storeId;
   next();
 });
@@ -93,19 +121,144 @@ app.delete('/api/carts/:id', (req, res) => {
   res.json({ success: true });
 });
 
-// 1. Auth
-app.post('/api/auth/login', async (req, res) => {
-  const { pin } = req.body;
-  // For SaaS, we just find the first user with this PIN across all stores.
-  // In a real app, users should enter a Store Code or Domain.
-  const user = await prisma.user.findFirst({
-    where: { pin },
-    include: { store: true }
-  });
-  if (user) {
-    return res.json(user);
+// 1. Auth & Register
+app.post('/api/auth/register-store', async (req, res) => {
+  const { storeName, storeCode, adminName, adminPin } = req.body;
+  
+  if (!storeName || !storeCode || !adminName || !adminPin) {
+    return res.status(400).json({ error: 'Vui lòng cung cấp đầy đủ thông tin đăng ký.' });
   }
-  return res.status(401).json({ error: 'Mã PIN không đúng' });
+  
+  // Kiểm tra định dạng storeCode (chỉ gồm chữ thường, số, dấu gạch nối)
+  const codeRegex = /^[a-z0-9-]+$/;
+  if (!codeRegex.test(storeCode)) {
+    return res.status(400).json({ error: 'Mã cửa hàng chỉ được chứa chữ thường không dấu, số và dấu gạch nối (-).' });
+  }
+  
+  try {
+    // Kiểm tra xem mã cửa hàng đã tồn tại chưa
+    const existingStore = await prisma.store.findUnique({
+      where: { code: storeCode }
+    });
+    if (existingStore) {
+      return res.status(400).json({ error: 'Mã cửa hàng này đã tồn tại trên hệ thống. Vui lòng chọn mã khác.' });
+    }
+    
+    // Khởi tạo cửa hàng mới
+    const store = await prisma.store.create({
+      data: {
+        name: storeName,
+        code: storeCode,
+        address: 'Địa chỉ quán của bạn',
+        phone: 'Số điện thoại liên hệ'
+      }
+    });
+    
+    // Tạo tài khoản Admin cho cửa hàng
+    const admin = await prisma.user.create({
+      data: {
+        storeId: store.id,
+        name: adminName,
+        pin: adminPin,
+        role: 'admin'
+      }
+    });
+    
+    // Tạo thêm tài khoản Nhân viên mặc định (mã PIN 2222)
+    await prisma.user.create({
+      data: {
+        storeId: store.id,
+        name: 'Nhân viên 1',
+        pin: '2222',
+        role: 'staff'
+      }
+    });
+    
+    // Khởi tạo sơ đồ bàn mặc định cho cửa hàng mới
+    const defaultTables = [
+      { name: 'Bàn 1', zone: 'Tầng trệt', capacity: 2 },
+      { name: 'Bàn 2', zone: 'Tầng trệt', capacity: 2 },
+      { name: 'Bàn 3', zone: 'Tầng trệt', capacity: 4 },
+      { name: 'Bàn 4', zone: 'Lầu 1', capacity: 4 },
+      { name: 'Bàn 5', zone: 'Sân vườn', capacity: 4 }
+    ];
+    for (const t of defaultTables) {
+      await prisma.table.create({
+        data: { ...t, storeId: store.id }
+      });
+    }
+    
+    // Khởi tạo các sản phẩm menu mặc định
+    const defaultProducts = [
+      { name: 'Cà phê Đen', price: 29000, category: 'Cà phê', popular: true, prepTime: '5 phút' },
+      { name: 'Cà phê Sữa', price: 35000, category: 'Cà phê', popular: true, prepTime: '5 phút' },
+      { name: 'Trà Đào Cam Sả', price: 45000, category: 'Trà', popular: true, prepTime: '5 phút' },
+      { name: 'Bánh Croissant', price: 35000, category: 'Bánh', popular: false, prepTime: '2 phút' }
+    ];
+    for (const p of defaultProducts) {
+      await prisma.product.create({
+        data: { ...p, storeId: store.id }
+      });
+    }
+
+    // Khởi tạo nguyên liệu kho mặc định
+    const defaultInventory = [
+      { name: 'Cà phê Arabica', unit: 'kg', qty: 10.0, minQty: 2, icon: '☕' },
+      { name: 'Sữa đặc', unit: 'lon', qty: 12.0, minQty: 3, icon: '🥫' }
+    ];
+    for (const item of defaultInventory) {
+      await prisma.inventory.create({
+        data: { ...item, storeId: store.id }
+      });
+    }
+    
+    res.json({ success: true, message: 'Đăng ký cửa hàng thành công!', storeCode });
+  } catch (err) {
+    res.status(500).json({ error: 'Lỗi hệ thống khi đăng ký cửa hàng: ' + err.message });
+  }
+});
+
+app.post('/api/auth/login', async (req, res) => {
+  const { storeCode, pin } = req.body;
+  
+  if (!storeCode || !pin) {
+    return res.status(400).json({ error: 'Vui lòng điền đầy đủ Mã cửa hàng và Mã PIN' });
+  }
+  
+  try {
+    const user = await prisma.user.findFirst({
+      where: {
+        store: { code: storeCode },
+        pin: pin
+      },
+      include: { store: true }
+    });
+    
+    if (user) {
+      // Tạo token JWT có thời hạn 30 ngày
+      const token = jwt.sign(
+        {
+          userId: user.id,
+          storeId: user.storeId,
+          role: user.role,
+          name: user.name
+        },
+        JWT_SECRET,
+        { expiresIn: '30d' }
+      );
+      
+      // Trả về thông tin user kèm token
+      const { pin: _p, ...safeUser } = user; // Loại bỏ PIN thô khỏi phản hồi
+      return res.json({
+        ...safeUser,
+        token
+      });
+    }
+    
+    return res.status(401).json({ error: 'Mã cửa hàng hoặc mã PIN không chính xác' });
+  } catch (err) {
+    return res.status(500).json({ error: 'Lỗi đăng nhập: ' + err.message });
+  }
 });
 
 // 1.1 Users (Employee Management)
@@ -459,15 +612,119 @@ app.get('/api/orders', async (req, res) => {
   res.json(orders);
 });
 
+// Helper để xác nhận thanh toán thành công cho đơn hàng pending
+const completeOrderPayment = async (orderId, storeId) => {
+  try {
+    const order = await prisma.order.findFirst({
+      where: { id: orderId, storeId, status: 'pending' },
+      include: { items: true }
+    });
+    if (!order) return null;
+
+    // Cập nhật trạng thái sang paid
+    const updatedOrder = await prisma.order.update({
+      where: { id: orderId },
+      data: { status: 'paid' },
+      include: { items: true, employee: true, customer: true }
+    });
+
+    // 1. Cập nhật ca làm việc nếu là tiền mặt
+    if (updatedOrder.paymentMethod === 'cash' && updatedOrder.employeeId) {
+      const activeShift = await prisma.cashShift.findFirst({
+        where: { storeId, userId: updatedOrder.employeeId, status: 'open' }
+      });
+      if (activeShift) {
+        await prisma.cashShift.update({
+          where: { id: activeShift.id },
+          data: {
+            cashSales: { increment: updatedOrder.total },
+            expectedCash: { increment: updatedOrder.total }
+          }
+        });
+      }
+    }
+
+    // 2. Cộng điểm tích lũy cho khách hàng
+    if (updatedOrder.customerId) {
+      const pointsToAdd = Math.floor(updatedOrder.total * 0.1);
+      const customer = await prisma.customer.findUnique({ where: { id: updatedOrder.customerId } });
+      if (customer) {
+        const newPoints = customer.points + pointsToAdd;
+        let newTier = customer.tier;
+        if (newPoints >= 1500) newTier = 'DIAMOND';
+        else if (newPoints >= 500) newTier = 'GOLD';
+        
+        await prisma.customer.update({
+          where: { id: updatedOrder.customerId },
+          data: { points: newPoints, tier: newTier }
+        });
+      }
+    }
+
+    // 3. Chuyển trạng thái bàn sang dirty (chờ dọn dẹp)
+    if (updatedOrder.tableId) {
+      const table = await prisma.table.update({
+        where: { id: updatedOrder.tableId },
+        data: { status: 'dirty', occupiedSince: null }
+      });
+      broadcast('tableUpdated', table, storeId);
+    }
+
+    // 4. Trừ kho nguyên liệu theo định lượng công thức (Recipe)
+    for (const c of updatedOrder.items) {
+      // Tìm sản phẩm trong DB theo tên để lấy ID
+      const product = await prisma.product.findFirst({
+        where: { storeId, name: c.name }
+      });
+      if (!product) continue;
+
+      const recipeItems = await prisma.recipeItem.findMany({
+        where: { productId: product.id },
+        include: { inventory: true }
+      });
+      
+      for (const recipe of recipeItems) {
+        const amount = recipe.qty * c.qty;
+        
+        const updatedInventory = await prisma.inventory.update({
+          where: { id: recipe.inventoryId },
+          data: { qty: { decrement: amount } }
+        });
+        
+        await prisma.stockTransaction.create({
+          data: {
+            storeId,
+            inventoryId: recipe.inventoryId,
+            type: 'SALE',
+            qtyChange: -amount,
+            balance: updatedInventory.qty,
+            note: `Bán hàng - HĐ ${updatedOrder.orderNumber} (${c.name} x${c.qty})`
+          }
+        });
+      }
+    }
+
+    // Đồng bộ thông tin qua WebSocket
+    broadcast('orderCreated', updatedOrder, storeId);
+    broadcast('inventoryUpdated', await prisma.inventory.findMany({ where: { storeId } }), storeId);
+
+    return updatedOrder;
+  } catch (err) {
+    console.error('Lỗi khi hoàn tất thanh toán:', err);
+    throw err;
+  }
+};
+
 app.post('/api/orders/checkout', async (req, res) => {
   const { 
     tableId, tableName, cart, subtotal, vatAmount, total, paymentMethod,
     customerId, voucherCode, discountAmount, employeeId,
-    // Phase 1: New discount & payment fields
     orderDiscount, orderDiscountType, discountReason,
-    payments // Array of { method, amount, reference? } for split payment
+    payments,
+    status // "pending" hoặc "paid"
   } = req.body;
   const storeId = req.storeId;
+  const orderStatus = status || 'paid';
   
   const date = new Date();
   const dateStr = date.toLocaleDateString('vi-VN');
@@ -486,13 +743,13 @@ app.post('/api/orders/checkout', async (req, res) => {
       vatAmount,
       total,
       paymentMethod: payments && payments.length > 1 ? 'mixed' : paymentMethod,
+      status: orderStatus,
       time: timeStr,
       date: dateStr,
       customerId,
       voucherCode,
       discountAmount,
       employeeId,
-      // Phase 1: Discount fields
       orderDiscount: orderDiscount || 0,
       orderDiscountType: orderDiscountType || null,
       discountReason: discountReason || null,
@@ -504,12 +761,10 @@ app.post('/api/orders/checkout', async (req, res) => {
           sugar: item.sugar,
           ice: item.ice,
           note: item.note,
-          // Phase 1: Per-item discount
           discount: item.discount || 0,
           discountType: item.discountType || null
         }))
       },
-      // Phase 1: Split payment records
       ...(payments && payments.length > 0 ? {
         payments: {
           create: payments.map(p => ({
@@ -523,92 +778,108 @@ app.post('/api/orders/checkout', async (req, res) => {
     include: { items: true, employee: true, payments: true }
   });
 
-  // Update active shift if payment includes cash
-  const cashAmount = payments
-    ? payments.filter(p => p.method === 'cash').reduce((s, p) => s + (Number(p.amount) || 0), 0)
-    : (paymentMethod === 'cash' ? total : 0);
+  // Nếu trạng thái là paid, thực hiện xử lý trừ kho, cộng điểm và cập nhật ca làm việc lập tức
+  if (orderStatus === 'paid') {
+    const cashAmount = payments
+      ? payments.filter(p => p.method === 'cash').reduce((s, p) => s + (Number(p.amount) || 0), 0)
+      : (paymentMethod === 'cash' ? total : 0);
 
-  if (cashAmount > 0 && employeeId) {
-    try {
-      const activeShift = await prisma.cashShift.findFirst({
-        where: { storeId, userId: employeeId, status: 'open' }
-      });
-      if (activeShift) {
-        await prisma.cashShift.update({
-          where: { id: activeShift.id },
-          data: {
-            cashSales: { increment: cashAmount },
-            expectedCash: { increment: cashAmount }
-          }
+    if (cashAmount > 0 && employeeId) {
+      try {
+        const activeShift = await prisma.cashShift.findFirst({
+          where: { storeId, userId: employeeId, status: 'open' }
         });
+        if (activeShift) {
+          await prisma.cashShift.update({
+            where: { id: activeShift.id },
+            data: {
+              cashSales: { increment: cashAmount },
+              expectedCash: { increment: cashAmount }
+            }
+          });
+        }
+      } catch (err) {
+        console.error('Error updating active shift cash sales:', err);
+      }
+    }
+
+    if (customerId) {
+      const pointsToAdd = Math.floor(total * 0.1);
+      const customer = await prisma.customer.findUnique({ where: { id: customerId } });
+      if (customer) {
+        const newPoints = customer.points + pointsToAdd;
+        let newTier = customer.tier;
+        if (newPoints >= 1500) newTier = 'DIAMOND';
+        else if (newPoints >= 500) newTier = 'GOLD';
+        
+        await prisma.customer.update({
+          where: { id: customerId },
+          data: { points: newPoints, tier: newTier }
+        });
+      }
+    }
+
+    if (tableId) {
+      const table = await prisma.table.update({
+        where: { id: tableId },
+        data: { status: 'dirty', occupiedSince: null }
+      });
+      broadcast('tableUpdated', table, storeId);
+    }
+
+    try {
+      for (const c of cart) {
+        const recipeItems = await prisma.recipeItem.findMany({
+          where: { productId: c.id },
+          include: { inventory: true }
+        });
+        
+        for (const recipe of recipeItems) {
+          const amount = recipe.qty * c.qty;
+          const updatedInventory = await prisma.inventory.update({
+            where: { id: recipe.inventoryId },
+            data: { qty: { decrement: amount } }
+          });
+          
+          await prisma.stockTransaction.create({
+            data: {
+              storeId,
+              inventoryId: recipe.inventoryId,
+              type: 'SALE',
+              qtyChange: -amount,
+              balance: updatedInventory.qty,
+              note: `Bán hàng - HĐ ${orderNumber} (${c.name} x${c.qty})`
+            }
+          });
+        }
       }
     } catch (err) {
-      console.error('Error updating active shift cash sales:', err);
+      console.error('Error deducting inventory:', err);
     }
-  }
 
-  if (customerId) {
-    const pointsToAdd = Math.floor(total * 0.1);
-    const customer = await prisma.customer.findUnique({ where: { id: customerId } });
-    if (customer) {
-      const newPoints = customer.points + pointsToAdd;
-      let newTier = customer.tier;
-      if (newPoints >= 1500) newTier = 'DIAMOND';
-      else if (newPoints >= 500) newTier = 'GOLD';
-      
-      await prisma.customer.update({
-        where: { id: customerId },
-        data: { points: newPoints, tier: newTier }
-      });
-    }
+    broadcast('orderCreated', order, storeId);
+    broadcast('inventoryUpdated', await prisma.inventory.findMany({ where: { storeId } }), storeId);
+  } else {
+    // Với đơn hàng pending, ta phát sự kiện orderCreated nhưng trạng thái sẽ là pending để thu ngân theo dõi
+    broadcast('orderCreated', order, storeId);
   }
-
-  if (tableId) {
-    const table = await prisma.table.update({
-      where: { id: tableId },
-      data: { status: 'dirty', occupiedSince: null }
-    });
-    broadcast('tableUpdated', table, storeId);
-  }
-
-  // Deduct ingredients from database recipes
-  try {
-    for (const c of cart) {
-      const recipeItems = await prisma.recipeItem.findMany({
-        where: { productId: c.id },
-        include: { inventory: true }
-      });
-      
-      for (const recipe of recipeItems) {
-        const amount = recipe.qty * c.qty;
-        
-        // Decrement inventory qty
-        const updatedInventory = await prisma.inventory.update({
-          where: { id: recipe.inventoryId },
-          data: { qty: { decrement: amount } }
-        });
-        
-        // Create SALE transaction
-        await prisma.stockTransaction.create({
-          data: {
-            storeId,
-            inventoryId: recipe.inventoryId,
-            type: 'SALE',
-            qtyChange: -amount,
-            balance: updatedInventory.qty,
-            note: `Bán hàng - HĐ ${orderNumber} (${c.name} x${c.qty})`
-          }
-        });
-      }
-    }
-  } catch (err) {
-    console.error('Error deducting inventory:', err);
-  }
-
-  broadcast('orderCreated', order, storeId);
-  broadcast('inventoryUpdated', await prisma.inventory.findMany({ where: { storeId } }), storeId);
 
   res.json(order);
+});
+
+// API xác nhận thanh toán thủ công cho đơn hàng pending
+app.put('/api/orders/:id/pay', async (req, res) => {
+  const { id } = req.params;
+  const storeId = req.storeId;
+  try {
+    const updated = await completeOrderPayment(id, storeId);
+    if (!updated) {
+      return res.status(404).json({ error: 'Không tìm thấy hóa đơn chờ thanh toán hoặc đã thanh toán trước đó' });
+    }
+    res.json(updated);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // 5. Inventory
@@ -1481,7 +1752,7 @@ app.get('/api/store/settings', async (req, res) => {
 });
 
 app.put('/api/store/settings', async (req, res) => {
-  const { name, address, phone, logo, vatRate, pointsRate, currency, printHeader, printFooter } = req.body;
+  const { name, address, phone, logo, vatRate, pointsRate, currency, printHeader, printFooter, bankId, bankAccountNo, bankAccountName } = req.body;
   try {
     const store = await prisma.store.update({
       where: { id: req.storeId },
@@ -1489,7 +1760,8 @@ app.put('/api/store/settings', async (req, res) => {
         name, address, phone, logo,
         vatRate: vatRate !== undefined ? Number(vatRate) : undefined,
         pointsRate: pointsRate !== undefined ? Number(pointsRate) : undefined,
-        currency, printHeader, printFooter
+        currency, printHeader, printFooter,
+        bankId, bankAccountNo, bankAccountName
       }
     });
     res.json(store);
@@ -1859,6 +2131,272 @@ app.get('/api/customers/:id/history', async (req, res) => {
   }
 });
 
+
+// --- KITCHEN DISPLAY SYSTEM (KDS) APIs (Phase 3) ---
+app.get('/api/kitchen/orders', async (req, res) => {
+  const storeId = req.storeId;
+  try {
+    const orders = await prisma.order.findMany({
+      where: {
+        storeId,
+        prepStatus: { in: ['pending', 'preparing'] },
+        status: { in: ['paid', 'pending'] }
+      },
+      orderBy: { timestamp: 'asc' },
+      include: { items: true }
+    });
+    res.json(orders);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put('/api/kitchen/orders/:id/status', async (req, res) => {
+  const { id } = req.params;
+  const { prepStatus } = req.body;
+  const storeId = req.storeId;
+  
+  if (!['pending', 'preparing', 'completed'].includes(prepStatus)) {
+    return res.status(400).json({ error: 'Trạng thái pha chế không hợp lệ' });
+  }
+
+  try {
+    const order = await prisma.order.update({
+      where: { id, storeId },
+      data: { prepStatus },
+      include: { items: true }
+    });
+    
+    // Phát WebSocket đồng bộ cho tất cả các màn hình bếp và POS thu ngân
+    broadcast('kitchenOrderUpdated', order, storeId);
+    res.json(order);
+  } catch (err) {
+    res.status(400).json({ error: 'Không thể cập nhật trạng thái pha chế: ' + err.message });
+  }
+});
+
+
+// --- PAYMENTS & DYNAMIC QR APIs (Phase 2) ---
+app.post('/api/payments/create-qr', async (req, res) => {
+  const { amount, orderNumber } = req.body;
+  const storeId = req.storeId;
+  
+  if (!amount || !orderNumber) {
+    return res.status(400).json({ error: 'Thiếu số tiền hoặc mã đơn hàng' });
+  }
+
+  try {
+    const store = await prisma.store.findUnique({
+      where: { id: storeId }
+    });
+    
+    if (!store) {
+      return res.status(404).json({ error: 'Không tìm thấy cửa hàng' });
+    }
+
+    // Lấy thông tin tài khoản ngân hàng của store, nếu không có dùng mặc định từ Env
+    const bankId = store.bankId || process.env.VITE_BANK_ID || 'MB';
+    const bankAccountNo = store.bankAccountNo || process.env.VITE_ACCOUNT_NO || '';
+    const bankAccountName = store.bankAccountName || process.env.VITE_ACCOUNT_NAME || '';
+
+    if (!bankAccountNo) {
+      return res.status(400).json({ error: 'Cửa hàng chưa thiết lập số tài khoản ngân hàng nhận tiền trong phần Cấu hình.' });
+    }
+
+    // Tạo mã VietQR qua API miễn phí của VietQR.io (compact2: chỉ hiển thị QR và số tiền tối giản)
+    const qrUrl = `https://img.vietqr.io/image/${bankId}-${bankAccountNo}-compact2.png?amount=${amount}&addInfo=${encodeURIComponent(orderNumber)}&accountName=${encodeURIComponent(bankAccountName)}`;
+
+    res.json({
+      qrUrl,
+      bankId,
+      bankAccountNo,
+      bankAccountName,
+      amount,
+      orderNumber
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Lỗi tạo mã thanh toán: ' + err.message });
+  }
+});
+
+app.post('/api/payments/simulate-success', async (req, res) => {
+  const { orderNumber } = req.body;
+  if (!orderNumber) return res.status(400).json({ error: 'Thiếu mã đơn hàng cần mô phỏng' });
+  
+  try {
+    const pendingOrder = await prisma.order.findFirst({
+      where: { orderNumber, status: 'pending' }
+    });
+    
+    if (pendingOrder) {
+      await completeOrderPayment(pendingOrder.id, pendingOrder.storeId);
+      console.log(`[SIMULATE] Thanh toán thành công trong DB. Phát socket cho đơn hàng: ${orderNumber}`);
+    } else {
+      console.log(`[SIMULATE] Không tìm thấy đơn hàng pending ${orderNumber} trong DB, phát socket thô.`);
+    }
+    
+    io.emit('paymentSuccess', { orderNumber });
+    res.json({ success: true, message: 'Đã gửi tín hiệu thanh toán thành công' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/payments/payos-webhook', async (req, res) => {
+  const payload = req.body;
+  console.log('PayOS Webhook received payload:', payload);
+  
+  const data = payload.data;
+  if (data) {
+    const orderNumber = data.description;
+    if (orderNumber) {
+      try {
+        const pendingOrder = await prisma.order.findFirst({
+          where: { orderNumber, status: 'pending' }
+        });
+        if (pendingOrder) {
+          await completeOrderPayment(pendingOrder.id, pendingOrder.storeId);
+          console.log(`[PAYOS] Đã đối soát & lưu thanh toán đơn hàng ${orderNumber} vào database.`);
+        }
+      } catch (err) {
+        console.error('[PAYOS] Lỗi khi hoàn tất thanh toán từ webhook:', err);
+      }
+      console.log(`[PAYOS] Giao dịch thành công. Kích hoạt đóng hóa đơn: ${orderNumber}`);
+      io.emit('paymentSuccess', { orderNumber });
+    }
+  }
+  res.json({ success: true });
+});
+
+app.post('/api/print', (req, res) => {
+  const { ip, port = 9100, order, store } = req.body;
+  if (!ip) {
+    return res.status(400).json({ error: 'Thiếu địa chỉ IP máy in' });
+  }
+
+  // Tiếng Việt không dấu helper
+  function removeAccents(str) {
+    if (!str) return '';
+    return str
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[đĐ]/g, m => m === 'đ' ? 'd' : 'D');
+  }
+
+  try {
+    const client = new net.Socket();
+    client.setTimeout(3000); // 3 seconds timeout
+
+    client.connect(port, ip, () => {
+      // Send ESC/POS commands
+      const commands = [];
+      
+      // Initialize printer
+      commands.push(Buffer.from([0x1B, 0x40]));
+
+      // Print Header (Bold, Centered, Double-height)
+      commands.push(Buffer.from([0x1B, 0x61, 0x01])); // Align center
+      commands.push(Buffer.from([0x1B, 0x45, 0x01])); // Bold on
+      commands.push(Buffer.from([0x1D, 0x21, 0x11])); // Double text size
+      commands.push(Buffer.from(removeAccents(store?.name || 'MANAGER COFFEE') + '\n\n'));
+      
+      // Normal size, normal text
+      commands.push(Buffer.from([0x1D, 0x21, 0x00])); // Normal size
+      commands.push(Buffer.from([0x1B, 0x45, 0x00])); // Bold off
+      commands.push(Buffer.from(removeAccents(store?.address || 'Dia chi quan') + '\n'));
+      commands.push(Buffer.from(removeAccents(`Tel: ${store?.phone || ''}`) + '\n'));
+      commands.push(Buffer.from('================================\n'));
+      
+      // Order details
+      commands.push(Buffer.from([0x1B, 0x45, 0x01])); // Bold on
+      commands.push(Buffer.from('HOA DON THANH TOAN\n'));
+      commands.push(Buffer.from([0x1B, 0x45, 0x00])); // Bold off
+      commands.push(Buffer.from('--------------------------------\n'));
+      
+      // Left aligned details
+      commands.push(Buffer.from([0x1B, 0x61, 0x00])); // Align left
+      commands.push(Buffer.from(removeAccents(`Ma HD: ${order.orderNumber || order.id.substring(0,8)}`) + '\n'));
+      commands.push(Buffer.from(removeAccents(`Ban:   ${order.tableName}`)+ '\n'));
+      commands.push(Buffer.from(`Gio:   ${new Date().toLocaleTimeString('vi-VN')}\n`));
+      commands.push(Buffer.from(`Ngay:  ${new Date().toLocaleDateString('vi-VN')}\n`));
+      commands.push(Buffer.from(`Hinh thuc: ${order.paymentMethod === 'cash' ? 'Tien mat' : 'Chuyen khoan'}\n`));
+      commands.push(Buffer.from('--------------------------------\n'));
+
+      // Items Column Headers
+      commands.push(Buffer.from('Mon                 SL   T.Tien\n'));
+      commands.push(Buffer.from('--------------------------------\n'));
+
+      // Items
+      order.items.forEach(item => {
+        let name = removeAccents(item.name);
+        if (name.length > 18) name = name.substring(0, 17) + '.';
+        const namePad = name.padEnd(20, ' ');
+        const qtyStr = ('x' + item.qty).padStart(3, ' ');
+        const totalVal = (item.price * item.qty).toLocaleString('vi-VN');
+        const priceStr = totalVal.padStart(9, ' ');
+        commands.push(Buffer.from(`${namePad}${qtyStr}${priceStr}\n`));
+        if (item.sugar !== '100%' || item.ice !== 'Nhiều đá' || item.note) {
+          const detail = [
+            item.sugar !== '100%' && `Duong ${item.sugar}`,
+            item.ice !== 'Nhiều đá' && removeAccents(item.ice),
+            item.note && removeAccents(item.note)
+          ].filter(Boolean).join(' - ');
+          commands.push(Buffer.from(`  * ${detail.substring(0, 28)}\n`));
+        }
+      });
+      
+      commands.push(Buffer.from('--------------------------------\n'));
+      
+      // Summary
+      const subtotalStr = order.subtotal.toLocaleString('vi-VN') + 'd';
+      commands.push(Buffer.from(`Tam tinh: ${subtotalStr.padStart(22, ' ')}\n`));
+      if (order.discountAmount > 0) {
+        const discStr = '-' + order.discountAmount.toLocaleString('vi-VN') + 'd';
+        commands.push(Buffer.from(`Giam gia: ${discStr.padStart(22, ' ')}\n`));
+      }
+      const vatStr = '+' + order.vatAmount.toLocaleString('vi-VN') + 'd';
+      commands.push(Buffer.from(`VAT (8%): ${vatStr.padStart(22, ' ')}\n`));
+      
+      commands.push(Buffer.from('================================\n'));
+      commands.push(Buffer.from([0x1B, 0x45, 0x01])); // Bold on
+      const totalStr = order.total.toLocaleString('vi-VN') + 'd';
+      commands.push(Buffer.from(`TONG CONG: ${totalStr.padStart(21, ' ')}\n`));
+      commands.push(Buffer.from([0x1B, 0x45, 0x00])); // Bold off
+      commands.push(Buffer.from('================================\n'));
+
+      // Print Footer
+      commands.push(Buffer.from([0x1B, 0x61, 0x01])); // Align center
+      if (store?.printFooter) {
+        commands.push(Buffer.from(removeAccents(store.printFooter) + '\n'));
+      } else {
+        commands.push(Buffer.from('Cam on quy khach!\nHen gap lai lan sau!\n'));
+      }
+      commands.push(Buffer.from('espressolab.vn\n\n\n\n\n')); // extra spacing
+      
+      // Cut paper command
+      commands.push(Buffer.from([0x1D, 0x56, 0x41, 0x03]));
+
+      // Write to TCP socket
+      client.write(Buffer.concat(commands), () => {
+        client.end();
+        res.json({ success: true, message: 'Đã gửi lệnh in thành công' });
+      });
+    });
+
+    client.on('error', (err) => {
+      console.error('Lỗi kết nối máy in:', err.message);
+      res.status(500).json({ error: `Không thể kết nối tới máy in tại IP ${ip}:9100. Vui lòng kiểm tra dây mạng và nguồn điện.` });
+    });
+
+    client.on('timeout', () => {
+      client.destroy();
+      res.status(500).json({ error: `Kết nối tới máy in tại IP ${ip}:9100 bị quá hạn (Timeout).` });
+    });
+
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 const PORT = process.env.PORT || 5000;
 httpServer.listen(PORT, () => {

@@ -11,9 +11,15 @@ export function TableProvider({ children }) {
   const fetchTables = async () => {
     try {
       const data = await api.get('/tables');
-      setTables(Array.isArray(data) ? data : []);
+      const list = Array.isArray(data) ? data : [];
+      setTables(list);
+      localStorage.setItem('cached_tables_list', JSON.stringify(list));
     } catch (err) {
-      console.error(err);
+      console.error('Failed to fetch tables, loading cached version:', err);
+      const cached = localStorage.getItem('cached_tables_list');
+      if (cached) {
+        setTables(JSON.parse(cached));
+      }
     } finally {
       setLoading(false);
     }

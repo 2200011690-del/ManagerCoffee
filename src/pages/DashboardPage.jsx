@@ -186,7 +186,16 @@ function OrderHistoryTab() {
                 {filtered.map(order => (
                   <tr key={order.timestamp} className="border-b border-cream-medium/30 hover:bg-cream-light/50 transition-colors">
                     <td className="px-4 py-3">
-                      <span className="font-mono font-bold text-coffee-accent text-xs bg-coffee-accent/10 px-2 py-1 rounded-lg">{order.orderNumber || order.id}</span>
+                      <div className="flex flex-col gap-1">
+                        <span className="font-mono font-bold text-coffee-accent text-xs bg-coffee-accent/10 px-2 py-1 rounded-lg w-fit">
+                          {order.orderNumber || order.id}
+                        </span>
+                        {order.isOffline && (
+                          <span className="text-[9px] text-orange-600 font-bold bg-orange-50 border border-orange-200 px-1.5 py-0.5 rounded-md w-fit animate-pulse">
+                            Chờ đồng bộ
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-4 py-3 font-medium text-coffee-dark">{order.tableName}</td>
                     <td className="px-4 py-3 text-coffee-light hidden sm:table-cell">

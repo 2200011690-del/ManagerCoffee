@@ -15,10 +15,18 @@ import EmployeeManagementPage from './pages/EmployeeManagementPage';
 import PromotionManagementPage from './pages/PromotionManagementPage';
 import StoreSettingsPage from './pages/StoreSettingsPage';
 import LockScreen from './pages/LockScreen';
+import KitchenPage from './pages/KitchenPage';
+import { useEffect } from 'react';
 
 function AppContent() {
-  const { currentView, notification } = useUI();
+  const { currentView, setView, notification } = useUI();
   const { currentUser, canAccess } = useAuth();
+
+  useEffect(() => {
+    if (window.location.hash === '#kitchen' || window.location.pathname === '/kitchen') {
+      setView('kitchen');
+    }
+  }, [setView]);
 
   const renderPage = () => {
     switch (currentView) {
@@ -43,9 +51,9 @@ function AppContent() {
 
   return (
     <div className="flex h-screen overflow-hidden">
-      <Sidebar />
+      {currentView !== 'kitchen' && <Sidebar />}
       <main className="flex-1 overflow-hidden">
-        {renderPage()}
+        {currentView === 'kitchen' ? <KitchenPage /> : renderPage()}
       </main>
 
       {/* Global Toast Notification */}
