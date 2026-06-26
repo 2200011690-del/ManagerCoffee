@@ -596,12 +596,17 @@ const completeOrderPayment = async (orderId, storeId) => {
       }
     }
 
-    // 2. Cộng điểm tích lũy cho khách hàng
+    // 2. Cộng điểm tích lũy cho khách hàng & trừ đi điểm sử dụng (nếu có)
     if (updatedOrder.customerId) {
-      const pointsToAdd = Math.floor(updatedOrder.total * 0.1);
+      const store = await prisma.store.findUnique({ where: { id: storeId } });
+      const pointsRate = store?.pointsRate ?? 0.1;
+      const pointsToAdd = Math.floor(updatedOrder.total * pointsRate);
       const customer = await prisma.customer.findUnique({ where: { id: updatedOrder.customerId } });
       if (customer) {
-        const newPoints = customer.points + pointsToAdd;
+        let newPoints = customer.points + pointsToAdd;
+        if (updatedOrder.usedPoints && updatedOrder.usedPoints > 0) {
+          newPoints = Math.max(0, newPoints - updatedOrder.usedPoints);
+        }
         let newTier = customer.tier;
         if (newPoints >= 1500) newTier = 'DIAMOND';
         else if (newPoints >= 500) newTier = 'GOLD';
@@ -673,7 +678,8 @@ app.post('/api/orders/checkout', async (req, res) => {
     customerId, voucherCode, discountAmount, employeeId,
     orderDiscount, orderDiscountType, discountReason,
     payments,
-    status // "pending" hoặc "paid"
+    status, // "pending" hoặc "paid"
+    usedPoints
   } = req.body;
   const storeId = req.storeId;
   const orderStatus = status || 'paid';
@@ -705,6 +711,7 @@ app.post('/api/orders/checkout', async (req, res) => {
       orderDiscount: orderDiscount || 0,
       orderDiscountType: orderDiscountType || null,
       discountReason: discountReason || null,
+      usedPoints: usedPoints ? Number(usedPoints) : 0,
       items: {
         create: cart.map(item => ({
           name: item.name,
@@ -727,7 +734,7 @@ app.post('/api/orders/checkout', async (req, res) => {
         }
       } : {})
     },
-    include: { items: true, employee: true, payments: true }
+    include: { items: true, employee: true, payments: true, customer: true }
   });
 
   // Nếu trạng thái là paid, thực hiện xử lý trừ kho, cộng điểm và cập nhật ca làm việc lập tức
@@ -756,10 +763,15 @@ app.post('/api/orders/checkout', async (req, res) => {
     }
 
     if (customerId) {
-      const pointsToAdd = Math.floor(total * 0.1);
+      const store = await prisma.store.findUnique({ where: { id: storeId } });
+      const pointsRate = store?.pointsRate ?? 0.1;
+      const pointsToAdd = Math.floor(total * pointsRate);
       const customer = await prisma.customer.findUnique({ where: { id: customerId } });
       if (customer) {
-        const newPoints = customer.points + pointsToAdd;
+        let newPoints = customer.points + pointsToAdd;
+        if (usedPoints && Number(usedPoints) > 0) {
+          newPoints = Math.max(0, newPoints - Number(usedPoints));
+        }
         let newTier = customer.tier;
         if (newPoints >= 1500) newTier = 'DIAMOND';
         else if (newPoints >= 500) newTier = 'GOLD';

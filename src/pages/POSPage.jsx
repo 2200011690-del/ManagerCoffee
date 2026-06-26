@@ -221,10 +221,15 @@ export default function POSPage() {
   const [customerPhone, setCustomerPhone] = useState('');
   const [customer, setCustomer] = useState(null);
   const [isSearchingCustomer, setIsSearchingCustomer] = useState(false);
+  const [usePoints, setUsePoints] = useState(false);
   
   const [voucherInput, setVoucherInput] = useState('');
   const [appliedVoucher, setAppliedVoucher] = useState(null);
   const [discountAmount, setDiscountAmount] = useState(0);
+
+  useEffect(() => {
+    setUsePoints(false);
+  }, [customer]);
 
   const filteredItems = useMemo(() => {
     // Use visibleMenu from MenuContext instead of static menuItems
@@ -300,7 +305,11 @@ export default function POSPage() {
   };
 
   const totalDiscount = discountAmount + orderDiscountAmount;
-  const finalTotal = total - totalDiscount > 0 ? total - totalDiscount : 0;
+  const tempTotal = total - totalDiscount > 0 ? total - totalDiscount : 0;
+  const maxPointsNeeded = Math.floor(tempTotal / 1000);
+  const pointsToDeduct = usePoints && customer ? Math.min(customer.points, maxPointsNeeded) : 0;
+  const pointsDiscount = pointsToDeduct * 1000;
+  const finalTotal = tempTotal - pointsDiscount > 0 ? tempTotal - pointsDiscount : 0;
 
   // ---- Checkout Handlers ----
   const handleConfirmPayment = async (splitPayments = null) => {
@@ -319,12 +328,13 @@ export default function POSPage() {
           paymentMethod: 'card',
           customerId: customer?.id,
           voucherCode: appliedVoucher?.code,
-          discountAmount: totalDiscount,
+          discountAmount: totalDiscount + pointsDiscount,
           employeeId: currentUser?.id,
           orderDiscount: orderDiscountAmount,
           orderDiscountType: orderDiscountAmount > 0 ? orderDiscountType : null,
           discountReason: discountReason || null,
-          status: 'pending' // Tạo hóa đơn pending chờ đối soát
+          status: 'pending', // Tạo hóa đơn pending chờ đối soát
+          usedPoints: pointsToDeduct
         });
         setPendingOrder(newOrder);
         setShowPayConfirm(false);
@@ -346,12 +356,13 @@ export default function POSPage() {
         paymentMethod: splitPayments ? 'mixed' : paymentMethod,
         customerId: customer?.id,
         voucherCode: appliedVoucher?.code,
-        discountAmount: totalDiscount,
+        discountAmount: totalDiscount + pointsDiscount,
         employeeId: currentUser?.id,
         orderDiscount: orderDiscountAmount,
         orderDiscountType: orderDiscountAmount > 0 ? orderDiscountType : null,
         discountReason: discountReason || null,
-        payments: splitPayments || null
+        payments: splitPayments || null,
+        usedPoints: pointsToDeduct
       });
       setPendingOrder(newOrder);
       setShowPayConfirm(false);
@@ -778,21 +789,34 @@ export default function POSPage() {
                 )}
               </div>
               {customer && (
-                <div className="flex items-center justify-between text-xs bg-cream-light p-2 rounded-lg">
-                  <div className="flex flex-col">
-                    <span className="font-bold text-coffee-dark">{customer.name} <span className="text-coffee-accent">({customer.tier})</span></span>
-                    <span className="text-coffee-medium">{customer.points} điểm</span>
+                <div className="space-y-2 bg-cream-light p-2 rounded-lg text-xs">
+                  <div className="flex items-center justify-between">
+                    <div className="flex flex-col">
+                      <span className="font-bold text-coffee-dark">{customer.name} <span className="text-coffee-accent">({customer.tier})</span></span>
+                      <span className="text-coffee-medium">{customer.points} điểm</span>
+                    </div>
+                    <button 
+                      type="button"
+                      onClick={() => {
+                        fetchCustomerHistory(customer.id);
+                        setShowCustomerHistoryModal(true);
+                      }}
+                      className="px-2 py-1 rounded bg-coffee-accent text-white font-semibold hover:bg-coffee-dark transition-colors flex-shrink-0"
+                    >
+                      Lịch sử
+                    </button>
                   </div>
-                  <button 
-                    type="button"
-                    onClick={() => {
-                      fetchCustomerHistory(customer.id);
-                      setShowCustomerHistoryModal(true);
-                    }}
-                    className="px-2 py-1 rounded bg-coffee-accent text-white font-semibold hover:bg-coffee-dark transition-colors flex-shrink-0"
-                  >
-                    Lịch sử
-                  </button>
+                  {customer.points > 0 && (
+                    <label className="flex items-center gap-2 mt-2 pt-2 border-t border-cream-medium/30 cursor-pointer select-none">
+                      <input 
+                        type="checkbox" 
+                        checked={usePoints} 
+                        onChange={(e) => setUsePoints(e.target.checked)} 
+                        className="rounded border-cream-dark text-coffee-accent focus:ring-coffee-accent"
+                      />
+                      <span className="font-medium text-coffee-dark">Dùng điểm tích lũy (1đ/điểm)</span>
+                    </label>
+                  )}
                 </div>
               )}
 
@@ -841,6 +865,15 @@ export default function POSPage() {
                     <button onClick={() => { setOrderDiscountAmount(0); setOrderDiscountValue(''); setDiscountReason(''); }} className="text-red-400 text-[10px] hover:underline ml-1">Xóa</button>
                   </span>
                   <span>-{orderDiscountAmount.toLocaleString('vi-VN')}đ</span>
+                </div>
+              )}
+              {pointsDiscount > 0 && (
+                <div className="flex justify-between text-sm text-green-600 font-medium animate-fade-in">
+                  <span className="flex items-center gap-1">
+                    <Gift size={12} className="text-green-600" />
+                    Dùng điểm ({pointsToDeduct} điểm)
+                  </span>
+                  <span>-{pointsDiscount.toLocaleString('vi-VN')}đ</span>
                 </div>
               )}
               <div className="flex justify-between text-sm text-coffee-medium">
@@ -991,8 +1024,14 @@ export default function POSPage() {
               </div>
               {totalDiscount > 0 && (
                 <div className="flex justify-between text-sm text-green-600 font-medium">
-                  <span>Giảm giá</span>
+                  <span>Giảm giá (Voucher/Đơn)</span>
                   <span>-{totalDiscount.toLocaleString('vi-VN')}đ</span>
+                </div>
+              )}
+              {pointsDiscount > 0 && (
+                <div className="flex justify-between text-sm text-green-600 font-medium">
+                  <span>Dùng điểm ({pointsToDeduct} điểm)</span>
+                  <span>-{pointsDiscount.toLocaleString('vi-VN')}đ</span>
                 </div>
               )}
               <div className="flex justify-between text-sm text-coffee-medium">

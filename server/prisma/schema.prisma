@@ -119,6 +119,7 @@ model Order {
   orderDiscount     Float?    @default(0)  // Discount value on entire order
   orderDiscountType String?   // "PERCENT" or "FIXED"
   discountReason    String?   // Reason for discount (anti-fraud)
+  usedPoints        Int?      @default(0)
 
   // Relations
   returnOrders   ReturnOrder[]

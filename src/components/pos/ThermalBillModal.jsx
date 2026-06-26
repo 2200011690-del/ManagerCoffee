@@ -100,6 +100,9 @@ export default function ThermalBillModal({ order, store, onConfirm, onClose }) {
             <p>{padLine('Ngày:', dateStr)}</p>
             <p>{padLine('Giờ:', timeStr)}</p>
             <p>{padLine('Bàn:', order.tableName)}</p>
+            {order.customer && (
+              <p>{padLine('Khách hàng:', order.customer.name)}</p>
+            )}
             <p>{padLine('Hình thức:', order.paymentMethod === 'cash' ? 'Tiền mặt' : order.paymentMethod === 'card' ? 'Chuyển khoản' : 'Thẻ/QR')}</p>
 
             <p className="my-1">{sep('-')}</p>
@@ -136,9 +139,20 @@ export default function ThermalBillModal({ order, store, onConfirm, onClose }) {
 
             {/* Totals */}
             <p>{padLine('Tạm tính:', order.subtotal.toLocaleString('vi-VN') + 'đ')}</p>
-            {order.discountAmount > 0 && (
-              <p>{padLine(`Giảm giá (${order.voucherCode || 'Chiết khấu'}):`, '-' + order.discountAmount.toLocaleString('vi-VN') + 'đ')}</p>
-            )}
+            {(() => {
+              const pointsDisc = (order.usedPoints || 0) * 1000;
+              const promoDisc = (order.discountAmount || 0) - pointsDisc;
+              return (
+                <>
+                  {promoDisc > 0 && (
+                    <p>{padLine(`Giảm giá (${order.voucherCode || 'Chiết khấu'}):`, '-' + promoDisc.toLocaleString('vi-VN') + 'đ')}</p>
+                  )}
+                  {pointsDisc > 0 && (
+                    <p>{padLine(`Dùng điểm (${order.usedPoints} điểm):`, '-' + pointsDisc.toLocaleString('vi-VN') + 'đ')}</p>
+                  )}
+                </>
+              );
+            })()}
             <p>{padLine('VAT (8%):', '+' + order.vatAmount.toLocaleString('vi-VN') + 'đ')}</p>
             <p className="font-bold text-sm">{sep('=')}</p>
             <p className="font-bold text-sm">{padLine('TỔNG CỘNG:', order.total.toLocaleString('vi-VN') + 'đ')}</p>
