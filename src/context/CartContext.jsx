@@ -306,7 +306,9 @@ export function CartProvider({ children }) {
 
     showNotification(`Đã thêm ${product.name}`);
 
+    console.log('[DEBUG] CartContext: isFirstItem =', isFirstItem, 'hasCallback =', !!onFirstItem);
     if (isFirstItem && onFirstItem) {
+      console.log('[DEBUG] CartContext: triggering onFirstItem callback');
       setTimeout(() => {
         onFirstItem();
       }, 0);

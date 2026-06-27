@@ -271,20 +271,24 @@ export default function POSPage() {
     });
   }, [activeCategory, searchQuery, visibleMenu]);
 
+  // Get table name for display
+  const activeTable = tables.find(t => t.id === activeTableId);
+  const tableLabel = activeTableId ? (activeTable?.name ?? activeTableId) : 'Mang về';
+
   const handleAddItem = (item, sugar, ice, note, qty = 1) => {
+    console.log('[DEBUG] handleAddItem:', item.name, 'table:', activeTableId, 'status:', activeTable?.status);
     // Nếu đây là lần đầu thêm món vào bàn này => tự động chuyển trạng thái bàn sang "Có khách"
     const onFirstItem = activeTableId && activeTable?.status === 'available'
-      ? () => updateTableStatus(activeTableId, 'occupied')
+      ? () => {
+          console.log('[DEBUG] Table status is available, updating to occupied');
+          updateTableStatus(activeTableId, 'occupied');
+        }
       : null;
 
     for (let i = 0; i < qty; i++) {
       addToCart(item, sugar, ice, note, i === 0 ? onFirstItem : null);
     }
   };
-
-  // Get table name for display
-  const activeTable = tables.find(t => t.id === activeTableId);
-  const tableLabel = activeTableId ? (activeTable?.name ?? activeTableId) : 'Mang về';
 
   // Step 1: user clicks "Thanh toán" => show confirm modal
   // Step 2: user confirms => save order to history, show thermal bill
