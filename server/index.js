@@ -245,6 +245,84 @@ app.delete('/api/users/:id', async (req, res) => {
   res.json({ success: true });
 });
 
+app.get('/api/users/salary-report', async (req, res) => {
+  const { startDate, endDate } = req.query;
+  const storeId = req.storeId;
+
+  try {
+    // 1. Get all users for this store
+    const users = await prisma.user.findMany({
+      where: { storeId },
+      orderBy: { name: 'asc' }
+    });
+
+    // 2. Build attendance filters
+    const attendanceFilter = {
+      storeId,
+      clockOut: { not: null } // only count completed attendances
+    };
+
+    if (startDate && endDate) {
+      const start = new Date(startDate);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+      attendanceFilter.clockIn = {
+        gte: start,
+        lte: end
+      };
+    } else {
+      // Default to this month
+      const start = new Date();
+      start.setDate(1);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date();
+      end.setHours(23, 59, 59, 999);
+      attendanceFilter.clockIn = {
+        gte: start,
+        lte: end
+      };
+    }
+
+    // 3. Fetch all completed attendances in this range
+    const attendances = await prisma.attendance.findMany({
+      where: attendanceFilter,
+      orderBy: { clockIn: 'asc' }
+    });
+
+    // 4. Map user records to calculate salary & hours
+    const report = users.map(user => {
+      const userAttendances = attendances.filter(a => a.userId === user.id);
+      
+      const totalHours = userAttendances.reduce((sum, a) => sum + (a.totalHours || 0), 0);
+      const shiftCount = userAttendances.length;
+      const totalSalary = Math.round(totalHours * (user.hourlyRate || 25000));
+
+      const { pin: _p, ...safeUser } = user;
+
+      return {
+        ...safeUser,
+        shiftCount,
+        totalHours: Number(totalHours.toFixed(2)),
+        totalSalary,
+        attendances: userAttendances.map(a => ({
+          id: a.id,
+          date: a.date,
+          clockIn: a.clockIn,
+          clockOut: a.clockOut,
+          totalHours: a.totalHours ? Number(a.totalHours.toFixed(2)) : 0
+        }))
+      };
+    });
+
+    res.json(report);
+  } catch (err) {
+    console.error('Error generating salary report:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
 // --- ATTENDANCE & SHIFT APIs ---
 
 // 1. Quick Clock-in/out

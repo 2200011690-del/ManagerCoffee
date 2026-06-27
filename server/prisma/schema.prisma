@@ -57,6 +57,14 @@ model User {
   attendances      Attendance[]
   cashShifts       CashShift[]
 
+  // Profiles
+  phone        String?
+  address      String?
+  cccd         String?
+  dateOfBirth  String?
+  startDate    String?
+  hourlyRate   Float    @default(25000)
+
   @@unique([storeId, pin])
 }
 
