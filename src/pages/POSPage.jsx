@@ -445,14 +445,16 @@ export default function POSPage() {
 
   // Recall held order
   const handleRecallHeldOrder = (held) => {
-    // Load items back to cart
+    // Load items back to cart with correct quantities
     held.items.forEach(item => {
-      addToCart(
-        { id: item.productId, name: item.name, price: item.price },
-        item.sugar || '100% đường',
-        item.ice || '100% đá',
-        item.note || ''
-      );
+      for (let i = 0; i < item.qty; i++) {
+        addToCart(
+          { id: item.productId, name: item.name, price: item.price },
+          item.sugar || '100% đường',
+          item.ice || '100% đá',
+          item.note || ''
+        );
+      }
     });
     setShowHeldOrders(false);
     showNotification('Đã thu hồi đơn tạm giữ!', 'success');
