@@ -371,7 +371,8 @@ export default function POSPage() {
         setShowPayConfirm(false);
         setShowQRModal(true); // Mở modal QR
       } catch (err) {
-        showNotification('Lỗi khởi tạo đơn hàng thanh toán QR', 'error');
+        console.error('QR Order Creation Error:', err);
+        showNotification(err.response?.data?.error || 'Lỗi khởi tạo đơn hàng thanh toán QR', 'error');
       }
       return;
     }
@@ -400,7 +401,8 @@ export default function POSPage() {
       setShowSplitPayment(false);
       setShowThermal(true);
     } catch (err) {
-      showNotification('Lỗi thanh toán hóa đơn', 'error');
+      console.error('Checkout Error:', err);
+      showNotification(err.response?.data?.error || 'Lỗi thanh toán hóa đơn', 'error');
     }
   };
 
