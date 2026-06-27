@@ -1,3 +1,4 @@
+import React from 'react';
 import { Plus, Flame, Coffee, CupSoda, Cake } from 'lucide-react';
 
 // Category color map
@@ -13,7 +14,7 @@ function getCategoryStyle(category) {
   return CATEGORY_COLORS[category] ?? { bg: 'bg-slate-50', border: 'border-slate-200', text: 'text-slate-600', dot: 'bg-slate-400' };
 }
 
-export default function ProductGrid({ items, onAddToCart, onSelectItem }) {
+const ProductGrid = React.memo(function ProductGrid({ items, onAddToCart, onSelectItem }) {
   if (items.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-ink-light">
@@ -75,4 +76,6 @@ export default function ProductGrid({ items, onAddToCart, onSelectItem }) {
       })}
     </div>
   );
-}
+});
+
+export default ProductGrid;

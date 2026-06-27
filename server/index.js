@@ -1254,8 +1254,15 @@ app.put('/api/products/:productId/recipe', async (req, res) => {
 app.get('/api/dashboard', async (req, res) => {
   const storeId = req.storeId;
   try {
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
     const orders = await prisma.order.findMany({
-      where: { storeId, status: 'paid' },
+      where: { 
+        storeId, 
+        status: 'paid',
+        timestamp: { gte: thirtyDaysAgo }
+      },
       include: { items: true },
       orderBy: { timestamp: 'desc' }
     });
@@ -1767,30 +1774,41 @@ app.get('/api/reports/employees', async (req, res) => {
     if (startDate) dateFilter.gte = new Date(startDate);
     if (endDate) dateFilter.lte = new Date(endDate);
 
-    const reports = [];
-    for (const user of users) {
-      const orders = await prisma.order.findMany({
-        where: {
-          storeId,
-          employeeId: user.id,
-          status: 'paid',
-          ...(startDate || endDate ? { timestamp: dateFilter } : {})
-        }
-      });
+    const orders = await prisma.order.findMany({
+      where: {
+        storeId,
+        status: 'paid',
+        ...(startDate || endDate ? { timestamp: dateFilter } : {})
+      },
+      select: {
+        employeeId: true,
+        total: true
+      }
+    });
 
-      const salesTotal = orders.reduce((sum, o) => sum + o.total, 0);
-      const ordersCount = orders.length;
-      const avgOrderValue = ordersCount > 0 ? Math.round(salesTotal / ordersCount) : 0;
+    // Group in memory in O(Orders) time
+    const employeeSalesMap = {};
+    orders.forEach(o => {
+      if (!o.employeeId) return;
+      if (!employeeSalesMap[o.employeeId]) {
+        employeeSalesMap[o.employeeId] = { salesTotal: 0, ordersCount: 0 };
+      }
+      employeeSalesMap[o.employeeId].salesTotal += o.total;
+      employeeSalesMap[o.employeeId].ordersCount += 1;
+    });
 
-      reports.push({
+    const reports = users.map(user => {
+      const stats = employeeSalesMap[user.id] || { salesTotal: 0, ordersCount: 0 };
+      return {
         id: user.id,
         name: user.name,
         role: user.role,
-        salesTotal,
-        ordersCount,
-        avgOrderValue
-      });
-    }
+        salesTotal: stats.salesTotal,
+        ordersCount: stats.ordersCount,
+        avgOrderValue: stats.ordersCount > 0 ? Math.round(stats.salesTotal / stats.ordersCount) : 0
+      };
+    });
+
     res.json(reports);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -1811,6 +1829,10 @@ app.get('/api/reports/time-analysis', async (req, res) => {
         storeId,
         status: 'paid',
         ...(startDate || endDate ? { timestamp: dateFilter } : {})
+      },
+      select: {
+        total: true,
+        timestamp: true
       }
     });
 

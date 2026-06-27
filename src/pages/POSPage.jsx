@@ -116,6 +116,37 @@ function TablePickerPanel({ onClose }) {
   );
 }
 
+// ---- Debounced Search Input ----
+function DebouncedSearchInput({ value, onChange, placeholder, className, icon: Icon }) {
+  const [localValue, setLocalValue] = useState(value);
+
+  useEffect(() => {
+    setLocalValue(value);
+  }, [value]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (localValue !== value) {
+        onChange(localValue);
+      }
+    }, 150);
+    return () => clearTimeout(timer);
+  }, [localValue, onChange, value]);
+
+  return (
+    <div className="relative flex-1 max-w-md">
+      {Icon && <Icon size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-coffee-light" />}
+      <input
+        type="text"
+        value={localValue}
+        onChange={e => setLocalValue(e.target.value)}
+        placeholder={placeholder}
+        className={className}
+      />
+    </div>
+  );
+}
+
 // ---- Main POS Page ----
 export default function POSPage() {
   const {
@@ -618,16 +649,13 @@ export default function POSPage() {
         {/* Top Bar: Search + Categories */}
         <div className="px-6 py-3 border-b border-cream-medium/60 bg-white/80 backdrop-blur-sm">
           <div className="flex items-center gap-4">
-            <div className="relative flex-1 max-w-md">
-              <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-coffee-light" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-                placeholder="Tìm kiếm món..."
-                className="input-field pl-10 min-h-[44px]"
-              />
-            </div>
+            <DebouncedSearchInput
+              value={searchQuery}
+              onChange={setSearchQuery}
+              placeholder="Tìm kiếm món..."
+              className="input-field pl-10 min-h-[44px]"
+              icon={Search}
+            />
             <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide">
               {categories.map(cat => (
                 <button

@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { Minus, Plus, Trash2, Percent, Tag } from 'lucide-react';
 
-export default function CartItem({ item, onRemove, onUpdateQty, onApplyDiscount }) {
+const CartItem = React.memo(function CartItem({ item, onRemove, onUpdateQty, onApplyDiscount }) {
   const [showDiscountPopup, setShowDiscountPopup] = useState(false);
   const [discountValue, setDiscountValue] = useState('');
   const [discountType, setDiscountType] = useState('PERCENT');
@@ -129,4 +129,6 @@ export default function CartItem({ item, onRemove, onUpdateQty, onApplyDiscount 
       )}
     </div>
   );
-}
+});
+
+export default CartItem;

@@ -127,6 +127,8 @@ model Order {
 
   @@unique([storeId, orderNumber])
   @@index([storeId])
+  @@index([storeId, timestamp])
+  @@index([storeId, employeeId, timestamp])
 }
 
 model OrderItem {

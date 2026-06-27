@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { useUI } from './UIContext';
 import { api } from '../api';
 import { socket } from '../socket';
@@ -21,6 +21,15 @@ export function CartProvider({ children }) {
   const [activeTableId, setActiveTableId] = useState(loadActiveTable);
   const [loading, setLoading] = useState(true);
   const [promotions, setPromotions] = useState([]);
+
+  const syncTimeoutRef = useRef({});
+
+  // Cleanup timeouts on unmount
+  useEffect(() => {
+    return () => {
+      Object.values(syncTimeoutRef.current).forEach(clearTimeout);
+    };
+  }, []);
 
   const fetchPromotions = async () => {
     try {
@@ -47,7 +56,20 @@ export function CartProvider({ children }) {
     fetchPromotions();
 
     const handleCartSync = (carts) => {
-      setTableCarts(carts);
+      setTableCarts(prev => {
+        const merged = { ...prev };
+        Object.keys(carts).forEach(key => {
+          if (!syncTimeoutRef.current[key]) {
+            merged[key] = carts[key];
+          }
+        });
+        Object.keys(merged).forEach(key => {
+          if (!carts[key] && !syncTimeoutRef.current[key]) {
+            delete merged[key];
+          }
+        });
+        return merged;
+      });
     };
 
     socket.on('cartSync', handleCartSync);
@@ -233,86 +255,122 @@ export function CartProvider({ children }) {
     return tableCarts[key] && tableCarts[key].length > 0;
   }, [tableCarts]);
 
-  // Sync a specific cart to backend
-  const syncCartToBackend = async (key, newCart) => {
-    // optimistic update
-    setTableCarts(prev => ({ ...prev, [key]: newCart }));
-    try {
-      if (newCart.length === 0) {
-        await api.delete(`/carts/${key}`);
-      } else {
-        await api.put(`/carts/${key}`, { cart: newCart });
-      }
-    } catch (err) {
-      console.error(err);
+  // Sync a specific cart to backend (debounced)
+  const syncCartToBackend = useCallback((key, newCart) => {
+    if (syncTimeoutRef.current[key]) {
+      clearTimeout(syncTimeoutRef.current[key]);
     }
-  };
+
+    syncTimeoutRef.current[key] = setTimeout(async () => {
+      try {
+        if (newCart.length === 0) {
+          await api.delete(`/carts/${key}`);
+        } else {
+          await api.put(`/carts/${key}`, { cart: newCart });
+        }
+      } catch (err) {
+        console.error('Error syncing cart:', err);
+      } finally {
+        delete syncTimeoutRef.current[key];
+      }
+    }, 400); // 400ms debounce
+  }, []);
 
   const addToCart = useCallback((product, sugar = '100% đường', ice = '100% đá', note = '', onFirstItem = null) => {
-    const newCart = [...cart];
-    const existingIndex = newCart.findIndex(
-      i => i.id === product.id && i.sugar === sugar && i.ice === ice && i.note === note
-    );
+    const key = activeTableId ?? TAKEAWAY_KEY;
+    let isFirstItem = false;
 
-    const isFirstItem = newCart.length === 0;
+    setTableCarts(prev => {
+      const currentCart = prev[key] ?? [];
+      isFirstItem = currentCart.length === 0;
+      const newCart = [...currentCart];
+      const existingIndex = newCart.findIndex(
+        i => i.id === product.id && i.sugar === sugar && i.ice === ice && i.note === note
+      );
 
-    if (existingIndex > -1) {
-      newCart[existingIndex] = { ...newCart[existingIndex], qty: newCart[existingIndex].qty + 1 };
-    } else {
-      newCart.push({
-        ...product,
-        cartItemId: `${product.id}-${Date.now()}-${Math.random()}`,
-        qty: 1,
-        sugar,
-        ice,
-        note
-      });
-    }
-    syncCartToBackend(cartKey, newCart);
+      if (existingIndex > -1) {
+        newCart[existingIndex] = { ...newCart[existingIndex], qty: newCart[existingIndex].qty + 1 };
+      } else {
+        newCart.push({
+          ...product,
+          cartItemId: `${product.id}-${Date.now()}-${Math.random()}`,
+          qty: 1,
+          sugar,
+          ice,
+          note
+        });
+      }
+      syncCartToBackend(key, newCart);
+      return { ...prev, [key]: newCart };
+    });
+
     showNotification(`Đã thêm ${product.name}`);
 
-    // Nếu đây là món đầu tiên được thêm vào bàn, báo cho POSPage để đổi trạng thái bàn
     if (isFirstItem && onFirstItem) {
-      onFirstItem();
+      setTimeout(() => {
+        onFirstItem();
+      }, 0);
     }
-  }, [cart, cartKey, showNotification]);
+  }, [activeTableId, syncCartToBackend, showNotification]);
 
   const removeFromCart = useCallback((cartItemId) => {
-    const newCart = cart.filter(i => i.cartItemId !== cartItemId);
-    syncCartToBackend(cartKey, newCart);
-  }, [cart, cartKey]);
+    const key = activeTableId ?? TAKEAWAY_KEY;
+    setTableCarts(prev => {
+      const currentCart = prev[key] ?? [];
+      const newCart = currentCart.filter(i => i.cartItemId !== cartItemId);
+      syncCartToBackend(key, newCart);
+      return { ...prev, [key]: newCart };
+    });
+  }, [activeTableId, syncCartToBackend]);
 
   const updateQty = useCallback((cartItemId, delta) => {
-    let newCart = [...cart];
-    const idx = newCart.findIndex(i => i.cartItemId === cartItemId);
-    if (idx === -1) return;
+    const key = activeTableId ?? TAKEAWAY_KEY;
+    setTableCarts(prev => {
+      const currentCart = prev[key] ?? [];
+      let newCart = [...currentCart];
+      const idx = newCart.findIndex(i => i.cartItemId === cartItemId);
+      if (idx === -1) return prev;
 
-    const currentQty = newCart[idx].qty;
-    if (currentQty + delta <= 0) {
-      newCart = newCart.filter(i => i.cartItemId !== cartItemId);
-    } else {
-      newCart[idx] = { ...newCart[idx], qty: currentQty + delta };
-    }
-    syncCartToBackend(cartKey, newCart);
-  }, [cart, cartKey]);
+      const currentQty = newCart[idx].qty;
+      if (currentQty + delta <= 0) {
+        newCart = newCart.filter(i => i.cartItemId !== cartItemId);
+      } else {
+        newCart[idx] = { ...newCart[idx], qty: currentQty + delta };
+      }
+      syncCartToBackend(key, newCart);
+      return { ...prev, [key]: newCart };
+    });
+  }, [activeTableId, syncCartToBackend]);
 
   const clearCart = useCallback(() => {
-    syncCartToBackend(cartKey, []);
-  }, [cartKey]);
+    const key = activeTableId ?? TAKEAWAY_KEY;
+    setTableCarts(prev => {
+      syncCartToBackend(key, []);
+      return { ...prev, [key]: [] };
+    });
+  }, [activeTableId, syncCartToBackend]);
 
   const clearCurrentCart = useCallback((targetTableId) => {
     const targetKey = targetTableId ?? TAKEAWAY_KEY;
-    syncCartToBackend(targetKey, []);
-  }, []);
+    setTableCarts(prev => {
+      syncCartToBackend(targetKey, []);
+      return { ...prev, [targetKey]: [] };
+    });
+  }, [syncCartToBackend]);
 
   const applyItemDiscount = useCallback((cartItemId, discountAmount, discountType) => {
-    const newCart = cart.map(item => 
-      item.cartItemId === cartItemId
-        ? { ...item, discount: discountAmount, discountType }
-        : item
-    );
-    syncCartToBackend(cartKey, newCart);
-  }, [cart, cartKey]);
+    const key = activeTableId ?? TAKEAWAY_KEY;
+    setTableCarts(prev => {
+      const currentCart = prev[key] ?? [];
+      const newCart = currentCart.map(item => 
+        item.cartItemId === cartItemId
+          ? { ...item, discount: discountAmount, discountType }
+          : item
+      );
+      syncCartToBackend(key, newCart);
+      return { ...prev, [key]: newCart };
+    });
+  }, [activeTableId, syncCartToBackend]);
 
   const value = {
     cart, subtotal, vatAmount, total, cartCount,
