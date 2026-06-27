@@ -689,7 +689,7 @@ export default function POSPage() {
 
         {/* Menu Grid */}
         <div className="flex-1 overflow-y-auto px-6 pb-6">
-          <ProductGrid items={filteredItems} onAddToCart={addToCart} onSelectItem={setSelectedItem} />
+          <ProductGrid items={filteredItems} onAddToCart={handleAddItem} onSelectItem={setSelectedItem} />
         </div>
 
         {/* Phím tắt cheat-sheet */}
