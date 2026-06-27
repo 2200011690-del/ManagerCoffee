@@ -1345,6 +1345,40 @@ app.get('/api/dashboard', async (req, res) => {
         itemsCount: o.items.reduce((sum, i) => sum + i.qty, 0)
       }));
 
+    // 6. Today Shifts
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+
+    const todayShiftsDb = await prisma.cashShift.findMany({
+      where: {
+        storeId,
+        openedAt: { gte: todayStart }
+      },
+      include: {
+        user: true
+      },
+      orderBy: {
+        openedAt: 'asc'
+      }
+    });
+
+    const shiftsList = todayShiftsDb.map((cs, idx) => {
+      const startStr = new Date(cs.openedAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+      const endStr = cs.closedAt 
+        ? new Date(cs.closedAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
+        : 'Đang chạy';
+      
+      return {
+        id: cs.id,
+        name: `Ca ${idx + 1}`,
+        staff: cs.user.name,
+        start: startStr,
+        end: endStr,
+        orders: cs.status === 'open' ? 'Đang chạy' : 'Đã đóng',
+        revenue: cs.cashSales
+      };
+    });
+
     res.json({
       today: {
         revenue: todayRevenue,
@@ -1360,7 +1394,8 @@ app.get('/api/dashboard', async (req, res) => {
       },
       weeklyRevenue,
       topItems,
-      recentOrders: recentOrdersList
+      recentOrders: recentOrdersList,
+      shifts: shiftsList
     });
   } catch (err) {
     console.error(err);
