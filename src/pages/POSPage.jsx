@@ -942,32 +942,33 @@ export default function POSPage() {
             </div>
 
             {/* Action buttons row 1: Discount + Hold */}
-            <div className="flex gap-2">
+            <div className="grid grid-cols-3 gap-2">
               <button
                 onClick={() => setShowOrderDiscount(true)}
                 disabled={currentUser?.role === 'staff' && !currentUser?.canApplyDiscount}
-                className={`flex-1 min-h-[38px] flex items-center justify-center gap-1 rounded-xl text-xs font-semibold border-2 transition-all ${
+                className={`min-h-[38px] flex items-center justify-center gap-1 rounded-xl text-xs font-semibold border-2 transition-all ${
                   currentUser?.role === 'staff' && !currentUser?.canApplyDiscount
                     ? 'border-gray-200 text-gray-400 bg-gray-50 cursor-not-allowed'
                     : 'border-green-200 text-green-700 bg-green-50 hover:bg-green-100'
                 }`}
               >
                 <Percent size={13} />
-                Giảm giá đơn
+                Giảm đơn
               </button>
               <button
                 onClick={handleHoldOrder}
-                className="flex-1 min-h-[38px] flex items-center justify-center gap-1 rounded-xl text-xs font-semibold border-2 border-amber-200 text-amber-700 bg-amber-50 hover:bg-amber-100 transition-all"
+                className="min-h-[38px] flex items-center justify-center gap-1 rounded-xl text-xs font-semibold border-2 border-amber-200 text-amber-700 bg-amber-50 hover:bg-amber-100 transition-all"
               >
                 <Pause size={13} />
                 Giữ đơn
               </button>
               <button
                 onClick={() => setShowHeldOrders(true)}
-                className="min-w-[38px] min-h-[38px] flex items-center justify-center rounded-xl border-2 border-amber-200 text-amber-700 bg-amber-50 hover:bg-amber-100 transition-all"
+                className="min-h-[38px] flex items-center justify-center gap-1 rounded-xl text-[11px] sm:text-xs font-semibold border-2 border-amber-200 text-amber-700 bg-amber-50 hover:bg-amber-100 transition-all"
                 title="Xem đơn tạm giữ"
               >
                 <Layers size={13} />
+                Đơn giữ
               </button>
             </div>
 
