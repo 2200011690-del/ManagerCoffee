@@ -344,10 +344,12 @@ export default function POSPage() {
 
   // ---- Checkout Handlers ----
   const handleConfirmPayment = async (splitPayments = null) => {
+    const isEvent = splitPayments && (splitPayments.nativeEvent || splitPayments.target);
+    const actualSplitPayments = isEvent ? null : splitPayments;
     const tableName = activeTableId ? (activeTable?.name ?? activeTableId) : 'Mang về';
     
     // Nếu thanh toán chuyển khoản QR -> Tạo hóa đơn ở trạng thái PENDING trước
-    if (paymentMethod === 'card' && !splitPayments) {
+    if (paymentMethod === 'card' && !actualSplitPayments) {
       try {
         const newOrder = await addOrder({
           tableId: activeTableId,
@@ -385,7 +387,7 @@ export default function POSPage() {
         subtotal,
         vatAmount,
         total: finalTotal,
-        paymentMethod: splitPayments ? 'mixed' : paymentMethod,
+        paymentMethod: actualSplitPayments ? 'mixed' : paymentMethod,
         customerId: customer?.id,
         voucherCode: appliedVoucher?.code,
         discountAmount: totalDiscount + pointsDiscount,
@@ -393,7 +395,7 @@ export default function POSPage() {
         orderDiscount: orderDiscountAmount,
         orderDiscountType: orderDiscountAmount > 0 ? orderDiscountType : null,
         discountReason: discountReason || null,
-        payments: splitPayments || null,
+        payments: actualSplitPayments || null,
         usedPoints: pointsToDeduct
       });
       setPendingOrder(newOrder);
@@ -1078,7 +1080,7 @@ export default function POSPage() {
             </div>
             <div className="flex gap-3">
               <button onClick={() => setShowPayConfirm(false)} className="min-h-[44px] flex-1 btn-secondary">Hủy</button>
-              <button onClick={handleConfirmPayment} className="min-h-[44px] flex-1 btn-primary">Xem hóa đơn</button>
+              <button onClick={() => handleConfirmPayment()} className="min-h-[44px] flex-1 btn-primary">Xem hóa đơn</button>
             </div>
           </div>
         </div>
