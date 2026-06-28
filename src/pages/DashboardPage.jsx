@@ -484,18 +484,20 @@ export default function DashboardPage() {
   const fetchVouchers = useCallback(async () => {
     try {
       const data = await api.get('/vouchers');
-      setVouchersList(data);
+      setVouchersList(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error(err);
+      setVouchersList([]);
     }
   }, []);
 
   const fetchCustomers = useCallback(async () => {
     try {
       const data = await api.get('/customers');
-      setCustomersList(data);
+      setCustomersList(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error(err);
+      setCustomersList([]);
     }
   }, []);
 
@@ -2335,20 +2337,20 @@ export default function DashboardPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
-                      {customersList
-                        .filter(c => c.name.toLowerCase().includes(custSearch.toLowerCase()) || c.phone.includes(custSearch))
+                      {(customersList || [])
+                        .filter(c => c && c.name && (c.name.toLowerCase().includes(custSearch.toLowerCase()) || (c.phone && c.phone.includes(custSearch))))
                         .map(c => (
                           <tr key={c.id} className="hover:bg-gray-50/50 transition-colors">
                             <td className="px-4 py-3.5">
                               <div className="flex items-center gap-2">
                                 <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 font-bold flex items-center justify-center text-sm">
-                                  {c.name[0].toUpperCase()}
+                                  {(c.name || '?')[0].toUpperCase()}
                                 </div>
-                                <span className="font-semibold text-gray-800">{c.name}</span>
+                                <span className="font-semibold text-gray-800">{c.name || '---'}</span>
                               </div>
                             </td>
-                            <td className="px-4 py-3.5 text-gray-650 font-mono">{c.phone}</td>
-                            <td className="px-4 py-3.5 text-right font-bold text-gray-900">{c.points} điểm</td>
+                            <td className="px-4 py-3.5 text-gray-650 font-mono">{c.phone || '---'}</td>
+                            <td className="px-4 py-3.5 text-right font-bold text-gray-900">{(c.points || 0)} điểm</td>
                             <td className="px-4 py-3.5 text-center">
                               {c.tier === 'DIAMOND' ? (
                                 <span className="bg-purple-100 text-purple-700 border border-purple-200 text-xs px-2.5 py-1 rounded-full font-bold">💎 Kim cương</span>
@@ -2434,28 +2436,28 @@ export default function DashboardPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
-                      {vouchersList
-                        .filter(v => v.code.toLowerCase().includes(vouchSearch.toLowerCase()))
+                      {(vouchersList || [])
+                        .filter(v => v && v.code && v.code.toLowerCase().includes(vouchSearch.toLowerCase()))
                         .map(v => {
                           const isExpired = v.expiryDate && new Date(v.expiryDate) < new Date();
                           return (
                             <tr key={v.id} className={`hover:bg-gray-50/50 transition-colors ${!v.isActive || isExpired ? 'opacity-60 bg-gray-50/40' : ''}`}>
                               <td className="px-4 py-3.5">
                                 <span className="font-mono font-bold bg-blue-50 text-blue-700 border border-blue-200 px-2.5 py-1 rounded text-xs">
-                                  {v.code}
+                                  {v.code || '---'}
                                 </span>
                               </td>
                               <td className="px-4 py-3.5 text-gray-600">
                                 {v.type === 'PERCENT' ? 'Giảm theo phần trăm (%)' : 'Giảm tiền mặt trực tiếp'}
                               </td>
                               <td className="px-4 py-3.5 text-right font-bold text-gray-900">
-                                {v.type === 'PERCENT' ? `${v.value}%` : `${v.value.toLocaleString('vi-VN')}đ`}
+                                {v.value !== undefined && v.value !== null ? (v.type === 'PERCENT' ? `${v.value}%` : `${Number(v.value).toLocaleString('vi-VN')}đ`) : '0đ'}
                               </td>
                               <td className="px-4 py-3.5 text-right text-gray-650">
-                                {v.minOrderValue.toLocaleString('vi-VN')}đ
+                                {v.minOrderValue !== undefined && v.minOrderValue !== null ? `${Number(v.minOrderValue).toLocaleString('vi-VN')}đ` : '0đ'}
                               </td>
                               <td className="px-4 py-3.5 text-right text-gray-650">
-                                {v.maxDiscount ? `${v.maxDiscount.toLocaleString('vi-VN')}đ` : 'Không giới hạn'}
+                                {v.maxDiscount !== undefined && v.maxDiscount !== null ? `${Number(v.maxDiscount).toLocaleString('vi-VN')}đ` : 'Không giới hạn'}
                               </td>
                               <td className="px-4 py-3.5 text-center text-gray-500 text-xs">
                                 {v.expiryDate ? new Date(v.expiryDate).toLocaleDateString('vi-VN') : 'Vĩnh viễn'}
@@ -2551,18 +2553,18 @@ export default function DashboardPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
-                      {tablesList
-                        .filter(t => t.name.toLowerCase().includes(tabSearch.toLowerCase()))
+                      {(tablesList || [])
+                        .filter(t => t && t.name && t.name.toLowerCase().includes(tabSearch.toLowerCase()))
                         .map(t => (
                           <tr key={t.id} className="hover:bg-gray-50/50 transition-colors">
-                            <td className="px-4 py-3.5 font-bold text-gray-800">{t.name}</td>
+                            <td className="px-4 py-3.5 font-bold text-gray-800">{t.name || '---'}</td>
                             <td className="px-4 py-3.5">
                               <span className="inline-flex items-center gap-1 text-xs text-gray-600 bg-gray-100 px-2 py-1 rounded-md font-medium">
                                 <MapPin size={11} className="text-gray-400" />
-                                {t.zone}
+                                {t.zone || '---'}
                               </span>
                             </td>
-                            <td className="px-4 py-3.5 text-center text-gray-900 font-semibold">{t.capacity} chỗ ngồi</td>
+                            <td className="px-4 py-3.5 text-center text-gray-900 font-semibold">{(t.capacity || 0)} chỗ ngồi</td>
                             <td className="px-4 py-3.5 text-center">
                               {t.status === 'occupied' ? (
                                 <span className="bg-pink-150 text-pink-700 text-[11px] px-2 py-0.5 rounded font-bold border border-pink-200">Có khách</span>
