@@ -184,6 +184,7 @@ export default function POSPage() {
   // Phase 2 states
   const [showQRModal, setShowQRModal] = useState(false);
   const [checkingOut, setCheckingOut] = useState(false);
+  const [mobileTab, setMobileTab] = useState('menu'); // 'menu' | 'cart'
 
   // Cash Shift Handover states
   const [activeShift, setActiveShift] = useState(null);
@@ -512,6 +513,7 @@ export default function POSPage() {
     setPendingOrder(null);
     showNotification('Thanh toán thành công! 🎉', 'success');
     loadActiveShift();
+    setMobileTab('menu');
   };
 
   // Customer History & Recommendation (Phase 3)
@@ -617,9 +619,9 @@ export default function POSPage() {
 
 
   return (
-    <div className="flex h-full gap-0 overflow-hidden">
+    <div className="flex h-full gap-0 overflow-hidden relative">
       {/* ======== LEFT: Menu Grid ======== */}
-      <div className="flex-1 flex flex-col overflow-hidden bg-cream-warm">
+      <div className={`flex-1 flex flex-col overflow-hidden bg-cream-warm lg:flex ${mobileTab === 'menu' ? 'flex' : 'hidden'}`}>
         {/* Quick Table Tab Strip (KiotViet style) */}
         <div className="px-4 pt-3 pb-0 border-b border-cream-medium/60 bg-white/90 flex items-center gap-1.5 overflow-x-auto scrollbar-hide flex-shrink-0">
           {/* Takeaway tab */}
@@ -703,20 +705,20 @@ export default function POSPage() {
         </div>
 
         {/* Phím tắt cheat-sheet */}
-        <div className="px-6 py-2 border-t border-cream-medium/40 bg-white/70 flex items-center justify-between text-[11px] text-coffee-medium flex-shrink-0">
+        <div className="hidden lg:flex px-6 py-2 border-t border-cream-medium/40 bg-white/70 items-center justify-between text-[11px] text-coffee-medium flex-shrink-0">
           <div className="flex gap-4">
             <span><kbd className="px-1.5 py-0.5 bg-gray-150 border border-gray-300 rounded font-mono text-[10px] shadow-sm font-bold text-gray-700 bg-white mr-1">F1</kbd>Tiền mặt</span>
             <span><kbd className="px-1.5 py-0.5 bg-gray-150 border border-gray-300 rounded font-mono text-[10px] shadow-sm font-bold text-gray-700 bg-white mr-1">F2</kbd>Thẻ / QR</span>
             <span><kbd className="px-1.5 py-0.5 bg-gray-150 border border-gray-300 rounded font-mono text-[10px] shadow-sm font-bold text-gray-700 bg-white mr-1">F3</kbd>Giữ đơn</span>
             <span><kbd className="px-1.5 py-0.5 bg-gray-150 border border-gray-300 rounded font-mono text-[10px] shadow-sm font-bold text-gray-700 bg-white mr-1">F9</kbd>Tìm món</span>
-            <span><kbd className="px-1.5 py-0.5 bg-gray-150 border border-gray-300 rounded font-mono text-[10px] shadow-sm font-bold text-gray-700 bg-white mr-1">+</kbd>/<kbd className="px-1.5 py-0.5 bg-gray-150 border border-gray-300 rounded font-mono text-[10px] shadow-sm font-bold text-gray-700 bg-white mx-1">-</kbd>Tăng/Giảm món đầu</span>
+            <span><kbd className="px-1.5 py-0.5 bg-gray-150 border border-gray-300 rounded font-mono text-[10px] shadow-sm font-bold text-gray-700 bg-white mx-1">+</kbd>/<kbd className="px-1.5 py-0.5 bg-gray-150 border border-gray-300 rounded font-mono text-[10px] shadow-sm font-bold text-gray-700 bg-white mx-1">-</kbd>Tăng/Giảm món đầu</span>
           </div>
           <span className="font-semibold text-coffee-accent hidden sm:inline">Phím tắt nhanh POS</span>
         </div>
       </div>
 
       {/* ======== RIGHT: Cart Panel ======== */}
-      <div className="w-80 xl:w-96 flex flex-col bg-white border-l border-cream-medium/50 shadow-coffee">
+      <div className={`w-full lg:w-80 xl:w-96 flex flex-col bg-white lg:border-l border-cream-medium/50 shadow-coffee lg:flex ${mobileTab === 'cart' ? 'flex' : 'hidden'}`}>
         {/* Shift Control bar */}
         {activeShift && (
           <div className="px-5 py-2.5 bg-[#F6ECE2] border-b border-cream-medium/40 flex items-center justify-between">
@@ -742,6 +744,13 @@ export default function POSPage() {
 
         {/* Cart Header */}
         <div className="px-5 py-3 border-b border-cream-medium/50">
+          {/* Mobile Back to Menu */}
+          <button 
+            onClick={() => setMobileTab('menu')}
+            className="lg:hidden mb-2.5 flex items-center gap-1.5 text-xs font-bold text-coffee-accent hover:underline"
+          >
+            <ArrowLeftRight size={12} className="rotate-180" /> Quay lại Thực đơn
+          </button>
           <div className="flex items-center justify-between mb-1.5">
             <div className="flex items-center gap-2">
               <ShoppingCart size={18} className="text-coffee-accent" />
@@ -1028,6 +1037,24 @@ export default function POSPage() {
           </div>
         )}
       </div>
+
+      {/* Floating Mobile Cart Bar */}
+      {cartCount > 0 && mobileTab === 'menu' && (
+        <div className="lg:hidden fixed bottom-4 left-4 right-4 z-40 animate-slide-up">
+          <button
+            onClick={() => setMobileTab('cart')}
+            className="w-full bg-coffee-dark text-white px-5 py-3 rounded-2xl shadow-coffee-lg flex items-center justify-between active:scale-98 transition-transform"
+          >
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center text-xs font-bold">
+                {cartCount}
+              </div>
+              <span className="font-semibold text-sm">Xem giỏ hàng</span>
+            </div>
+            <span className="font-bold text-sm">{(total || subtotal).toLocaleString('vi-VN')}đ</span>
+          </button>
+        </div>
+      )}
 
       {/* ===== Modals ===== */}
 

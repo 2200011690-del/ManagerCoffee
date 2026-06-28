@@ -15,11 +15,12 @@ import EmployeeManagementPage from './pages/EmployeeManagementPage';
 import PromotionManagementPage from './pages/PromotionManagementPage';
 import StoreSettingsPage from './pages/StoreSettingsPage';
 import LockScreen from './pages/LockScreen';
-import KitchenPage from './pages/KitchenPage';
 import { useEffect } from 'react';
+import { Menu } from 'lucide-react';
+import KitchenPage from './pages/KitchenPage';
 
 function AppContent() {
-  const { currentView, setView, notification } = useUI();
+  const { currentView, setView, notification, isMobileMenuOpen, setIsMobileMenuOpen } = useUI();
   const { currentUser, canAccess } = useAuth();
 
   useEffect(() => {
@@ -52,8 +53,32 @@ function AppContent() {
   return (
     <div className="flex h-screen overflow-hidden">
       {currentView !== 'kitchen' && <Sidebar />}
-      <main className="flex-1 overflow-hidden">
-        {currentView === 'kitchen' ? <KitchenPage /> : renderPage()}
+      <main className="flex-1 overflow-hidden flex flex-col h-full">
+        {/* Mobile top bar */}
+        {currentView !== 'kitchen' && (
+          <div className="lg:hidden flex items-center justify-between bg-sidebar-bg text-white px-4 py-3 border-b border-sidebar-border z-30">
+            <button 
+              onClick={() => setIsMobileMenuOpen(true)}
+              className="p-1.5 hover:bg-sidebar-hover rounded-lg text-white"
+            >
+              <Menu size={20} />
+            </button>
+            <span className="font-display font-bold text-sm tracking-wider">
+              {currentView === 'pos' ? 'BÁN HÀNG' :
+               currentView === 'tables' ? 'SƠ ĐỒ BÀN' :
+               currentView === 'dashboard' ? 'BÁO CÁO' :
+               currentView === 'menu' ? 'QUẢN LÝ MENU' :
+               currentView === 'promotions' ? 'KHUYẾN MÃI' :
+               currentView === 'employees' ? 'NHÂN SỰ' : 'CÀI ĐẶT'}
+            </span>
+            <div className="w-8 h-8 rounded-full bg-primary-600 flex items-center justify-center text-xs font-bold text-white">
+              {(currentUser?.name ?? '?')[0].toUpperCase()}
+            </div>
+          </div>
+        )}
+        <div className="flex-1 overflow-hidden relative">
+          {currentView === 'kitchen' ? <KitchenPage /> : renderPage()}
+        </div>
       </main>
 
       {/* Global Toast Notification */}

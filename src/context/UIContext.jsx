@@ -5,8 +5,12 @@ const UIContext = createContext(null);
 export function UIProvider({ children }) {
   const [currentView, setCurrentView] = useState('pos'); // 'pos' | 'tables' | 'dashboard'
   const [notification, setNotification] = useState(null); // { message, type: 'success'|'error'|'info' }
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  const setView = (view) => setCurrentView(view);
+  const setView = (view) => {
+    setCurrentView(view);
+    setIsMobileMenuOpen(false);
+  };
 
   const clearNotification = () => setNotification(null);
 
@@ -22,6 +26,8 @@ export function UIProvider({ children }) {
     setNotification,
     showNotification,
     clearNotification,
+    isMobileMenuOpen,
+    setIsMobileMenuOpen
   };
 
   return <UIContext.Provider value={value}>{children}</UIContext.Provider>;

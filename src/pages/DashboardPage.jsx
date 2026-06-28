@@ -885,7 +885,7 @@ export default function DashboardPage() {
             </p>
           </div>
           {/* Tab switcher */}
-          <div className="flex bg-cream-light rounded-xl p-1 gap-1">
+          <div className="flex bg-cream-light rounded-xl p-1 gap-1 overflow-x-auto scrollbar-hide max-w-full flex-nowrap">
             <button
               onClick={() => setActiveTab('overview')}
               className={`min-h-[40px] px-4 py-2 rounded-lg text-sm font-semibold transition-all ${

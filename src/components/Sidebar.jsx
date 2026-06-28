@@ -18,7 +18,7 @@ const ALL_NAV_ITEMS = [
 ];
 
 export default function Sidebar() {
-  const { currentView, setView } = useUI();
+  const { currentView, setView, isMobileMenuOpen, setIsMobileMenuOpen } = useUI();
   const { cartCount } = useCart();
   const { currentUser, logout, isAdmin } = useAuth();
   const { lowStockItems } = useInventory();
@@ -51,7 +51,18 @@ export default function Sidebar() {
   );
 
   return (
-    <aside className="flex flex-col h-screen w-52 flex-shrink-0 bg-sidebar-bg border-r border-sidebar-border">
+    <>
+      {/* Mobile backdrop overlay */}
+      {isMobileMenuOpen && (
+        <div 
+          onClick={() => setIsMobileMenuOpen(false)}
+          className="lg:hidden fixed inset-0 z-40 bg-black/60 backdrop-blur-xs transition-opacity"
+        />
+      )}
+
+      <aside className={`flex flex-col h-screen w-52 flex-shrink-0 bg-sidebar-bg border-r border-sidebar-border fixed lg:static top-0 left-0 z-50 transition-transform duration-300 transform ${
+        isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+      }`}>
 
       {/* Logo */}
       <div className="px-4 pt-5 pb-4 border-b border-sidebar-border">
@@ -150,6 +161,7 @@ export default function Sidebar() {
       {showAttendanceModal && (
         <QuickAttendanceModal onClose={() => setShowAttendanceModal(false)} />
       )}
-    </aside>
+      </aside>
+    </>
   );
 }
