@@ -175,7 +175,7 @@ function OrderHistoryTab() {
                   <th className="text-left px-4 py-3 font-semibold text-coffee-medium">Mã HĐ</th>
                   <th className="text-left px-4 py-3 font-semibold text-coffee-medium">Bàn</th>
                   <th className="text-left px-4 py-3 font-semibold text-coffee-medium hidden sm:table-cell">Thời gian</th>
-                  <th className="text-left px-4 py-3 font-semibold text-coffee-medium hidden sm:table-cell">Nhân viên</th>
+                  <th className="text-left px-4 py-3 font-semibold text-coffee-medium hidden sm:table-cell">Người bán</th>
                   <th className="text-left px-4 py-3 font-semibold text-coffee-medium hidden md:table-cell">Món</th>
                   <th className="text-left px-4 py-3 font-semibold text-coffee-medium">Hình thức</th>
                   <th className="text-right px-4 py-3 font-semibold text-coffee-medium">Tổng</th>
@@ -266,7 +266,7 @@ function OrderHistoryTab() {
                 </div>
                 <div className="bg-cream-light rounded-xl p-3 col-span-2 flex justify-between items-center">
                   <div>
-                    <p className="text-coffee-light text-xs">Nhân viên</p>
+                    <p className="text-coffee-light text-xs">Người bán</p>
                     <p className="font-bold text-coffee-dark">{detailOrder.employee?.name || 'Không rõ'}</p>
                   </div>
                   {detailOrder.customer && (
