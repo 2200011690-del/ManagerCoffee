@@ -1012,7 +1012,7 @@ export default function DashboardPage() {
               style={activeTab === 'vouchers' ? { background: 'linear-gradient(135deg, #A76D42, #C8956C)' } : {}}
             >
               <Tag size={14} />
-              Khuyến mãi
+              Mã giảm giá (Voucher)
             </button>
             <button
               onClick={() => setActiveTab('tables')}
