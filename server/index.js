@@ -6,6 +6,7 @@ import { Server } from 'socket.io';
 import { PrismaClient } from '@prisma/client';
 import jwt from 'jsonwebtoken';
 import net from 'net';
+import bcrypt from 'bcryptjs';
 
 dotenv.config();
 const JWT_SECRET = process.env.JWT_SECRET || 'manager-coffee-super-secret-key-1234';
@@ -123,9 +124,9 @@ app.delete('/api/carts/:id', (req, res) => {
 
 // 1. Auth & Register
 app.post('/api/auth/register-store', async (req, res) => {
-  const { storeName, storeCode, adminName, adminPin } = req.body;
+  const { storeName, storeCode, adminName, adminEmail, adminPassword } = req.body;
   
-  if (!storeName || !storeCode || !adminName || !adminPin) {
+  if (!storeName || !storeCode || !adminName || !adminEmail || !adminPassword) {
     return res.status(400).json({ error: 'Vui lòng cung cấp đầy đủ thông tin đăng ký.' });
   }
   
@@ -143,6 +144,14 @@ app.post('/api/auth/register-store', async (req, res) => {
     if (existingStore) {
       return res.status(400).json({ error: 'Mã cửa hàng này đã tồn tại trên hệ thống. Vui lòng chọn mã khác.' });
     }
+
+    // Kiểm tra xem email đã được sử dụng chưa
+    const existingEmail = await prisma.user.findUnique({
+      where: { email: adminEmail }
+    });
+    if (existingEmail) {
+      return res.status(400).json({ error: 'Email này đã được sử dụng. Vui lòng nhập email khác.' });
+    }
     
     // Khởi tạo cửa hàng mới
     const store = await prisma.store.create({
@@ -153,14 +162,19 @@ app.post('/api/auth/register-store', async (req, res) => {
         phone: 'Số điện thoại liên hệ'
       }
     });
+
+    // Mã hóa mật khẩu của admin
+    const hashedPassword = await bcrypt.hash(adminPassword, 10);
     
     // Tạo tài khoản Admin cho cửa hàng
     const admin = await prisma.user.create({
       data: {
         storeId: store.id,
         name: adminName,
-        pin: adminPin,
-        role: 'admin'
+        email: adminEmail,
+        password: hashedPassword,
+        role: 'admin',
+        pin: null // Admin không sử dụng PIN
       }
     });
     
@@ -170,6 +184,53 @@ app.post('/api/auth/register-store', async (req, res) => {
   }
 });
 
+// Đăng nhập dành cho Admin bằng Email & Mật khẩu
+app.post('/api/auth/login-admin', async (req, res) => {
+  const { email, password } = req.body;
+  if (!email || !password) {
+    return res.status(400).json({ error: 'Vui lòng điền đầy đủ Email và Mật khẩu.' });
+  }
+
+  try {
+    const user = await prisma.user.findUnique({
+      where: { email },
+      include: { store: true }
+    });
+
+    if (!user || user.role !== 'admin') {
+      return res.status(401).json({ error: 'Email hoặc mật khẩu không chính xác.' });
+    }
+
+    // Kiểm tra mật khẩu mã hóa
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+    if (!isPasswordValid) {
+      return res.status(401).json({ error: 'Email hoặc mật khẩu không chính xác.' });
+    }
+
+    // Tạo token JWT có thời hạn 30 ngày
+    const token = jwt.sign(
+      {
+        userId: user.id,
+        storeId: user.storeId,
+        role: user.role,
+        name: user.name
+      },
+      JWT_SECRET,
+      { expiresIn: '30d' }
+    );
+
+    // Trả về thông tin user kèm token (bảo mật: loại bỏ mật khẩu thô)
+    const { password: _pw, ...safeUser } = user;
+    return res.json({
+      ...safeUser,
+      token
+    });
+  } catch (err) {
+    return res.status(500).json({ error: 'Lỗi đăng nhập Admin: ' + err.message });
+  }
+});
+
+// Đăng nhập POS / Nhân viên bằng Mã cửa hàng & Mã PIN
 app.post('/api/auth/login', async (req, res) => {
   const { storeCode, pin } = req.body;
   
@@ -186,28 +247,33 @@ app.post('/api/auth/login', async (req, res) => {
       include: { store: true }
     });
     
-    if (user) {
-      // Tạo token JWT có thời hạn 30 ngày
-      const token = jwt.sign(
-        {
-          userId: user.id,
-          storeId: user.storeId,
-          role: user.role,
-          name: user.name
-        },
-        JWT_SECRET,
-        { expiresIn: '30d' }
-      );
-      
-      // Trả về thông tin user kèm token
-      const { pin: _p, ...safeUser } = user; // Loại bỏ PIN thô khỏi phản hồi
-      return res.json({
-        ...safeUser,
-        token
-      });
+    if (!user) {
+      return res.status(401).json({ error: 'Mã cửa hàng hoặc mã PIN không chính xác' });
+    }
+
+    // Bảo mật: Tài khoản Admin bắt buộc phải đăng nhập bằng Email/Password, chặn đăng nhập bằng PIN
+    if (user.role === 'admin') {
+      return res.status(403).json({ error: 'Tài khoản Admin không được phép đăng nhập bằng mã PIN. Vui lòng sử dụng đăng nhập Admin.' });
     }
     
-    return res.status(401).json({ error: 'Mã cửa hàng hoặc mã PIN không chính xác' });
+    // Tạo token JWT có thời hạn 30 ngày
+    const token = jwt.sign(
+      {
+        userId: user.id,
+        storeId: user.storeId,
+        role: user.role,
+        name: user.name
+      },
+      JWT_SECRET,
+      { expiresIn: '30d' }
+    );
+    
+    // Trả về thông tin user kèm token
+    const { pin: _p, password: _pw, ...safeUser } = user;
+    return res.json({
+      ...safeUser,
+      token
+    });
   } catch (err) {
     return res.status(500).json({ error: 'Lỗi đăng nhập: ' + err.message });
   }

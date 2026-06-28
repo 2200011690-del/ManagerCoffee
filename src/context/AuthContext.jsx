@@ -50,6 +50,30 @@ export function AuthProvider({ children }) {
     }
   };
 
+  const loginAdmin = async (email, password) => {
+    setIsLoading(true);
+    try {
+      const user = await api.post('/auth/login-admin', { email, password });
+      user.allowedViews = ['pos', 'tables', 'dashboard', 'menu', 'employees', 'settings'];
+        
+      setCurrentUser(user);
+      setPinError('');
+      sessionStorage.setItem(AUTH_KEY, JSON.stringify(user));
+      
+      if (user.storeId) {
+        joinStore(user.storeId);
+      }
+      
+      return true;
+    } catch (err) {
+      const errorMsg = err.response?.data?.error || 'Email hoặc mật khẩu không chính xác. Vui lòng thử lại.';
+      setPinError(errorMsg);
+      return false;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const logout = () => {
     setCurrentUser(null);
     setPinError('');
@@ -70,6 +94,7 @@ export function AuthProvider({ children }) {
     <AuthContext.Provider value={{
       currentUser,
       login,
+      loginAdmin,
       logout,
       isAdmin,
       canAccess,

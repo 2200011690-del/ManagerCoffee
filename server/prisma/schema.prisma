@@ -46,7 +46,9 @@ model User {
   id      String  @id @default(cuid())
   storeId String
   store   Store   @relation(fields: [storeId], references: [id], onDelete: Cascade)
-  pin     String  
+  pin     String?  
+  email   String? @unique
+  password String?
   name    String
   role             String  // "admin" or "staff"
   canApplyDiscount Boolean @default(true)
