@@ -183,6 +183,7 @@ export default function POSPage() {
   
   // Phase 2 states
   const [showQRModal, setShowQRModal] = useState(false);
+  const [checkingOut, setCheckingOut] = useState(false);
 
   // Cash Shift Handover states
   const [activeShift, setActiveShift] = useState(null);
@@ -352,6 +353,7 @@ export default function POSPage() {
     const actualSplitPayments = isEvent ? null : splitPayments;
     const tableName = activeTableId ? (activeTable?.name ?? activeTableId) : 'Mang về';
     
+    setCheckingOut(true);
     // Nếu thanh toán chuyển khoản QR -> Tạo hóa đơn ở trạng thái PENDING trước
     if (paymentMethod === 'card' && !actualSplitPayments) {
       try {
@@ -379,6 +381,8 @@ export default function POSPage() {
       } catch (err) {
         console.error('QR Order Creation Error:', err);
         showNotification(err.response?.data?.error || 'Lỗi khởi tạo đơn hàng thanh toán QR', 'error');
+      } finally {
+        setCheckingOut(false);
       }
       return;
     }
@@ -409,6 +413,8 @@ export default function POSPage() {
     } catch (err) {
       console.error('Checkout Error:', err);
       showNotification(err.response?.data?.error || 'Lỗi thanh toán hóa đơn', 'error');
+    } finally {
+      setCheckingOut(false);
     }
   };
 
@@ -1083,8 +1089,13 @@ export default function POSPage() {
               </div>
             </div>
             <div className="flex gap-3">
-              <button onClick={() => setShowPayConfirm(false)} className="min-h-[44px] flex-1 btn-secondary">Hủy</button>
-              <button onClick={() => handleConfirmPayment()} className="min-h-[44px] flex-1 btn-primary">Xem hóa đơn</button>
+              <button onClick={() => setShowPayConfirm(false)} disabled={checkingOut} className="min-h-[44px] flex-1 btn-secondary">Hủy</button>
+              <button onClick={() => handleConfirmPayment()} disabled={checkingOut} className="min-h-[44px] flex-1 btn-primary flex items-center justify-center gap-2">
+                {checkingOut ? (
+                  <span className="animate-spin mr-1">⌛</span>
+                ) : null}
+                {checkingOut ? 'Đang xử lý...' : 'Xem hóa đơn'}
+              </button>
             </div>
           </div>
         </div>

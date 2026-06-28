@@ -10,7 +10,7 @@ export default function PaymentQRModal({ onClose, amount, orderNumber, onSuccess
   const [qrUrl, setQrUrl] = useState('');
   const [bankInfo, setBankInfo] = useState(null);
   const [error, setError] = useState('');
-  const [simulating, setSimulating] = useState(false);
+  const [bypassing, setBypassing] = useState(false);
   const [paid, setPaid] = useState(false);
 
   useEffect(() => {
@@ -61,10 +61,13 @@ export default function PaymentQRModal({ onClose, amount, orderNumber, onSuccess
 
   const handleBypass = async () => {
     // Thu ngân kiểm tra thấy tiền đã về và bấm xác nhận thủ công
+    setBypassing(true);
     try {
-      onSuccess();
+      await onSuccess();
     } catch (err) {
       showNotification('Lỗi xác nhận', 'error');
+    } finally {
+      setBypassing(false);
     }
   };
 
@@ -152,9 +155,13 @@ export default function PaymentQRModal({ onClose, amount, orderNumber, onSuccess
               <div className="space-y-2 pt-2">
                 <button
                   onClick={handleBypass}
-                  className="w-full min-h-[40px] rounded-xl text-xs font-semibold bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 flex items-center justify-center gap-1 transition-all"
+                  disabled={bypassing}
+                  className="w-full min-h-[40px] rounded-xl text-xs font-semibold bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 flex items-center justify-center gap-1 transition-all disabled:opacity-50"
                 >
-                  Xác nhận đã nhận tiền (Bypass)
+                  {bypassing ? (
+                    <span className="animate-spin mr-1">⌛</span>
+                  ) : null}
+                  {bypassing ? 'Đang xác nhận...' : 'Xác nhận đã nhận tiền (Bypass)'}
                 </button>
               </div>
             </div>
