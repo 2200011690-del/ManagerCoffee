@@ -129,9 +129,9 @@ export default function PaymentQRModal({ onClose, amount, orderNumber, onSuccess
                   <span>Số tiền:</span>
                   <span className="text-coffee-accent text-base">{amount.toLocaleString('vi-VN')} VNĐ</span>
                 </div>
-                <div className="flex justify-between text-xs font-semibold text-coffee-medium">
+                 <div className="flex justify-between text-xs font-semibold text-coffee-medium">
                   <span>Nội dung chuyển:</span>
-                  <span className="text-coffee-accent font-mono">{orderNumber}</span>
+                  <span className="text-coffee-accent font-mono">{bankInfo?.transferContent || orderNumber}</span>
                 </div>
               </div>
 
@@ -148,28 +148,14 @@ export default function PaymentQRModal({ onClose, amount, orderNumber, onSuccess
 
               <div className="divider border-cream-medium my-2" />
 
-              {/* Simulation & Bypass buttons */}
+               {/* Manual Bypass button */}
               <div className="space-y-2 pt-2">
-                <div className="flex gap-2">
-                  <button
-                    onClick={handleSimulate}
-                    disabled={simulating}
-                    className="flex-1 min-h-[38px] rounded-xl text-xs font-semibold bg-yellow-50 text-yellow-700 border border-yellow-200 hover:bg-yellow-100 flex items-center justify-center gap-1.5 transition-all"
-                  >
-                    <Sparkles size={12} />
-                    Mô phỏng Chuyển khoản
-                  </button>
-                  <button
-                    onClick={handleBypass}
-                    className="flex-1 min-h-[38px] rounded-xl text-xs font-semibold bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 flex items-center justify-center gap-1 transition-all"
-                  >
-                    Xác nhận thô (Bypass)
-                  </button>
-                </div>
-                
-                <p className="text-[10px] text-coffee-light leading-relaxed">
-                  * Nút <strong>Mô phỏng Chuyển khoản</strong> giả lập hệ thống nhận Webhook thanh toán thành công để thử nghiệm dòng chảy realtime.
-                </p>
+                <button
+                  onClick={handleBypass}
+                  className="w-full min-h-[40px] rounded-xl text-xs font-semibold bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 flex items-center justify-center gap-1 transition-all"
+                >
+                  Xác nhận đã nhận tiền (Bypass)
+                </button>
               </div>
             </div>
           )}

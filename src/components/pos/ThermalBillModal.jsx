@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Printer, CheckCircle, X } from 'lucide-react';
 import { api } from '../../api';
+import { useAuth } from '../../context/AuthContext';
 
 function VietQRCode({ amount, info, bankId = 'MB', accountNo = '', accountName = '' }) {
   const url = `https://img.vietqr.io/image/${bankId}-${accountNo}-compact2.png?amount=${amount}&addInfo=${encodeURIComponent(info)}&accountName=${encodeURIComponent(accountName)}`;
@@ -19,8 +20,23 @@ function padLine(left, right, total = 32) {
   return left + ' '.repeat(Math.max(1, pad)) + right;
 }
 
-export default function ThermalBillModal({ order, store, onConfirm, onClose }) {
+export default function ThermalBillModal({ order, store: propStore, onConfirm, onClose }) {
+  const { currentUser } = useAuth();
   const [printing, setPrinting] = useState(false);
+  const [store, setStore] = useState(propStore || currentUser?.store || null);
+
+  useEffect(() => {
+    // Luôn tải lại cấu hình mới nhất từ server để đảm bảo thông tin in là chính xác nhất
+    const fetchStoreSettings = async () => {
+      try {
+        const data = await api.get('/store/settings');
+        setStore(data);
+      } catch (err) {
+        console.error('Lỗi khi tải thông tin cửa hàng:', err);
+      }
+    };
+    fetchStoreSettings();
+  }, [propStore]);
 
   if (!order) return null;
 
@@ -187,7 +203,7 @@ export default function ThermalBillModal({ order, store, onConfirm, onClose }) {
             ) : (
               <p className="text-center text-xs">Hen gap lai lan sau ♥</p>
             )}
-            <p className="text-center text-[9px] mt-1 text-gray-400">espressolab.vn</p>
+            <p className="text-center text-[9px] mt-1 text-gray-400">{store?.code ? `${store.code}.vn` : 'espressolab.vn'}</p>
           </div>
         </div>
 

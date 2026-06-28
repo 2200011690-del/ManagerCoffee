@@ -93,6 +93,7 @@ export default function StoreSettingsPage() {
         port: 9100,
         store: {
           name: settings.name || 'QUAN TEST IN',
+          code: settings.code || '',
           address: settings.address || '123 Duong Test',
           phone: settings.phone || '0987654321',
           printFooter: settings.printFooter || 'Cam on da in thu!'

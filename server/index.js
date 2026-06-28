@@ -2276,6 +2276,11 @@ app.put('/api/kitchen/orders/:id/status', async (req, res) => {
 
 
 // --- PAYMENTS & DYNAMIC QR APIs (Phase 2) ---
+function normalizeString(str) {
+  if (!str) return '';
+  return str.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+}
+
 app.post('/api/payments/create-qr', async (req, res) => {
   const { amount, orderNumber } = req.body;
   const storeId = req.storeId;
@@ -2302,8 +2307,11 @@ app.post('/api/payments/create-qr', async (req, res) => {
       return res.status(400).json({ error: 'Cửa hàng chưa thiết lập số tài khoản ngân hàng nhận tiền trong phần Cấu hình.' });
     }
 
+    // Tạo mã nội dung chuyển khoản đặc trưng cho từng cửa hàng: storeCode-orderNumber
+    const transferContent = `${store.code}-${orderNumber}`;
+
     // Tạo mã VietQR qua API miễn phí của VietQR.io (compact2: chỉ hiển thị QR và số tiền tối giản)
-    const qrUrl = `https://img.vietqr.io/image/${bankId}-${bankAccountNo}-compact2.png?amount=${amount}&addInfo=${encodeURIComponent(orderNumber)}&accountName=${encodeURIComponent(bankAccountName)}`;
+    const qrUrl = `https://img.vietqr.io/image/${bankId}-${bankAccountNo}-compact2.png?amount=${amount}&addInfo=${encodeURIComponent(transferContent)}&accountName=${encodeURIComponent(bankAccountName)}`;
 
     res.json({
       qrUrl,
@@ -2311,7 +2319,8 @@ app.post('/api/payments/create-qr', async (req, res) => {
       bankAccountNo,
       bankAccountName,
       amount,
-      orderNumber
+      orderNumber,
+      transferContent
     });
   } catch (err) {
     res.status(500).json({ error: 'Lỗi tạo mã thanh toán: ' + err.message });
@@ -2320,21 +2329,23 @@ app.post('/api/payments/create-qr', async (req, res) => {
 
 app.post('/api/payments/simulate-success', async (req, res) => {
   const { orderNumber } = req.body;
+  const storeId = req.storeId;
   if (!orderNumber) return res.status(400).json({ error: 'Thiếu mã đơn hàng cần mô phỏng' });
   
   try {
     const pendingOrder = await prisma.order.findFirst({
-      where: { orderNumber, status: 'pending' }
+      where: { storeId, orderNumber, status: 'pending' }
     });
     
     if (pendingOrder) {
       await completeOrderPayment(pendingOrder.id, pendingOrder.storeId);
-      console.log(`[SIMULATE] Thanh toán thành công trong DB. Phát socket cho đơn hàng: ${orderNumber}`);
+      console.log(`[SIMULATE] Thanh toán thành công trong DB. Phát socket cho đơn hàng: ${orderNumber} của store ${storeId}`);
+      broadcast('paymentSuccess', { orderNumber }, storeId);
     } else {
       console.log(`[SIMULATE] Không tìm thấy đơn hàng pending ${orderNumber} trong DB, phát socket thô.`);
+      broadcast('paymentSuccess', { orderNumber }, storeId);
     }
     
-    io.emit('paymentSuccess', { orderNumber });
     res.json({ success: true, message: 'Đã gửi tín hiệu thanh toán thành công' });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -2347,21 +2358,56 @@ app.post('/api/payments/payos-webhook', async (req, res) => {
   
   const data = payload.data;
   if (data) {
-    const orderNumber = data.description;
-    if (orderNumber) {
+    const description = data.description;
+    if (description) {
       try {
-        const pendingOrder = await prisma.order.findFirst({
-          where: { orderNumber, status: 'pending' }
+        const normalizedDesc = normalizeString(description);
+        
+        // Tìm tất cả cửa hàng để xác định store sở hữu mô tả này
+        const stores = await prisma.store.findMany({ where: { isActive: true } });
+        let matchedStore = null;
+        let matchedOrderNumber = null;
+        
+        for (const store of stores) {
+          const storeCodeNorm = normalizeString(store.code);
+          // Kiểm tra xem mô tả chuyển khoản có bắt đầu bằng mã cửa hàng không
+          if (normalizedDesc.startsWith(storeCodeNorm)) {
+            matchedStore = store;
+            matchedOrderNumber = normalizedDesc.substring(storeCodeNorm.length);
+            break;
+          }
+        }
+        
+        if (matchedStore && matchedOrderNumber) {
+          const pendingOrders = await prisma.order.findMany({
+            where: { storeId: matchedStore.id, status: 'pending' }
+          });
+          // Đối chiếu mã đơn hàng (đã loại bỏ ký tự đặc biệt)
+          const pendingOrder = pendingOrders.find(o => normalizeString(o.orderNumber) === matchedOrderNumber);
+          if (pendingOrder) {
+            await completeOrderPayment(pendingOrder.id, pendingOrder.storeId);
+            console.log(`[PAYOS] Đã đối soát đơn hàng ${pendingOrder.orderNumber} cho store ${matchedStore.name} thành công.`);
+            broadcast('paymentSuccess', { orderNumber: pendingOrder.orderNumber }, pendingOrder.storeId);
+            return res.json({ success: true });
+          }
+        }
+        
+        // Fallback: Tìm đơn hàng trùng khớp mã đơn hàng trên toàn hệ thống
+        const allPendingOrders = await prisma.order.findMany({
+          where: { status: 'pending' }
         });
-        if (pendingOrder) {
-          await completeOrderPayment(pendingOrder.id, pendingOrder.storeId);
-          console.log(`[PAYOS] Đã đối soát & lưu thanh toán đơn hàng ${orderNumber} vào database.`);
+        const matchedFallback = allPendingOrders.find(o => {
+          const oNorm = normalizeString(o.orderNumber);
+          return normalizedDesc.includes(oNorm);
+        });
+        if (matchedFallback) {
+          await completeOrderPayment(matchedFallback.id, matchedFallback.storeId);
+          console.log(`[PAYOS - Fallback] Đã đối soát đơn hàng ${matchedFallback.orderNumber} của store ${matchedFallback.storeId} thành công.`);
+          broadcast('paymentSuccess', { orderNumber: matchedFallback.orderNumber }, matchedFallback.storeId);
         }
       } catch (err) {
         console.error('[PAYOS] Lỗi khi hoàn tất thanh toán từ webhook:', err);
       }
-      console.log(`[PAYOS] Giao dịch thành công. Kích hoạt đóng hóa đơn: ${orderNumber}`);
-      io.emit('paymentSuccess', { orderNumber });
     }
   }
   res.json({ success: true });
@@ -2470,7 +2516,7 @@ app.post('/api/print', (req, res) => {
       } else {
         commands.push(Buffer.from('Cam on quy khach!\nHen gap lai lan sau!\n'));
       }
-      commands.push(Buffer.from('espressolab.vn\n\n\n\n\n')); // extra spacing
+      commands.push(Buffer.from((store?.code ? `${store.code}.vn` : 'espressolab.vn') + '\n\n\n\n\n')); // extra spacing
       
       // Cut paper command
       commands.push(Buffer.from([0x1D, 0x56, 0x41, 0x03]));
