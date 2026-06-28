@@ -2298,6 +2298,8 @@ export default function DashboardPage() {
                 </div>
               </div>
             )}
+          </div>
+        )}
 
             {/* ===== CUSTOMERS CRM TAB ===== */}
             {activeTab === 'customers' && (
@@ -3102,8 +3104,6 @@ export default function DashboardPage() {
                 </div>
               </div>
             )}
-          </div>
-        )}
 
         {/* ===== DETAILED REPORTS TAB ===== */}
         {activeTab === 'detailed_reports' && (
