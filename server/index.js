@@ -38,6 +38,41 @@ const io = new Server(httpServer, {
 
 const prisma = new PrismaClient();
 
+// ===== VIETNAM TIMEZONE HELPERS (UTC+7) =====
+// Converts a UTC Date to Vietnam time by adding 7 hours offset
+function toVNDate(date = new Date()) {
+  return new Date(date.getTime() + 7 * 60 * 60 * 1000);
+}
+
+// Returns current date string in YYYY-MM-DD format, Vietnam timezone
+function getVNDateStr(date = new Date()) {
+  const vn = toVNDate(date);
+  return vn.toISOString().split('T')[0];
+}
+
+// Returns start of day in UTC for a VN date string (e.g. '2026-06-29' → 2026-06-28T17:00:00Z)
+function getVNStartOfDay(dateStr) {
+  return new Date(dateStr + 'T00:00:00+07:00');
+}
+
+// Returns end of day in UTC for a VN date string (e.g. '2026-06-29' → 2026-06-29T16:59:59.999Z)
+function getVNEndOfDay(dateStr) {
+  return new Date(dateStr + 'T23:59:59.999+07:00');
+}
+
+// Returns time string in HH:MM format, Vietnam timezone
+function getVNTimeStr(date = new Date()) {
+  const vn = toVNDate(date);
+  return vn.toISOString().split('T')[1].substring(0, 5);
+}
+
+// Returns date string in dd/M/yyyy format (vi-VN style), Vietnam timezone
+function getVNLocaleDateStr(date = new Date()) {
+  const vn = toVNDate(date);
+  return `${vn.getUTCDate()}/${vn.getUTCMonth() + 1}/${vn.getUTCFullYear()}`;
+}
+// ===== END TIMEZONE HELPERS =====
+
 app.use(cors({ origin: allowedOrigins, credentials: true }));
 app.use(express.json());
 
@@ -575,31 +610,25 @@ app.get('/api/users/salary-report', async (req, res) => {
       orderBy: { name: 'asc' }
     });
 
-    // 2. Build attendance filters
+    // 2. Build attendance filters (VN timezone aware)
     const attendanceFilter = {
       storeId,
       clockOut: { not: null } // only count completed attendances
     };
 
     if (startDate && endDate) {
-      const start = new Date(startDate);
-      start.setHours(0, 0, 0, 0);
-      const end = new Date(endDate);
-      end.setHours(23, 59, 59, 999);
       attendanceFilter.clockIn = {
-        gte: start,
-        lte: end
+        gte: getVNStartOfDay(startDate),
+        lte: getVNEndOfDay(endDate)
       };
     } else {
-      // Default to this month
-      const start = new Date();
-      start.setDate(1);
-      start.setHours(0, 0, 0, 0);
-      const end = new Date();
-      end.setHours(23, 59, 59, 999);
+      // Default to this month (VN timezone)
+      const vnNow = toVNDate();
+      const firstDayStr = `${vnNow.getUTCFullYear()}-${String(vnNow.getUTCMonth() + 1).padStart(2, '0')}-01`;
+      const todayStr = getVNDateStr();
       attendanceFilter.clockIn = {
-        gte: start,
-        lte: end
+        gte: getVNStartOfDay(firstDayStr),
+        lte: getVNEndOfDay(todayStr)
       };
     }
 
@@ -656,9 +685,7 @@ app.post('/api/attendance/quick', async (req, res) => {
     }
 
     const now = new Date();
-    const offset = now.getTimezoneOffset();
-    const localNow = new Date(now.getTime() - (offset * 60 * 1000));
-    const dateStr = localNow.toISOString().split('T')[0];
+    const dateStr = getVNDateStr(now);
 
     const activeAttendance = await prisma.attendance.findFirst({
       where: { storeId: req.storeId, userId: user.id, clockOut: null }
@@ -1199,8 +1226,8 @@ app.post('/api/orders/checkout', async (req, res) => {
   }
   
   const date = new Date();
-  const dateStr = date.toLocaleDateString('vi-VN');
-  const timeStr = date.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+  const dateStr = getVNLocaleDateStr(date);
+  const timeStr = getVNTimeStr(date);
   
   const count = await prisma.order.count({ where: { storeId } });
   const orderNumber = `#HD${1001 + count}`;
@@ -1860,10 +1887,15 @@ app.get('/api/dashboard', async (req, res) => {
     });
 
     const now = new Date();
-    const todayStr = now.toLocaleDateString('vi-VN');
+    const todayDateStr = getVNDateStr(now);
+    const todayStartUTC = getVNStartOfDay(todayDateStr);
+    const todayEndUTC = getVNEndOfDay(todayDateStr);
 
-    // 1. Today Stats
-    const todayOrders = orders.filter(o => o.date === todayStr);
+    // 1. Today Stats (compare by timestamp for timezone accuracy)
+    const todayOrders = orders.filter(o => {
+      const ts = new Date(o.timestamp);
+      return ts >= todayStartUTC && ts <= todayEndUTC;
+    });
     const todayRevenue = todayOrders.reduce((sum, o) => sum + o.total, 0);
     const todayOrdersCount = todayOrders.length;
     
@@ -1877,18 +1909,23 @@ app.get('/api/dashboard', async (req, res) => {
     const todayCustomersCount = uniqueCustomerIds.size + guestCount;
     const avgOrderValue = todayOrdersCount > 0 ? Math.round(todayRevenue / todayOrdersCount) : 0;
 
-    // 2. Weekly Revenue (Last 7 days, including today)
+    // 2. Weekly Revenue (Last 7 days, including today — using VN timezone)
     const weeklyRevenue = [];
     const DAY_NAMES = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
     for (let i = 6; i >= 0; i--) {
-      const d = new Date();
-      d.setDate(now.getDate() - i);
-      const dateStr = d.toLocaleDateString('vi-VN');
-      const dayName = DAY_NAMES[d.getDay()];
+      const d = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
+      const dayDateStr = getVNDateStr(d);
+      const vnD = toVNDate(d);
+      const dayName = DAY_NAMES[vnD.getUTCDay()];
+      const dayStart = getVNStartOfDay(dayDateStr);
+      const dayEnd = getVNEndOfDay(dayDateStr);
       
-      const dayOrders = orders.filter(o => o.date === dateStr);
+      const dayOrders = orders.filter(o => {
+        const ts = new Date(o.timestamp);
+        return ts >= dayStart && ts <= dayEnd;
+      });
       const dayRevenue = dayOrders.reduce((sum, o) => sum + o.total, 0);
-      weeklyRevenue.push({ day: dayName, date: dateStr, revenue: dayRevenue });
+      weeklyRevenue.push({ day: dayName, date: dayDateStr, revenue: dayRevenue });
     }
 
     // 3. This Week vs Last Week (growth)
@@ -2452,8 +2489,8 @@ app.get('/api/reports/employees', async (req, res) => {
     });
     
     const dateFilter = {};
-    if (startDate) dateFilter.gte = new Date(startDate);
-    if (endDate) dateFilter.lte = new Date(endDate);
+    if (startDate) dateFilter.gte = getVNStartOfDay(startDate);
+    if (endDate) dateFilter.lte = getVNEndOfDay(endDate);
 
     const orders = await prisma.order.findMany({
       where: {
@@ -2503,8 +2540,8 @@ app.get('/api/reports/time-analysis', async (req, res) => {
   const { startDate, endDate } = req.query;
   try {
     const dateFilter = {};
-    if (startDate) dateFilter.gte = new Date(startDate);
-    if (endDate) dateFilter.lte = new Date(endDate);
+    if (startDate) dateFilter.gte = getVNStartOfDay(startDate);
+    if (endDate) dateFilter.lte = getVNEndOfDay(endDate);
 
     const orders = await prisma.order.findMany({
       where: {
@@ -2573,8 +2610,8 @@ app.get('/api/reports/profit-loss', async (req, res) => {
   const { startDate, endDate } = req.query;
   try {
     const dateFilter = {};
-    if (startDate) dateFilter.gte = new Date(startDate);
-    if (endDate) dateFilter.lte = new Date(endDate);
+    if (startDate) dateFilter.gte = getVNStartOfDay(startDate);
+    if (endDate) dateFilter.lte = getVNEndOfDay(endDate);
 
     const orders = await prisma.order.findMany({
       where: {
