@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "build": "npm install && npx prisma generate",
+    "build": "npx prisma generate && npx prisma db push",
     "start": "node index.js",
     "dev": "nodemon index.js"
   },

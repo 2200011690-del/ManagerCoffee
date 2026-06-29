@@ -56,7 +56,7 @@ Render cung cấp máy chủ miễn phí (Free Tier) phù hợp cho các dự á
    - `NODE_ENV`: `production`
    - `PORT`: `10000`
    - `CORS_ORIGIN`: Dán link Vercel frontend sau khi deploy Vercel thành công, ví dụ `https://manager-coffee.vercel.app`.
-6. Nhấn **Create Web Service**. Chờ Render build code (Khoảng 2-5 phút).
+6. Nhấn **Create Web Service**. Chờ Render build code (Khoảng 2-5 phút). Lệnh build backend sẽ tự chạy `prisma generate` và `prisma db push` để cập nhật các bảng mới như `AuditLog`.
 7. Khi thành công, copy đường dẫn `.onrender.com` của API (VD: `https://manager-coffee-api.onrender.com`).
 
 ---

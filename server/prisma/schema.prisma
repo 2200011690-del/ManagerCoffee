@@ -40,6 +40,7 @@ model Store {
   returnOrders ReturnOrder[]
   heldOrders   HeldOrder[]
   promotions     Promotion[]
+  auditLogs      AuditLog[]
 }
 
 model User {
@@ -365,4 +366,24 @@ model Promotion {
   createdAt   DateTime  @default(now())
 
   @@index([storeId])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  storeId   String
+  store     Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  userId    String?
+  userName  String?
+  userRole  String?
+  action    String
+  entity    String
+  entityId  String?
+  metadata  String?
+  ip        String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  @@index([storeId, createdAt])
+  @@index([storeId, action])
+  @@index([storeId, entity])
 }

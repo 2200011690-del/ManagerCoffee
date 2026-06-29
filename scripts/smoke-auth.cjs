@@ -94,6 +94,9 @@ async function main() {
   try {
     await waitForServer(server);
 
+    const health = await request('/api/health');
+    assert(health.status === 200 && health.body?.ok === true, 'Health endpoint public phai hoat dong', health);
+
     const noAuthUsers = await request('/api/users');
     assert(noAuthUsers.status === 401, 'API quan tri phai chan request khong token', noAuthUsers);
 
@@ -150,6 +153,31 @@ async function main() {
       headers: { Authorization: `Bearer ${adminToken}` },
     });
     assert(adminUsers.status === 200 && Array.isArray(adminUsers.body), 'Admin phai xem duoc danh sach nhan su', adminUsers);
+
+    const systemStatus = await request('/api/system/status', {
+      headers: { Authorization: `Bearer ${adminToken}` },
+    });
+    assert(systemStatus.status === 200 && systemStatus.body?.ok === true, 'Admin phai xem duoc system status', systemStatus);
+
+    const auditLogsAsStaff = await request('/api/audit-logs', {
+      headers: { Authorization: `Bearer ${staffToken}` },
+    });
+    assert(auditLogsAsStaff.status === 403, 'Staff khong duoc xem audit log', auditLogsAsStaff);
+
+    const auditLogs = await request('/api/audit-logs', {
+      headers: { Authorization: `Bearer ${adminToken}` },
+    });
+    assert(auditLogs.status === 200 && Array.isArray(auditLogs.body), 'Admin phai xem duoc audit log', auditLogs);
+
+    const backup = await request('/api/backup/export', {
+      headers: { Authorization: `Bearer ${adminToken}` },
+    });
+    assert(backup.status === 200 && backup.body?.store && Array.isArray(backup.body?.users), 'Admin phai export duoc backup', backup);
+    assert(
+      backup.body.users.every((user) => user.pin === undefined && user.password === undefined),
+      'Backup khong duoc lo PIN/password nhan vien',
+      backup.body.users
+    );
 
     console.log('Smoke auth test passed.');
   } finally {

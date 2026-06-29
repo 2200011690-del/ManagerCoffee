@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-and-smoke:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: managercoffee
+          POSTGRES_PASSWORD: managercoffee
+          POSTGRES_DB: managercoffee
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U managercoffee -d managercoffee"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://managercoffee:managercoffee@localhost:5432/managercoffee?schema=public
+      DIRECT_URL: postgresql://managercoffee:managercoffee@localhost:5432/managercoffee?schema=public
+      JWT_SECRET: ci-smoke-secret
+      NODE_ENV: test
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Install backend dependencies
+        run: npm ci --prefix server
+
+      - name: Generate Prisma Client
+        run: npx prisma generate
+        working-directory: server
+
+      - name: Push database schema
+        run: npx prisma db push --skip-generate
+        working-directory: server
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
+
+      - name: Smoke auth
+        run: npm run test:smoke
+
+      - name: Smoke sales
+        run: npm run test:smoke:sales
+
+      - name: Smoke shifts
+        run: npm run test:smoke:shifts

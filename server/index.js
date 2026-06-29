@@ -46,6 +46,28 @@ const canViewReports = (user) => isAdminUser(user) || user?.canViewReports === t
 const canRefundOrders = (user) => isAdminUser(user) || user?.canRefund === true;
 const canManageUserRecord = (user, userId) => isAdminUser(user) || user?.userId === userId;
 
+async function writeAuditLog(req, action, entity, entityId = null, metadata = {}) {
+  if (!req.storeId) return;
+  try {
+    await prisma.auditLog.create({
+      data: {
+        storeId: req.storeId,
+        userId: req.user?.userId || null,
+        userName: req.user?.name || null,
+        userRole: req.user?.role || null,
+        action,
+        entity,
+        entityId,
+        metadata: JSON.stringify(metadata || {}),
+        ip: req.ip || null,
+        userAgent: req.headers['user-agent'] || null
+      }
+    });
+  } catch (err) {
+    console.error('Audit log failed:', err.message);
+  }
+}
+
 function requireAdmin(req, res) {
   if (!isAdminUser(req.user)) {
     res.status(403).json({ error: 'Tài khoản của bạn không có quyền thực hiện thao tác quản trị này.' });
@@ -101,6 +123,7 @@ const broadcast = (event, data, storeId) => {
 app.use((req, res, next) => {
   // Cho phép bỏ qua kiểm tra đăng nhập/đăng ký/webhook PayOS
   if (
+    req.path === '/api/health' ||
     req.path === '/api/auth/login' || 
     req.path === '/api/auth/login-admin' ||
     req.path === '/api/auth/register-store' ||
@@ -139,6 +162,144 @@ app.use((req, res, next) => {
 
 // --- API ENDPOINTS ---
 
+app.get('/api/health', async (req, res) => {
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    res.json({
+      ok: true,
+      service: 'manager-coffee-api',
+      env: process.env.NODE_ENV || 'development',
+      time: new Date().toISOString()
+    });
+  } catch (err) {
+    res.status(503).json({
+      ok: false,
+      service: 'manager-coffee-api',
+      error: err.message,
+      time: new Date().toISOString()
+    });
+  }
+});
+
+app.get('/api/system/status', async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  try {
+    const [
+      users,
+      products,
+      orders,
+      openShifts,
+      inventoryForStatus,
+      pendingOrders
+    ] = await Promise.all([
+      prisma.user.count({ where: { storeId: req.storeId } }),
+      prisma.product.count({ where: { storeId: req.storeId } }),
+      prisma.order.count({ where: { storeId: req.storeId } }),
+      prisma.cashShift.count({ where: { storeId: req.storeId, status: 'open' } }),
+      prisma.inventory.findMany({ where: { storeId: req.storeId }, select: { qty: true, minQty: true } }),
+      prisma.order.count({ where: { storeId: req.storeId, status: 'pending' } })
+    ]);
+    const lowStockItems = inventoryForStatus.filter((item) => item.qty <= item.minQty).length;
+
+    res.json({
+      ok: true,
+      time: new Date().toISOString(),
+      storeId: req.storeId,
+      counts: {
+        users,
+        products,
+        orders,
+        openShifts,
+        lowStockItems,
+        pendingOrders
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.get('/api/backup/export', async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  try {
+    const storeId = req.storeId;
+    const [
+      store,
+      users,
+      products,
+      tables,
+      inventory,
+      suppliers,
+      stockTransactions,
+      customers,
+      vouchers,
+      orders,
+      returns,
+      heldOrders,
+      promotions,
+      attendances,
+      cashShifts,
+      auditLogs
+    ] = await Promise.all([
+      prisma.store.findUnique({ where: { id: storeId } }),
+      prisma.user.findMany({ where: { storeId }, orderBy: { name: 'asc' } }),
+      prisma.product.findMany({ where: { storeId }, include: { recipes: true }, orderBy: { name: 'asc' } }),
+      prisma.table.findMany({ where: { storeId }, orderBy: { name: 'asc' } }),
+      prisma.inventory.findMany({ where: { storeId }, orderBy: { name: 'asc' } }),
+      prisma.supplier.findMany({ where: { storeId }, orderBy: { name: 'asc' } }),
+      prisma.stockTransaction.findMany({ where: { storeId }, orderBy: { createdAt: 'desc' }, take: 5000 }),
+      prisma.customer.findMany({ where: { storeId }, orderBy: { createdAt: 'desc' } }),
+      prisma.voucher.findMany({ where: { storeId }, orderBy: { code: 'asc' } }),
+      prisma.order.findMany({ where: { storeId }, include: { items: true, payments: true }, orderBy: { timestamp: 'desc' }, take: 5000 }),
+      prisma.returnOrder.findMany({ where: { storeId }, include: { items: true }, orderBy: { createdAt: 'desc' }, take: 2000 }),
+      prisma.heldOrder.findMany({ where: { storeId }, include: { items: true }, orderBy: { createdAt: 'desc' } }),
+      prisma.promotion.findMany({ where: { storeId }, orderBy: { createdAt: 'desc' } }),
+      prisma.attendance.findMany({ where: { storeId }, orderBy: { clockIn: 'desc' }, take: 5000 }),
+      prisma.cashShift.findMany({ where: { storeId }, orderBy: { openedAt: 'desc' }, take: 5000 }),
+      prisma.auditLog.findMany({ where: { storeId }, orderBy: { createdAt: 'desc' }, take: 5000 })
+    ]);
+
+    const safeUsers = users.map((user) => {
+      const safeUser = { ...user };
+      delete safeUser.pin;
+      delete safeUser.password;
+      return safeUser;
+    });
+    const payload = {
+      exportedAt: new Date().toISOString(),
+      storeId,
+      version: '1.0',
+      store,
+      users: safeUsers,
+      products,
+      tables,
+      inventory,
+      suppliers,
+      stockTransactions,
+      customers,
+      vouchers,
+      orders,
+      returns,
+      heldOrders,
+      promotions,
+      attendances,
+      cashShifts,
+      auditLogs
+    };
+
+    await writeAuditLog(req, 'export', 'backup', storeId, {
+      orders: orders.length,
+      products: products.length,
+      inventory: inventory.length
+    });
+
+    res.setHeader('Content-Disposition', `attachment; filename="manager-coffee-backup-${store?.code || storeId}-${Date.now()}.json"`);
+    res.json(payload);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Carts
 app.get('/api/carts', (req, res) => {
   const storeId = req.storeId;
@@ -163,6 +324,32 @@ app.delete('/api/carts/:id', (req, res) => {
     broadcast('cartSync', storeCarts[storeId], storeId);
   }
   res.json({ success: true });
+});
+
+app.get('/api/audit-logs', async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const { limit = '100', action, entity, userId } = req.query;
+  const take = Math.min(Math.max(Number(limit) || 100, 1), 500);
+  const where = {
+    storeId: req.storeId,
+    ...(action ? { action: String(action) } : {}),
+    ...(entity ? { entity: String(entity) } : {}),
+    ...(userId ? { userId: String(userId) } : {})
+  };
+
+  try {
+    const logs = await prisma.auditLog.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      take
+    });
+    res.json(logs.map((log) => ({
+      ...log,
+      metadata: log.metadata ? JSON.parse(log.metadata) : {}
+    })));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // 1. Auth & Register
@@ -341,6 +528,7 @@ app.post('/api/users', async (req, res) => {
   if (!requireAdmin(req, res)) return;
   try {
     const user = await prisma.user.create({ data: { ...req.body, storeId: req.storeId } });
+    await writeAuditLog(req, 'create', 'user', user.id, { name: user.name, role: user.role });
     res.json(user);
   } catch (err) {
     res.status(400).json({ error: 'Mã PIN đã tồn tại hoặc lỗi dữ liệu' });
@@ -358,6 +546,7 @@ app.put('/api/users/:id', async (req, res) => {
       return res.status(404).json({ error: 'Không tìm thấy nhân viên cần cập nhật' });
     }
     const user = await prisma.user.findFirst({ where: { id: req.params.id, storeId: req.storeId } });
+    await writeAuditLog(req, 'update', 'user', user.id, { fields: Object.keys(req.body || {}) });
     res.json(user);
   } catch (err) {
     res.status(400).json({ error: 'Lỗi cập nhật' });
@@ -370,6 +559,7 @@ app.delete('/api/users/:id', async (req, res) => {
   if (deleted.count === 0) {
     return res.status(404).json({ error: 'Không tìm thấy nhân viên cần xóa' });
   }
+  await writeAuditLog(req, 'delete', 'user', req.params.id);
   res.json({ success: true });
 });
 
@@ -546,6 +736,7 @@ app.post('/api/attendance', async (req, res) => {
       },
       include: { user: true }
     });
+    await writeAuditLog(req, 'create', 'attendance', attendance.id, { userId, date });
     res.json(attendance);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -584,6 +775,7 @@ app.put('/api/attendance/:id', async (req, res) => {
       where: { id: req.params.id, storeId: req.storeId },
       include: { user: true }
     });
+    await writeAuditLog(req, 'update', 'attendance', attendance.id, { userId, date });
     res.json(attendance);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -600,6 +792,7 @@ app.delete('/api/attendance/:id', async (req, res) => {
     if (deleted.count === 0) {
       return res.status(404).json({ error: 'Không tìm thấy bản ghi chấm công cần xóa' });
     }
+    await writeAuditLog(req, 'delete', 'attendance', req.params.id);
     res.json({ success: true });
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -659,6 +852,7 @@ app.post('/api/shifts/open', async (req, res) => {
         status: 'open'
       }
     });
+    await writeAuditLog(req, 'open', 'cashShift', shift.id, { userId, openingCash: shift.openingCash });
     res.json(shift);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -697,6 +891,12 @@ app.post('/api/shifts/close', async (req, res) => {
     });
     const updatedShift = await prisma.cashShift.findFirst({
       where: { id: shiftId, storeId: req.storeId }
+    });
+    await writeAuditLog(req, 'close', 'cashShift', updatedShift.id, {
+      userId: updatedShift.userId,
+      expectedCash: updatedShift.expectedCash,
+      actualCash: updatedShift.actualCash,
+      discrepancy: updatedShift.discrepancy
     });
     res.json(updatedShift);
   } catch (err) {
@@ -778,6 +978,7 @@ app.get('/api/products', async (req, res) => {
 app.post('/api/products', async (req, res) => {
   if (!requireAdmin(req, res)) return;
   const product = await prisma.product.create({ data: { ...req.body, storeId: req.storeId } });
+  await writeAuditLog(req, 'create', 'product', product.id, { name: product.name, price: product.price });
   broadcast('productUpdated', { action: 'create', product }, req.storeId);
   res.json(product);
 });
@@ -792,6 +993,7 @@ app.put('/api/products/:id', async (req, res) => {
     return res.status(404).json({ error: 'Không tìm thấy sản phẩm cần cập nhật' });
   }
   const product = await prisma.product.findFirst({ where: { id: req.params.id, storeId: req.storeId } });
+  await writeAuditLog(req, 'update', 'product', product.id, { fields: Object.keys(req.body || {}) });
   broadcast('productUpdated', { action: 'update', product }, req.storeId);
   res.json(product);
 });
@@ -802,6 +1004,7 @@ app.delete('/api/products/:id', async (req, res) => {
   if (deleted.count === 0) {
     return res.status(404).json({ error: 'Không tìm thấy sản phẩm cần xóa' });
   }
+  await writeAuditLog(req, 'delete', 'product', req.params.id);
   broadcast('productUpdated', { action: 'delete', id: req.params.id }, req.storeId);
   res.json({ success: true });
 });
@@ -830,6 +1033,9 @@ app.put('/api/tables/:id', async (req, res) => {
     return res.status(404).json({ error: 'Không tìm thấy bàn cần cập nhật' });
   }
   const table = await prisma.table.findFirst({ where: { id: req.params.id, storeId: req.storeId } });
+  if (!isStatusOnlyUpdate) {
+    await writeAuditLog(req, 'update', 'table', table.id, { fields: Object.keys(req.body || {}) });
+  }
   broadcast('tableUpdated', table, req.storeId);
   res.json(table);
 });
@@ -1230,6 +1436,7 @@ app.post('/api/inventory', async (req, res) => {
       });
     }
 
+    await writeAuditLog(req, 'create', 'inventory', item.id, { name: item.name, qty: item.qty, unit: item.unit });
     broadcast('inventoryUpdated', await prisma.inventory.findMany({ where: { storeId }, orderBy: { name: 'asc' } }), storeId);
     res.json(item);
   } catch (err) {
@@ -1257,6 +1464,7 @@ app.put('/api/inventory/:id', async (req, res) => {
       return res.status(404).json({ error: 'Không tìm thấy nguyên liệu cần cập nhật' });
     }
     const item = await prisma.inventory.findFirst({ where: { id, storeId } });
+    await writeAuditLog(req, 'update', 'inventory', item.id, { fields: Object.keys(req.body || {}) });
     broadcast('inventoryUpdated', await prisma.inventory.findMany({ where: { storeId }, orderBy: { name: 'asc' } }), storeId);
     res.json(item);
   } catch (err) {
@@ -1276,6 +1484,7 @@ app.delete('/api/inventory/:id', async (req, res) => {
     if (deleted.count === 0) {
       return res.status(404).json({ error: 'Không tìm thấy nguyên liệu cần xóa' });
     }
+    await writeAuditLog(req, 'delete', 'inventory', id);
     broadcast('inventoryUpdated', await prisma.inventory.findMany({ where: { storeId }, orderBy: { name: 'asc' } }), storeId);
     res.json({ success: true });
   } catch (err) {
@@ -1321,6 +1530,12 @@ app.post('/api/inventory/import', async (req, res) => {
       }
     });
 
+    await writeAuditLog(req, 'import', 'inventory', inventoryId, {
+      qty: Number(qty),
+      cost: cost ? Number(cost) : null,
+      supplierId: supplierId || null,
+      transactionId: transaction.id
+    });
     broadcast('inventoryUpdated', await prisma.inventory.findMany({ where: { storeId }, orderBy: { name: 'asc' } }), storeId);
     res.json(transaction);
   } catch (err) {
@@ -1359,6 +1574,12 @@ app.post('/api/inventory/adjust', async (req, res) => {
       }
     });
 
+    await writeAuditLog(req, 'adjust', 'inventory', inventoryId, {
+      oldQty,
+      actualQty: Number(actualQty),
+      diff,
+      transactionId: transaction.id
+    });
     broadcast('inventoryUpdated', await prisma.inventory.findMany({ where: { storeId }, orderBy: { name: 'asc' } }), storeId);
     res.json(transaction);
   } catch (err) {
@@ -1434,6 +1655,7 @@ app.post('/api/inventory/reset', async (req, res) => {
       }
     }
 
+    await writeAuditLog(req, 'reset', 'inventory', null, { itemCount: INITIAL_INVENTORY.length });
     broadcast('inventoryUpdated', await prisma.inventory.findMany({ where: { storeId }, orderBy: { name: 'asc' } }), storeId);
     res.json({ success: true });
   } catch (err) {
@@ -1612,6 +1834,7 @@ app.put('/api/products/:productId/recipe', async (req, res) => {
       });
       created.push(item);
     }
+    await writeAuditLog(req, 'update', 'recipe', product.id, { ingredientCount: created.length });
     res.json(created);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -1792,6 +2015,7 @@ app.put('/api/customers/:id', async (req, res) => {
       return res.status(404).json({ error: 'Không tìm thấy khách hàng cần cập nhật' });
     }
     const customer = await prisma.customer.findFirst({ where: { id, storeId } });
+    await writeAuditLog(req, 'update', 'customer', customer.id, { fields: Object.keys(req.body || {}) });
     res.json(customer);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -1809,6 +2033,7 @@ app.delete('/api/customers/:id', async (req, res) => {
     if (deleted.count === 0) {
       return res.status(404).json({ error: 'Không tìm thấy khách hàng cần xóa' });
     }
+    await writeAuditLog(req, 'delete', 'customer', id);
     res.json({ success: true });
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -1833,6 +2058,7 @@ app.post('/api/vouchers', async (req, res) => {
         isActive: isActive !== false
       }
     });
+    await writeAuditLog(req, 'create', 'voucher', voucher.id, { code: voucher.code, type: voucher.type, value: voucher.value });
     res.json(voucher);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -1861,6 +2087,7 @@ app.put('/api/vouchers/:id', async (req, res) => {
       return res.status(404).json({ error: 'Không tìm thấy voucher cần cập nhật' });
     }
     const voucher = await prisma.voucher.findFirst({ where: { id, storeId } });
+    await writeAuditLog(req, 'update', 'voucher', voucher.id, { fields: Object.keys(req.body || {}) });
     res.json(voucher);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -1878,6 +2105,7 @@ app.delete('/api/vouchers/:id', async (req, res) => {
     if (deleted.count === 0) {
       return res.status(404).json({ error: 'Không tìm thấy voucher cần xóa' });
     }
+    await writeAuditLog(req, 'delete', 'voucher', id);
     res.json({ success: true });
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -1898,6 +2126,7 @@ app.post('/api/tables', async (req, res) => {
         capacity: Number(capacity) || 2
       }
     });
+    await writeAuditLog(req, 'create', 'table', table.id, { name: table.name, zone: table.zone, capacity: table.capacity });
     broadcast('tableUpdated', table, storeId);
     res.json(table);
   } catch (err) {
@@ -1916,6 +2145,7 @@ app.delete('/api/tables/:id', async (req, res) => {
     if (deleted.count === 0) {
       return res.status(404).json({ error: 'Không tìm thấy bàn cần xóa' });
     }
+    await writeAuditLog(req, 'delete', 'table', id);
     // In a real websocket setup, we can broadcast tableDeletion.
     // For now we just return success.
     res.json({ success: true });
@@ -2066,6 +2296,13 @@ app.post('/api/orders/:orderId/return', async (req, res) => {
       }
     }
 
+    await writeAuditLog(req, 'return', 'order', orderId, {
+      returnOrderId: returnOrder.id,
+      returnNumber: returnOrder.returnNumber,
+      refundAmount,
+      refundMethod: refundMethod || 'cash',
+      itemCount: items.length
+    });
     broadcast('inventoryUpdated', await prisma.inventory.findMany({ where: { storeId } }), storeId);
     res.json(returnOrder);
   } catch (err) {
@@ -2174,6 +2411,9 @@ app.put('/api/store/settings', async (req, res) => {
         currency, printHeader, printFooter,
         bankId, bankAccountNo, bankAccountName
       }
+    });
+    await writeAuditLog(req, 'update', 'storeSettings', req.storeId, {
+      fields: Object.keys(req.body || {}).filter((key) => key !== 'bankAccountNo')
     });
     res.json(store);
   } catch (err) {
