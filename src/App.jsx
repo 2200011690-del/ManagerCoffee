@@ -20,7 +20,7 @@ import { Menu } from 'lucide-react';
 import KitchenPage from './pages/KitchenPage';
 
 function AppContent() {
-  const { currentView, setView, notification, isMobileMenuOpen, setIsMobileMenuOpen } = useUI();
+  const { currentView, setView, notification, setIsMobileMenuOpen } = useUI();
   const { currentUser, canAccess } = useAuth();
 
   useEffect(() => {

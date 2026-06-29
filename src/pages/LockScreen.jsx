@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Delete, Coffee, Building2, Store, UserPlus, ChevronLeft, HelpCircle } from 'lucide-react';
+import { useState } from 'react';
+import { Delete, Coffee, Building2, Store, UserPlus, ChevronLeft } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../api';
 
@@ -12,6 +12,9 @@ const PAD_KEYS = [
 
 export default function LockScreen() {
   const { login, loginAdmin, pinError, setPinError, isLoading } = useAuth();
+  const demoAdminEmail = 'admin@espresso-lab.vn';
+  const demoAdminPassword = 'admin123456';
+  const showDemoCredentials = import.meta.env.DEV;
   const [storeCode, setStoreCode] = useState(() => localStorage.getItem('manager_coffee_store_code') || '');
   const [isSelectingStore, setIsSelectingStore] = useState(!storeCode);
   const [tempStoreCode, setTempStoreCode] = useState(storeCode);
@@ -85,7 +88,7 @@ export default function LockScreen() {
       setPinError('Vui lòng điền đầy đủ Email và Mật khẩu.');
       return;
     }
-    const ok = await loginAdmin(adminEmail.trim(), adminPassword.trim());
+    const ok = await loginAdmin(storeCode, adminEmail.trim(), adminPassword.trim());
     if (!ok) {
       setShake(true);
       setTimeout(() => setShake(false), 600);
@@ -116,7 +119,7 @@ export default function LockScreen() {
 
     setRegLoading(true);
     try {
-      const res = await api.post('/auth/register-store', regForm);
+      await api.post('/auth/register-store', regForm);
       setRegSuccess('Đăng ký cửa hàng thành công! Vui lòng đăng nhập bằng tài khoản Admin mới.');
       setStoreCode(code);
       setTempStoreCode(code);
@@ -156,16 +159,18 @@ export default function LockScreen() {
           <p className="text-white/70 text-sm leading-relaxed mb-6">
             Hệ thống POS đa phân quyền phục vụ quản lý đơn hàng, bàn ăn và kho nguyên liệu realtime dành riêng cho mô hình F&B.
           </p>
-          <div className="bg-white/10 rounded-xl p-4 border border-white/10">
-            <p className="text-white font-semibold text-sm mb-1 flex items-center gap-1.5">
-              <Store size={15} /> Dùng thử Hệ thống:
-            </p>
-            <p className="text-white/80 text-xs leading-relaxed">
-              Nhập mã quán mặc định: <span className="font-bold text-yellow-300">espresso-lab</span><br/>
-              Đăng nhập Admin: Nhấn nút bên dưới chọn đăng nhập Admin qua Email / Mật khẩu.<br/>
-              Mã PIN Nhân viên: <span className="font-bold text-yellow-300">2222</span>
-            </p>
-          </div>
+          {showDemoCredentials && (
+            <div className="bg-white/10 rounded-xl p-4 border border-white/10">
+              <p className="text-white font-semibold text-sm mb-1 flex items-center gap-1.5">
+                <Store size={15} /> Dùng thử Hệ thống:
+              </p>
+              <p className="text-white/80 text-xs leading-relaxed">
+                Nhập mã quán mặc định: <span className="font-bold text-yellow-300">espresso-lab</span><br/>
+                Admin demo: <span className="font-bold text-yellow-300">{demoAdminEmail}</span> / <span className="font-bold text-yellow-300">{demoAdminPassword}</span><br/>
+                Mã PIN Nhân viên: <span className="font-bold text-yellow-300">2222</span>
+              </p>
+            </div>
+          )}
         </div>
         <div className="flex items-center gap-2 text-white/40 text-xs">
           <Building2 size={12} />
@@ -252,7 +257,7 @@ export default function LockScreen() {
                         required
                         value={adminEmail}
                         onChange={(e) => setAdminEmail(e.target.value)}
-                        placeholder="admin@vidu.com"
+                        placeholder={showDemoCredentials ? demoAdminEmail : 'admin@yourstore.vn'}
                         className="w-full min-h-[44px] bg-slate-800 text-white border border-slate-700 rounded-xl px-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
                       />
                     </div>
@@ -265,7 +270,7 @@ export default function LockScreen() {
                         required
                         value={adminPassword}
                         onChange={(e) => setAdminPassword(e.target.value)}
-                        placeholder="••••••"
+                        placeholder={showDemoCredentials ? demoAdminPassword : 'Nhập mật khẩu quản trị'}
                         className="w-full min-h-[44px] bg-slate-800 text-white border border-slate-700 rounded-xl px-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
                       />
                     </div>

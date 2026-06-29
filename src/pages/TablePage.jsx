@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo } from 'react';
-import { Users, Coffee, Sparkles, Clock, MapPin, RefreshCw, CheckCircle, ShoppingBag, Utensils, ChevronRight, Plus, Edit, Trash2, X } from 'lucide-react';
+import { Users, Coffee, Sparkles, Clock, MapPin, RefreshCw, ShoppingBag, Utensils, ChevronRight, Plus, Edit, Trash2, X } from 'lucide-react';
 import { useTable } from '../context/TableContext';
 import { useCart } from '../context/CartContext';
 import { useUI } from '../context/UIContext';
@@ -213,7 +213,7 @@ export default function TablePage() {
     setFormZone(table.zone);
     setFormCapacity(table.capacity);
     setShowModal(true);
-  }, [zonesList]);
+  }, []);
 
   const handleDeleteClick = useCallback(async (tableId) => {
     if (window.confirm('Bạn có chắc chắn muốn xóa bàn này?')) {

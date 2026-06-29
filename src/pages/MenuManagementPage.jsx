@@ -265,7 +265,7 @@ export default function MenuManagementPage() {
       }
       showNotification('Thêm món mới thành công! 🎉', 'success');
       setShowAdd(false);
-    } catch (err) {
+    } catch {
       showNotification('Lỗi khi thêm món mới!', 'error');
     }
   };
@@ -284,7 +284,7 @@ export default function MenuManagementPage() {
       }
       showNotification('Cập nhật món thành công! 🎉', 'success');
       setEditTarget(null);
-    } catch (err) {
+    } catch {
       showNotification('Lỗi khi cập nhật món!', 'error');
     }
   };
@@ -295,7 +295,7 @@ export default function MenuManagementPage() {
       await removeItem(item.id);
       showNotification('Xóa món thành công! 🗑️', 'success');
       setDeleteConfirm(null);
-    } catch (err) {
+    } catch {
       showNotification('Lỗi khi xóa món!', 'error');
     } finally {
       setIsDeleting(false);

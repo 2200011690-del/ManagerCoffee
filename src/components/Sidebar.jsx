@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Coffee, LayoutGrid, BarChart3, ChefHat, ChevronRight, Wifi, WifiOff, LogOut, Shield, Users, ShoppingBag, Clock, Settings, Gift } from 'lucide-react';
+import { Coffee, LayoutGrid, BarChart3, ChefHat, Wifi, WifiOff, LogOut, Shield, Users, ShoppingBag, Clock, Settings, Gift } from 'lucide-react';
 import { useUI } from '../context/UIContext';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
@@ -20,7 +20,7 @@ const ALL_NAV_ITEMS = [
 export default function Sidebar() {
   const { currentView, setView, isMobileMenuOpen, setIsMobileMenuOpen } = useUI();
   const { cartCount } = useCart();
-  const { currentUser, logout, isAdmin } = useAuth();
+  const { currentUser, logout, isAdmin, canAccess } = useAuth();
   const { lowStockItems } = useInventory();
 
   const [now, setNow] = useState(new Date());
@@ -46,8 +46,8 @@ export default function Sidebar() {
   const timeStr = now.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
   const dateStr = now.toLocaleDateString('vi-VN', { weekday: 'short', day: '2-digit', month: '2-digit' });
 
-  const navItems = ALL_NAV_ITEMS.filter(item =>
-    currentUser && item.roles.includes(currentUser.role)
+  const navItems = ALL_NAV_ITEMS.filter((item) =>
+    currentUser && item.roles.includes(currentUser.role) && canAccess(item.id)
   );
 
   return (

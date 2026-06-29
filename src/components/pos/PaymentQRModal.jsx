@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
-import { X, CreditCard, RefreshCw, CheckCircle2, ShieldAlert, Sparkles } from 'lucide-react';
+import { X, CreditCard, RefreshCw, CheckCircle2, ShieldAlert } from 'lucide-react';
 import { api } from '../../api';
 import { socket } from '../../socket';
 import { useUI } from '../../context/UIContext';
 
-export default function PaymentQRModal({ onClose, amount, orderNumber, onSuccess, onFail }) {
+export default function PaymentQRModal({ amount, orderNumber, onSuccess, onFail }) {
   const { showNotification } = useUI();
   const [loading, setLoading] = useState(true);
   const [qrUrl, setQrUrl] = useState('');
@@ -45,26 +45,14 @@ export default function PaymentQRModal({ onClose, amount, orderNumber, onSuccess
     return () => {
       socket.off('paymentSuccess', handlePaymentSuccess);
     };
-  }, [amount, orderNumber]);
-
-  const handleSimulate = async () => {
-    setSimulating(true);
-    try {
-      await api.post('/payments/simulate-success', { orderNumber });
-      showNotification('Đã gửi yêu cầu mô phỏng thanh toán thành công!', 'success');
-    } catch (err) {
-      showNotification('Lỗi mô phỏng thanh toán', 'error');
-    } finally {
-      setSimulating(false);
-    }
-  };
+  }, [amount, orderNumber, onSuccess, showNotification]);
 
   const handleBypass = async () => {
     // Thu ngân kiểm tra thấy tiền đã về và bấm xác nhận thủ công
     setBypassing(true);
     try {
       await onSuccess();
-    } catch (err) {
+    } catch {
       showNotification('Lỗi xác nhận', 'error');
     } finally {
       setBypassing(false);

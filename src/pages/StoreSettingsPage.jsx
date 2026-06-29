@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Settings, Save, Globe, Receipt, Gift, Percent, RefreshCw, CheckCircle, AlertTriangle, CreditCard, Image as ImageIcon } from 'lucide-react';
+import { Settings, Save, Globe, Receipt, Gift, Percent, RefreshCw, AlertTriangle, CreditCard, Image as ImageIcon } from 'lucide-react';
 import { api } from '../api';
 import { useUI } from '../context/UIContext';
 
@@ -47,7 +47,7 @@ export default function StoreSettingsPage() {
           bankAccountName: data.bankAccountName || ''
         });
       }
-    } catch (err) {
+    } catch {
       showNotification('Không thể tải cấu hình cửa hàng', 'error');
     } finally {
       setLoading(false);
@@ -73,7 +73,7 @@ export default function StoreSettingsPage() {
       await api.put('/store/settings', settings);
       localStorage.setItem('lan_printer_ip', printerIp);
       showNotification('Lưu cấu hình thành công! 🎉', 'success');
-    } catch (err) {
+    } catch {
       showNotification('Lỗi khi lưu cấu hình', 'error');
     } finally {
       setSaving(false);

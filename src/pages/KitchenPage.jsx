@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
-import { Coffee, Clock, CheckCircle2, Play, AlertCircle, Volume2, VolumeX, LogOut, RefreshCw, ArrowLeft } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Coffee, Clock, CheckCircle2, Play, Volume2, VolumeX, LogOut, RefreshCw, ArrowLeft } from 'lucide-react';
 import { api } from '../api';
 import { socket } from '../socket';
 import { useAuth } from '../context/AuthContext';
@@ -60,7 +60,7 @@ export default function KitchenPage() {
   useEffect(() => {
     fetchKitchenOrders();
     
-    const handleNewOrder = (order) => {
+    const handleNewOrder = () => {
       // Khi có order mới (bất kể paid hay pending), bếp sẽ tải lại danh sách
       fetchKitchenOrders();
       if (soundEnabled) {

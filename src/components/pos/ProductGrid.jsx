@@ -1,5 +1,5 @@
 import React from 'react';
-import { Plus, Flame, Coffee, CupSoda, Cake } from 'lucide-react';
+import { Plus, Flame } from 'lucide-react';
 
 // Category color map
 const CATEGORY_COLORS = {

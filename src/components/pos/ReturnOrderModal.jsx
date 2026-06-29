@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Search, RotateCcw, X, Package, AlertTriangle, CheckCircle, Banknote, CreditCard } from 'lucide-react';
+import { Search, RotateCcw, X, AlertTriangle, CheckCircle, Banknote, CreditCard } from 'lucide-react';
 import { api } from '../../api';
 
 export default function ReturnOrderModal({ onClose, onSuccess }) {

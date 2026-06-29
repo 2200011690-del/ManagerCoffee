@@ -1,9 +1,22 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState } from 'react';
 import { api } from '../api';
 import { joinStore } from '../socket';
 
 const AuthContext = createContext(null);
 const AUTH_KEY = 'manager_coffee_auth_session';
+const ADMIN_VIEWS = ['pos', 'tables', 'kitchen', 'dashboard', 'menu', 'promotions', 'employees', 'settings'];
+const STAFF_BASE_VIEWS = ['pos', 'tables', 'kitchen'];
+
+function getAllowedViews(user) {
+  if (!user) return [];
+  if (user.role === 'admin') return ADMIN_VIEWS;
+
+  const allowedViews = [...STAFF_BASE_VIEWS];
+  if (user.canViewReports) {
+    allowedViews.push('dashboard');
+  }
+  return allowedViews;
+}
 
 export function AuthProvider({ children }) {
   const [currentUser, setCurrentUser] = useState(() => {
@@ -28,9 +41,7 @@ export function AuthProvider({ children }) {
     setIsLoading(true);
     try {
       const user = await api.post('/auth/login', { storeCode, pin });
-      user.allowedViews = user.role === 'admin' 
-        ? ['pos', 'tables', 'dashboard', 'menu', 'employees', 'settings'] 
-        : (user.canViewReports ? ['pos', 'tables', 'dashboard'] : ['pos', 'tables']);
+      user.allowedViews = getAllowedViews(user);
         
       setCurrentUser(user);
       setPinError('');
@@ -50,11 +61,11 @@ export function AuthProvider({ children }) {
     }
   };
 
-  const loginAdmin = async (email, password) => {
+  const loginAdmin = async (storeCode, email, password) => {
     setIsLoading(true);
     try {
-      const user = await api.post('/auth/login-admin', { email, password });
-      user.allowedViews = ['pos', 'tables', 'dashboard', 'menu', 'employees', 'settings'];
+      const user = await api.post('/auth/login-admin', { storeCode, email, password });
+      user.allowedViews = getAllowedViews(user);
         
       setCurrentUser(user);
       setPinError('');
@@ -86,7 +97,6 @@ export function AuthProvider({ children }) {
   const canAccess = (viewId) => {
     if (!currentUser) return false;
     if (currentUser.role === 'admin') return true;
-    if (viewId === 'dashboard') return !!currentUser.canViewReports;
     return currentUser.allowedViews?.includes(viewId);
   };
 
@@ -99,6 +109,7 @@ export function AuthProvider({ children }) {
       isAdmin,
       canAccess,
       pinError,
+      setPinError,
       isLoading
     }}>
       {children}

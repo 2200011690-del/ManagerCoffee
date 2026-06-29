@@ -9,7 +9,18 @@ import net from 'net';
 import bcrypt from 'bcryptjs';
 
 dotenv.config();
-const JWT_SECRET = process.env.JWT_SECRET || 'manager-coffee-super-secret-key-1234';
+const DEFAULT_JWT_SECRET = 'manager-coffee-super-secret-key-1234';
+const IS_PRODUCTION = process.env.NODE_ENV === 'production';
+
+if (IS_PRODUCTION && !process.env.JWT_SECRET) {
+  throw new Error('Thiếu JWT_SECRET trong môi trường production.');
+}
+
+if (!process.env.JWT_SECRET) {
+  console.warn('[AUTH] Dang su dung JWT_SECRET mac dinh cho moi truong local/dev.');
+}
+
+const JWT_SECRET = process.env.JWT_SECRET || DEFAULT_JWT_SECRET;
 
 const allowedOrigins = process.env.CORS_ORIGIN 
   ? process.env.CORS_ORIGIN.split(',') 
@@ -29,6 +40,35 @@ const prisma = new PrismaClient();
 
 app.use(cors({ origin: allowedOrigins, credentials: true }));
 app.use(express.json());
+
+const isAdminUser = (user) => user?.role === 'admin';
+const canViewReports = (user) => isAdminUser(user) || user?.canViewReports === true;
+const canRefundOrders = (user) => isAdminUser(user) || user?.canRefund === true;
+const canManageUserRecord = (user, userId) => isAdminUser(user) || user?.userId === userId;
+
+function requireAdmin(req, res) {
+  if (!isAdminUser(req.user)) {
+    res.status(403).json({ error: 'Tài khoản của bạn không có quyền thực hiện thao tác quản trị này.' });
+    return false;
+  }
+  return true;
+}
+
+function requireReportAccess(req, res) {
+  if (!canViewReports(req.user)) {
+    res.status(403).json({ error: 'Tài khoản của bạn không có quyền xem báo cáo.' });
+    return false;
+  }
+  return true;
+}
+
+function requireRefundAccess(req, res) {
+  if (!canRefundOrders(req.user)) {
+    res.status(403).json({ error: 'Tài khoản của bạn không có quyền trả hàng hoặc hoàn tiền.' });
+    return false;
+  }
+  return true;
+}
 
 // --- IN-MEMORY CARTS (For Realtime Sync) ---
 // Structure: { storeId: { tableId: cart, __takeaway__: cart } }
@@ -62,6 +102,7 @@ app.use((req, res, next) => {
   // Cho phép bỏ qua kiểm tra đăng nhập/đăng ký/webhook PayOS
   if (
     req.path === '/api/auth/login' || 
+    req.path === '/api/auth/login-admin' ||
     req.path === '/api/auth/register-store' ||
     req.path === '/api/payments/payos-webhook'
   ) {
@@ -83,7 +124,9 @@ app.use((req, res, next) => {
     }
   } else {
     // Fallback cho local development hoặc migration scripts
-    storeId = req.headers['x-store-id'];
+    if (!IS_PRODUCTION) {
+      storeId = req.headers['x-store-id'];
+    }
   }
   
   if (!storeId && req.path.startsWith('/api/')) {
@@ -167,7 +210,7 @@ app.post('/api/auth/register-store', async (req, res) => {
     const hashedPassword = await bcrypt.hash(adminPassword, 10);
     
     // Tạo tài khoản Admin cho cửa hàng
-    const admin = await prisma.user.create({
+    await prisma.user.create({
       data: {
         storeId: store.id,
         name: adminName,
@@ -186,9 +229,9 @@ app.post('/api/auth/register-store', async (req, res) => {
 
 // Đăng nhập dành cho Admin bằng Email & Mật khẩu
 app.post('/api/auth/login-admin', async (req, res) => {
-  const { email, password } = req.body;
-  if (!email || !password) {
-    return res.status(400).json({ error: 'Vui lòng điền đầy đủ Email và Mật khẩu.' });
+  const { storeCode, email, password } = req.body;
+  if (!storeCode || !email || !password) {
+    return res.status(400).json({ error: 'Vui lòng điền đầy đủ Mã cửa hàng, Email và Mật khẩu.' });
   }
 
   try {
@@ -197,7 +240,7 @@ app.post('/api/auth/login-admin', async (req, res) => {
       include: { store: true }
     });
 
-    if (!user || user.role !== 'admin') {
+    if (!user || user.role !== 'admin' || !user.password || user.store?.code !== storeCode) {
       return res.status(401).json({ error: 'Email hoặc mật khẩu không chính xác.' });
     }
 
@@ -213,7 +256,11 @@ app.post('/api/auth/login-admin', async (req, res) => {
         userId: user.id,
         storeId: user.storeId,
         role: user.role,
-        name: user.name
+        name: user.name,
+        canViewReports: true,
+        canRefund: true,
+        canApplyDiscount: true,
+        maxDiscountPct: 100
       },
       JWT_SECRET,
       { expiresIn: '30d' }
@@ -262,7 +309,11 @@ app.post('/api/auth/login', async (req, res) => {
         userId: user.id,
         storeId: user.storeId,
         role: user.role,
-        name: user.name
+        name: user.name,
+        canViewReports: !!user.canViewReports,
+        canRefund: !!user.canRefund,
+        canApplyDiscount: !!user.canApplyDiscount,
+        maxDiscountPct: user.maxDiscountPct ?? 0
       },
       JWT_SECRET,
       { expiresIn: '30d' }
@@ -281,11 +332,13 @@ app.post('/api/auth/login', async (req, res) => {
 
 // 1.1 Users (Employee Management)
 app.get('/api/users', async (req, res) => {
+  if (!requireAdmin(req, res)) return;
   const users = await prisma.user.findMany({ where: { storeId: req.storeId } });
   res.json(users);
 });
 
 app.post('/api/users', async (req, res) => {
+  if (!requireAdmin(req, res)) return;
   try {
     const user = await prisma.user.create({ data: { ...req.body, storeId: req.storeId } });
     res.json(user);
@@ -295,11 +348,16 @@ app.post('/api/users', async (req, res) => {
 });
 
 app.put('/api/users/:id', async (req, res) => {
+  if (!requireAdmin(req, res)) return;
   try {
-    const user = await prisma.user.update({
+    const updated = await prisma.user.updateMany({
       where: { id: req.params.id, storeId: req.storeId },
       data: req.body
     });
+    if (updated.count === 0) {
+      return res.status(404).json({ error: 'Không tìm thấy nhân viên cần cập nhật' });
+    }
+    const user = await prisma.user.findFirst({ where: { id: req.params.id, storeId: req.storeId } });
     res.json(user);
   } catch (err) {
     res.status(400).json({ error: 'Lỗi cập nhật' });
@@ -307,11 +365,16 @@ app.put('/api/users/:id', async (req, res) => {
 });
 
 app.delete('/api/users/:id', async (req, res) => {
-  await prisma.user.delete({ where: { id: req.params.id, storeId: req.storeId } });
+  if (!requireAdmin(req, res)) return;
+  const deleted = await prisma.user.deleteMany({ where: { id: req.params.id, storeId: req.storeId } });
+  if (deleted.count === 0) {
+    return res.status(404).json({ error: 'Không tìm thấy nhân viên cần xóa' });
+  }
   res.json({ success: true });
 });
 
 app.get('/api/users/salary-report', async (req, res) => {
+  if (!requireAdmin(req, res)) return;
   const { startDate, endDate } = req.query;
   const storeId = req.storeId;
 
@@ -444,6 +507,7 @@ app.post('/api/attendance/quick', async (req, res) => {
 
 // 2. Attendance logs for admin
 app.get('/api/attendance/logs', async (req, res) => {
+  if (!requireAdmin(req, res)) return;
   try {
     const logs = await prisma.attendance.findMany({
       where: { storeId: req.storeId },
@@ -458,8 +522,14 @@ app.get('/api/attendance/logs', async (req, res) => {
 
 // 2.1 Add manual attendance (Admin)
 app.post('/api/attendance', async (req, res) => {
+  if (!requireAdmin(req, res)) return;
   const { userId, date, clockIn, clockOut } = req.body;
   try {
+    const user = await prisma.user.findFirst({ where: { id: userId, storeId: req.storeId } });
+    if (!user) {
+      return res.status(400).json({ error: 'Nhân viên không thuộc cửa hàng hiện tại' });
+    }
+
     let totalHours = null;
     if (clockIn && clockOut) {
       const diffMs = new Date(clockOut).getTime() - new Date(clockIn).getTime();
@@ -484,14 +554,20 @@ app.post('/api/attendance', async (req, res) => {
 
 // 2.2 Edit manual attendance (Admin)
 app.put('/api/attendance/:id', async (req, res) => {
+  if (!requireAdmin(req, res)) return;
   const { userId, date, clockIn, clockOut } = req.body;
   try {
+    const user = await prisma.user.findFirst({ where: { id: userId, storeId: req.storeId } });
+    if (!user) {
+      return res.status(400).json({ error: 'Nhân viên không thuộc cửa hàng hiện tại' });
+    }
+
     let totalHours = null;
     if (clockIn && clockOut) {
       const diffMs = new Date(clockOut).getTime() - new Date(clockIn).getTime();
       totalHours = Math.round((diffMs / (1000 * 60 * 60)) * 100) / 100;
     }
-    const attendance = await prisma.attendance.update({
+    const updated = await prisma.attendance.updateMany({
       where: { id: req.params.id, storeId: req.storeId },
       data: {
         userId,
@@ -499,7 +575,13 @@ app.put('/api/attendance/:id', async (req, res) => {
         clockIn: new Date(clockIn),
         clockOut: clockOut ? new Date(clockOut) : null,
         totalHours
-      },
+      }
+    });
+    if (updated.count === 0) {
+      return res.status(404).json({ error: 'Không tìm thấy bản ghi chấm công cần cập nhật' });
+    }
+    const attendance = await prisma.attendance.findFirst({
+      where: { id: req.params.id, storeId: req.storeId },
       include: { user: true }
     });
     res.json(attendance);
@@ -510,10 +592,14 @@ app.put('/api/attendance/:id', async (req, res) => {
 
 // 2.3 Delete attendance (Admin)
 app.delete('/api/attendance/:id', async (req, res) => {
+  if (!requireAdmin(req, res)) return;
   try {
-    await prisma.attendance.delete({
+    const deleted = await prisma.attendance.deleteMany({
       where: { id: req.params.id, storeId: req.storeId }
     });
+    if (deleted.count === 0) {
+      return res.status(404).json({ error: 'Không tìm thấy bản ghi chấm công cần xóa' });
+    }
     res.json({ success: true });
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -522,7 +608,18 @@ app.delete('/api/attendance/:id', async (req, res) => {
 
 // 3. Check active shift
 app.get('/api/shifts/active/:userId', async (req, res) => {
+  if (!canManageUserRecord(req.user, req.params.userId)) {
+    return res.status(403).json({ error: 'Bạn không có quyền xem ca làm việc của nhân viên khác' });
+  }
+
   try {
+    const user = await prisma.user.findFirst({
+      where: { id: req.params.userId, storeId: req.storeId }
+    });
+    if (!user) {
+      return res.status(404).json({ error: 'Không tìm thấy nhân viên trong cửa hàng hiện tại' });
+    }
+
     const activeShift = await prisma.cashShift.findFirst({
       where: { storeId: req.storeId, userId: req.params.userId, status: 'open' }
     });
@@ -535,7 +632,16 @@ app.get('/api/shifts/active/:userId', async (req, res) => {
 // 4. Open a shift
 app.post('/api/shifts/open', async (req, res) => {
   const { userId, openingCash } = req.body;
+  if (!canManageUserRecord(req.user, userId)) {
+    return res.status(403).json({ error: 'Bạn không có quyền mở ca cho nhân viên khác' });
+  }
+
   try {
+    const user = await prisma.user.findFirst({ where: { id: userId, storeId: req.storeId } });
+    if (!user) {
+      return res.status(400).json({ error: 'Nhân viên không thuộc cửa hàng hiện tại' });
+    }
+
     const existing = await prisma.cashShift.findFirst({
       where: { storeId: req.storeId, userId, status: 'open' }
     });
@@ -563,11 +669,14 @@ app.post('/api/shifts/open', async (req, res) => {
 app.post('/api/shifts/close', async (req, res) => {
   const { shiftId, actualCash, notes } = req.body;
   try {
-    const shift = await prisma.cashShift.findUnique({
-      where: { id: shiftId }
+    const shift = await prisma.cashShift.findFirst({
+      where: { id: shiftId, storeId: req.storeId }
     });
     if (!shift) {
       return res.status(404).json({ error: 'Không tìm thấy ca làm việc' });
+    }
+    if (!canManageUserRecord(req.user, shift.userId)) {
+      return res.status(403).json({ error: 'Bạn không có quyền đóng ca của nhân viên khác' });
     }
     if (shift.status === 'closed') {
       return res.status(400).json({ error: 'Ca làm việc này đã được đóng trước đó' });
@@ -576,8 +685,8 @@ app.post('/api/shifts/close', async (req, res) => {
     const actual = Number(actualCash) || 0;
     const discrepancy = actual - shift.expectedCash;
 
-    const updatedShift = await prisma.cashShift.update({
-      where: { id: shiftId },
+    await prisma.cashShift.updateMany({
+      where: { id: shiftId, storeId: req.storeId },
       data: {
         closedAt: new Date(),
         actualCash: actual,
@@ -585,6 +694,9 @@ app.post('/api/shifts/close', async (req, res) => {
         notes,
         status: 'closed'
       }
+    });
+    const updatedShift = await prisma.cashShift.findFirst({
+      where: { id: shiftId, storeId: req.storeId }
     });
     res.json(updatedShift);
   } catch (err) {
@@ -594,6 +706,7 @@ app.post('/api/shifts/close', async (req, res) => {
 
 // 6. Shift handover history logs
 app.get('/api/shifts/logs', async (req, res) => {
+  if (!requireAdmin(req, res)) return;
   try {
     const logs = await prisma.cashShift.findMany({
       where: { storeId: req.storeId },
@@ -663,22 +776,32 @@ app.get('/api/products', async (req, res) => {
 });
 
 app.post('/api/products', async (req, res) => {
+  if (!requireAdmin(req, res)) return;
   const product = await prisma.product.create({ data: { ...req.body, storeId: req.storeId } });
   broadcast('productUpdated', { action: 'create', product }, req.storeId);
   res.json(product);
 });
 
 app.put('/api/products/:id', async (req, res) => {
-  const product = await prisma.product.update({
+  if (!requireAdmin(req, res)) return;
+  const updated = await prisma.product.updateMany({
     where: { id: req.params.id, storeId: req.storeId },
     data: req.body
   });
+  if (updated.count === 0) {
+    return res.status(404).json({ error: 'Không tìm thấy sản phẩm cần cập nhật' });
+  }
+  const product = await prisma.product.findFirst({ where: { id: req.params.id, storeId: req.storeId } });
   broadcast('productUpdated', { action: 'update', product }, req.storeId);
   res.json(product);
 });
 
 app.delete('/api/products/:id', async (req, res) => {
-  await prisma.product.delete({ where: { id: req.params.id, storeId: req.storeId } });
+  if (!requireAdmin(req, res)) return;
+  const deleted = await prisma.product.deleteMany({ where: { id: req.params.id, storeId: req.storeId } });
+  if (deleted.count === 0) {
+    return res.status(404).json({ error: 'Không tìm thấy sản phẩm cần xóa' });
+  }
   broadcast('productUpdated', { action: 'delete', id: req.params.id }, req.storeId);
   res.json({ success: true });
 });
@@ -690,10 +813,23 @@ app.get('/api/tables', async (req, res) => {
 });
 
 app.put('/api/tables/:id', async (req, res) => {
-  const table = await prisma.table.update({
+  const isStatusOnlyUpdate = Object.keys(req.body).every((key) => ['status', 'occupiedSince'].includes(key));
+  if (!isStatusOnlyUpdate && !requireAdmin(req, res)) return;
+
+  const updated = await prisma.table.updateMany({
     where: { id: req.params.id, storeId: req.storeId },
-    data: req.body
+    data: {
+      ...(req.body.status !== undefined ? { status: req.body.status } : {}),
+      ...(req.body.occupiedSince !== undefined ? { occupiedSince: req.body.occupiedSince } : {}),
+      ...(req.body.name !== undefined ? { name: req.body.name } : {}),
+      ...(req.body.zone !== undefined ? { zone: req.body.zone } : {}),
+      ...(req.body.capacity !== undefined ? { capacity: Number(req.body.capacity) || 2 } : {})
+    }
   });
+  if (updated.count === 0) {
+    return res.status(404).json({ error: 'Không tìm thấy bàn cần cập nhật' });
+  }
+  const table = await prisma.table.findFirst({ where: { id: req.params.id, storeId: req.storeId } });
   broadcast('tableUpdated', table, req.storeId);
   res.json(table);
 });
@@ -745,7 +881,7 @@ const completeOrderPayment = async (orderId, storeId) => {
       const store = await prisma.store.findUnique({ where: { id: storeId } });
       const pointsRate = store?.pointsRate ?? 0.1;
       const pointsToAdd = Math.floor(updatedOrder.total * pointsRate);
-      const customer = await prisma.customer.findUnique({ where: { id: updatedOrder.customerId } });
+      const customer = await prisma.customer.findFirst({ where: { id: updatedOrder.customerId, storeId } });
       if (customer) {
         let newPoints = customer.points + pointsToAdd;
         if (updatedOrder.usedPoints && updatedOrder.usedPoints > 0) {
@@ -756,7 +892,7 @@ const completeOrderPayment = async (orderId, storeId) => {
         else if (newPoints >= 500) newTier = 'GOLD';
         
         await prisma.customer.update({
-          where: { id: updatedOrder.customerId },
+          where: { id: customer.id },
           data: { points: newPoints, tier: newTier }
         });
       }
@@ -764,10 +900,11 @@ const completeOrderPayment = async (orderId, storeId) => {
 
     // 3. Chuyển trạng thái bàn sang dirty (chờ dọn dẹp)
     if (updatedOrder.tableId) {
-      const table = await prisma.table.update({
-        where: { id: updatedOrder.tableId },
+      await prisma.table.updateMany({
+        where: { id: updatedOrder.tableId, storeId },
         data: { status: 'dirty', occupiedSince: null }
       });
+      const table = await prisma.table.findFirst({ where: { id: updatedOrder.tableId, storeId } });
       broadcast('tableUpdated', table, storeId);
     }
 
@@ -787,10 +924,12 @@ const completeOrderPayment = async (orderId, storeId) => {
       for (const recipe of recipeItems) {
         const amount = recipe.qty * c.qty;
         
-        const updatedInventory = await prisma.inventory.update({
-          where: { id: recipe.inventoryId },
+        const updated = await prisma.inventory.updateMany({
+          where: { id: recipe.inventoryId, storeId },
           data: { qty: { decrement: amount } }
         });
+        if (updated.count === 0) continue;
+        const updatedInventory = await prisma.inventory.findFirst({ where: { id: recipe.inventoryId, storeId } });
         
         await prisma.stockTransaction.create({
           data: {
@@ -827,6 +966,31 @@ app.post('/api/orders/checkout', async (req, res) => {
   } = req.body;
   const storeId = req.storeId;
   const orderStatus = status || 'paid';
+
+  if (!Array.isArray(cart) || cart.length === 0) {
+    return res.status(400).json({ error: 'Giỏ hàng trống hoặc không hợp lệ' });
+  }
+
+  if (tableId) {
+    const table = await prisma.table.findFirst({ where: { id: tableId, storeId } });
+    if (!table) {
+      return res.status(400).json({ error: 'Bàn không thuộc cửa hàng hiện tại' });
+    }
+  }
+
+  if (customerId) {
+    const customer = await prisma.customer.findFirst({ where: { id: customerId, storeId } });
+    if (!customer) {
+      return res.status(400).json({ error: 'Khách hàng không thuộc cửa hàng hiện tại' });
+    }
+  }
+
+  if (employeeId) {
+    const employee = await prisma.user.findFirst({ where: { id: employeeId, storeId } });
+    if (!employee) {
+      return res.status(400).json({ error: 'Nhân viên không thuộc cửa hàng hiện tại' });
+    }
+  }
   
   const date = new Date();
   const dateStr = date.toLocaleDateString('vi-VN');
@@ -910,7 +1074,7 @@ app.post('/api/orders/checkout', async (req, res) => {
       const store = await prisma.store.findUnique({ where: { id: storeId } });
       const pointsRate = store?.pointsRate ?? 0.1;
       const pointsToAdd = Math.floor(total * pointsRate);
-      const customer = await prisma.customer.findUnique({ where: { id: customerId } });
+      const customer = await prisma.customer.findFirst({ where: { id: customerId, storeId } });
       if (customer) {
         let newPoints = customer.points + pointsToAdd;
         if (usedPoints && Number(usedPoints) > 0) {
@@ -928,26 +1092,32 @@ app.post('/api/orders/checkout', async (req, res) => {
     }
 
     if (tableId) {
-      const table = await prisma.table.update({
-        where: { id: tableId },
+      await prisma.table.updateMany({
+        where: { id: tableId, storeId },
         data: { status: 'dirty', occupiedSince: null }
       });
+      const table = await prisma.table.findFirst({ where: { id: tableId, storeId } });
       broadcast('tableUpdated', table, storeId);
     }
 
     try {
       for (const c of cart) {
+        const product = await prisma.product.findFirst({ where: { id: c.id, storeId } });
+        if (!product) continue;
+
         const recipeItems = await prisma.recipeItem.findMany({
-          where: { productId: c.id },
+          where: { productId: product.id },
           include: { inventory: true }
         });
         
         for (const recipe of recipeItems) {
           const amount = recipe.qty * c.qty;
-          const updatedInventory = await prisma.inventory.update({
-            where: { id: recipe.inventoryId },
+          const updated = await prisma.inventory.updateMany({
+            where: { id: recipe.inventoryId, storeId },
             data: { qty: { decrement: amount } }
           });
+          if (updated.count === 0) continue;
+          const updatedInventory = await prisma.inventory.findFirst({ where: { id: recipe.inventoryId, storeId } });
           
           await prisma.stockTransaction.create({
             data: {
@@ -1031,6 +1201,7 @@ app.get('/api/inventory', async (req, res) => {
 
 // Create new ingredient
 app.post('/api/inventory', async (req, res) => {
+  if (!requireAdmin(req, res)) return;
   const storeId = req.storeId;
   const { name, unit, qty, minQty, icon } = req.body;
   try {
@@ -1068,11 +1239,12 @@ app.post('/api/inventory', async (req, res) => {
 
 // Update ingredient
 app.put('/api/inventory/:id', async (req, res) => {
+  if (!requireAdmin(req, res)) return;
   const storeId = req.storeId;
   const { id } = req.params;
   const { name, unit, minQty, icon } = req.body;
   try {
-    const item = await prisma.inventory.update({
+    const updated = await prisma.inventory.updateMany({
       where: { id, storeId },
       data: {
         name,
@@ -1081,6 +1253,10 @@ app.put('/api/inventory/:id', async (req, res) => {
         icon
       }
     });
+    if (updated.count === 0) {
+      return res.status(404).json({ error: 'Không tìm thấy nguyên liệu cần cập nhật' });
+    }
+    const item = await prisma.inventory.findFirst({ where: { id, storeId } });
     broadcast('inventoryUpdated', await prisma.inventory.findMany({ where: { storeId }, orderBy: { name: 'asc' } }), storeId);
     res.json(item);
   } catch (err) {
@@ -1090,12 +1266,16 @@ app.put('/api/inventory/:id', async (req, res) => {
 
 // Delete ingredient
 app.delete('/api/inventory/:id', async (req, res) => {
+  if (!requireAdmin(req, res)) return;
   const storeId = req.storeId;
   const { id } = req.params;
   try {
-    await prisma.inventory.delete({
+    const deleted = await prisma.inventory.deleteMany({
       where: { id, storeId }
     });
+    if (deleted.count === 0) {
+      return res.status(404).json({ error: 'Không tìm thấy nguyên liệu cần xóa' });
+    }
     broadcast('inventoryUpdated', await prisma.inventory.findMany({ where: { storeId }, orderBy: { name: 'asc' } }), storeId);
     res.json({ success: true });
   } catch (err) {
@@ -1105,17 +1285,21 @@ app.delete('/api/inventory/:id', async (req, res) => {
 
 // Import stock (Nhập hàng)
 app.post('/api/inventory/import', async (req, res) => {
+  if (!requireAdmin(req, res)) return;
   const storeId = req.storeId;
   const { inventoryId, qty, cost, supplierId, note } = req.body;
   try {
-    const ingredient = await prisma.inventory.findUnique({
-      where: { id: inventoryId }
-    });
+    const ingredient = await prisma.inventory.findFirst({ where: { id: inventoryId, storeId } });
     if (!ingredient) return res.status(404).json({ error: 'Nguyên liệu không tồn tại' });
 
+    if (supplierId) {
+      const supplier = await prisma.supplier.findFirst({ where: { id: supplierId, storeId } });
+      if (!supplier) return res.status(400).json({ error: 'Nhà cung cấp không thuộc cửa hàng hiện tại' });
+    }
+
     const newQty = ingredient.qty + Number(qty);
-    const updated = await prisma.inventory.update({
-      where: { id: inventoryId },
+    await prisma.inventory.updateMany({
+      where: { id: inventoryId, storeId },
       data: { qty: newQty }
     });
 
@@ -1146,19 +1330,18 @@ app.post('/api/inventory/import', async (req, res) => {
 
 // Adjust stock (Kiểm kho)
 app.post('/api/inventory/adjust', async (req, res) => {
+  if (!requireAdmin(req, res)) return;
   const storeId = req.storeId;
   const { inventoryId, actualQty, note } = req.body;
   try {
-    const ingredient = await prisma.inventory.findUnique({
-      where: { id: inventoryId }
-    });
+    const ingredient = await prisma.inventory.findFirst({ where: { id: inventoryId, storeId } });
     if (!ingredient) return res.status(404).json({ error: 'Nguyên liệu không tồn tại' });
 
     const oldQty = ingredient.qty;
     const diff = Number(actualQty) - oldQty;
 
-    await prisma.inventory.update({
-      where: { id: inventoryId },
+    await prisma.inventory.updateMany({
+      where: { id: inventoryId, storeId },
       data: { qty: Number(actualQty) }
     });
 
@@ -1185,6 +1368,7 @@ app.post('/api/inventory/adjust', async (req, res) => {
 
 // Reset Inventory to default seeded values
 app.post('/api/inventory/reset', async (req, res) => {
+  if (!requireAdmin(req, res)) return;
   const storeId = req.storeId;
   try {
     await prisma.stockTransaction.deleteMany({ where: { storeId } });
@@ -1260,6 +1444,7 @@ app.post('/api/inventory/reset', async (req, res) => {
 
 // Get stock transaction history
 app.get('/api/inventory/transactions', async (req, res) => {
+  if (!requireAdmin(req, res)) return;
   const storeId = req.storeId;
   try {
     const transactions = await prisma.stockTransaction.findMany({
@@ -1278,6 +1463,7 @@ app.get('/api/inventory/transactions', async (req, res) => {
 
 // Suppliers APIs
 app.get('/api/suppliers', async (req, res) => {
+  if (!requireAdmin(req, res)) return;
   const storeId = req.storeId;
   try {
     const suppliers = await prisma.supplier.findMany({
@@ -1296,6 +1482,7 @@ app.get('/api/suppliers', async (req, res) => {
 });
 
 app.post('/api/suppliers', async (req, res) => {
+  if (!requireAdmin(req, res)) return;
   const storeId = req.storeId;
   const { name, phone, email, address } = req.body;
   try {
@@ -1315,11 +1502,12 @@ app.post('/api/suppliers', async (req, res) => {
 });
 
 app.put('/api/suppliers/:id', async (req, res) => {
+  if (!requireAdmin(req, res)) return;
   const storeId = req.storeId;
   const { id } = req.params;
   const { name, phone, email, address } = req.body;
   try {
-    const supplier = await prisma.supplier.update({
+    const updated = await prisma.supplier.updateMany({
       where: { id, storeId },
       data: {
         name,
@@ -1328,6 +1516,10 @@ app.put('/api/suppliers/:id', async (req, res) => {
         address
       }
     });
+    if (updated.count === 0) {
+      return res.status(404).json({ error: 'Không tìm thấy nhà cung cấp cần cập nhật' });
+    }
+    const supplier = await prisma.supplier.findFirst({ where: { id, storeId } });
     res.json(supplier);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -1335,12 +1527,16 @@ app.put('/api/suppliers/:id', async (req, res) => {
 });
 
 app.delete('/api/suppliers/:id', async (req, res) => {
+  if (!requireAdmin(req, res)) return;
   const storeId = req.storeId;
   const { id } = req.params;
   try {
-    await prisma.supplier.delete({
+    const deleted = await prisma.supplier.deleteMany({
       where: { id, storeId }
     });
+    if (deleted.count === 0) {
+      return res.status(404).json({ error: 'Không tìm thấy nhà cung cấp cần xóa' });
+    }
     res.json({ success: true });
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -1349,10 +1545,18 @@ app.delete('/api/suppliers/:id', async (req, res) => {
 
 // Product Recipe APIs
 app.get('/api/products/:productId/recipe', async (req, res) => {
+  if (!requireAdmin(req, res)) return;
   const { productId } = req.params;
   try {
+    const product = await prisma.product.findFirst({
+      where: { id: productId, storeId: req.storeId }
+    });
+    if (!product) {
+      return res.status(404).json({ error: 'Không tìm thấy sản phẩm' });
+    }
+
     const recipeItems = await prisma.recipeItem.findMany({
-      where: { productId },
+      where: { productId: product.id },
       include: {
         inventory: true
       }
@@ -1364,21 +1568,41 @@ app.get('/api/products/:productId/recipe', async (req, res) => {
 });
 
 app.put('/api/products/:productId/recipe', async (req, res) => {
+  if (!requireAdmin(req, res)) return;
   const { productId } = req.params;
   const { ingredients } = req.body; // array of { inventoryId, qty }
   try {
+    const product = await prisma.product.findFirst({
+      where: { id: productId, storeId: req.storeId }
+    });
+    if (!product) {
+      return res.status(404).json({ error: 'Không tìm thấy sản phẩm' });
+    }
+
+    const cleanIngredients = Array.isArray(ingredients) ? ingredients : [];
+    const inventoryIds = cleanIngredients.map((ing) => ing.inventoryId).filter(Boolean);
+    const ownedInventory = await prisma.inventory.findMany({
+      where: { id: { in: inventoryIds }, storeId: req.storeId },
+      select: { id: true }
+    });
+    const ownedInventoryIds = new Set(ownedInventory.map((item) => item.id));
+    const hasForeignInventory = inventoryIds.some((id) => !ownedInventoryIds.has(id));
+    if (hasForeignInventory) {
+      return res.status(400).json({ error: 'Công thức chứa nguyên liệu không thuộc cửa hàng hiện tại' });
+    }
+
     // Delete existing recipe items
     await prisma.recipeItem.deleteMany({
-      where: { productId }
+      where: { productId: product.id }
     });
 
     // Create new recipe items
     const created = [];
-    for (const ing of ingredients) {
+    for (const ing of cleanIngredients) {
       if (Number(ing.qty) <= 0) continue;
       const item = await prisma.recipeItem.create({
         data: {
-          productId,
+          productId: product.id,
           inventoryId: ing.inventoryId,
           qty: Number(ing.qty)
         },
@@ -1396,6 +1620,7 @@ app.put('/api/products/:productId/recipe', async (req, res) => {
 
 // 6. Dashboard Analytics
 app.get('/api/dashboard', async (req, res) => {
+  if (!requireReportAccess(req, res)) return;
   const storeId = req.storeId;
   try {
     const thirtyDaysAgo = new Date();
@@ -1549,11 +1774,12 @@ app.get('/api/dashboard', async (req, res) => {
 
 // 7. Customers CRM CRUD Extensions
 app.put('/api/customers/:id', async (req, res) => {
+  if (!requireAdmin(req, res)) return;
   const storeId = req.storeId;
   const { id } = req.params;
   const { name, phone, points, tier } = req.body;
   try {
-    const customer = await prisma.customer.update({
+    const updated = await prisma.customer.updateMany({
       where: { id, storeId },
       data: {
         name,
@@ -1562,6 +1788,10 @@ app.put('/api/customers/:id', async (req, res) => {
         tier
       }
     });
+    if (updated.count === 0) {
+      return res.status(404).json({ error: 'Không tìm thấy khách hàng cần cập nhật' });
+    }
+    const customer = await prisma.customer.findFirst({ where: { id, storeId } });
     res.json(customer);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -1569,12 +1799,16 @@ app.put('/api/customers/:id', async (req, res) => {
 });
 
 app.delete('/api/customers/:id', async (req, res) => {
+  if (!requireAdmin(req, res)) return;
   const storeId = req.storeId;
   const { id } = req.params;
   try {
-    await prisma.customer.delete({
+    const deleted = await prisma.customer.deleteMany({
       where: { id, storeId }
     });
+    if (deleted.count === 0) {
+      return res.status(404).json({ error: 'Không tìm thấy khách hàng cần xóa' });
+    }
     res.json({ success: true });
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -1583,6 +1817,7 @@ app.delete('/api/customers/:id', async (req, res) => {
 
 // 8. Vouchers CRUD
 app.post('/api/vouchers', async (req, res) => {
+  if (!requireAdmin(req, res)) return;
   const storeId = req.storeId;
   const { code, type, value, minOrderValue, maxDiscount, expiryDate, isActive } = req.body;
   try {
@@ -1605,11 +1840,12 @@ app.post('/api/vouchers', async (req, res) => {
 });
 
 app.put('/api/vouchers/:id', async (req, res) => {
+  if (!requireAdmin(req, res)) return;
   const storeId = req.storeId;
   const { id } = req.params;
   const { code, type, value, minOrderValue, maxDiscount, expiryDate, isActive } = req.body;
   try {
-    const voucher = await prisma.voucher.update({
+    const updated = await prisma.voucher.updateMany({
       where: { id, storeId },
       data: {
         code,
@@ -1621,6 +1857,10 @@ app.put('/api/vouchers/:id', async (req, res) => {
         isActive: isActive !== false
       }
     });
+    if (updated.count === 0) {
+      return res.status(404).json({ error: 'Không tìm thấy voucher cần cập nhật' });
+    }
+    const voucher = await prisma.voucher.findFirst({ where: { id, storeId } });
     res.json(voucher);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -1628,12 +1868,16 @@ app.put('/api/vouchers/:id', async (req, res) => {
 });
 
 app.delete('/api/vouchers/:id', async (req, res) => {
+  if (!requireAdmin(req, res)) return;
   const storeId = req.storeId;
   const { id } = req.params;
   try {
-    await prisma.voucher.delete({
+    const deleted = await prisma.voucher.deleteMany({
       where: { id, storeId }
     });
+    if (deleted.count === 0) {
+      return res.status(404).json({ error: 'Không tìm thấy voucher cần xóa' });
+    }
     res.json({ success: true });
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -1642,6 +1886,7 @@ app.delete('/api/vouchers/:id', async (req, res) => {
 
 // 9. Tables Configuration CRUD
 app.post('/api/tables', async (req, res) => {
+  if (!requireAdmin(req, res)) return;
   const storeId = req.storeId;
   const { name, zone, capacity } = req.body;
   try {
@@ -1660,34 +1905,17 @@ app.post('/api/tables', async (req, res) => {
   }
 });
 
-app.put('/api/tables/:id', async (req, res) => {
-  const storeId = req.storeId;
-  const { id } = req.params;
-  const { name, zone, capacity, status } = req.body;
-  try {
-    const table = await prisma.table.update({
-      where: { id, storeId },
-      data: {
-        name,
-        zone,
-        capacity: Number(capacity) || 2,
-        status: status || undefined
-      }
-    });
-    broadcast('tableUpdated', table, storeId);
-    res.json(table);
-  } catch (err) {
-    res.status(400).json({ error: err.message });
-  }
-});
-
 app.delete('/api/tables/:id', async (req, res) => {
+  if (!requireAdmin(req, res)) return;
   const storeId = req.storeId;
   const { id } = req.params;
   try {
-    await prisma.table.delete({
+    const deleted = await prisma.table.deleteMany({
       where: { id, storeId }
     });
+    if (deleted.count === 0) {
+      return res.status(404).json({ error: 'Không tìm thấy bàn cần xóa' });
+    }
     // In a real websocket setup, we can broadcast tableDeletion.
     // For now we just return success.
     res.json({ success: true });
@@ -1700,17 +1928,46 @@ app.delete('/api/tables/:id', async (req, res) => {
 
 // 10. Return / Refund
 app.post('/api/orders/:orderId/return', async (req, res) => {
+  if (!requireRefundAccess(req, res)) return;
   const storeId = req.storeId;
   const { orderId } = req.params;
   const { items, reason, refundMethod, employeeId } = req.body;
   // items: [{ orderItemName, price, qty, reason? }]
   try {
-    const order = await prisma.order.findUnique({
-      where: { id: orderId },
+    if (!Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ error: 'Vui lòng chọn ít nhất một món cần trả' });
+    }
+
+    const order = await prisma.order.findFirst({
+      where: { id: orderId, storeId },
       include: { items: true }
     });
-    if (!order || order.storeId !== storeId) {
+    if (!order) {
       return res.status(404).json({ error: 'Không tìm thấy hóa đơn' });
+    }
+
+    if (employeeId) {
+      const employee = await prisma.user.findFirst({ where: { id: employeeId, storeId } });
+      if (!employee) {
+        return res.status(400).json({ error: 'Nhân viên không thuộc cửa hàng hiện tại' });
+      }
+    }
+
+    for (const returnItem of items) {
+      const qty = Number(returnItem.qty) || 0;
+      if (qty <= 0) {
+        return res.status(400).json({ error: 'Số lượng trả hàng không hợp lệ' });
+      }
+
+      const orderItem = order.items.find(oi => oi.name === returnItem.orderItemName);
+      if (!orderItem) {
+        return res.status(400).json({ error: `Món ${returnItem.orderItemName} không thuộc hóa đơn này` });
+      }
+
+      const remainingQty = orderItem.qty - (orderItem.returnedQty || 0);
+      if (qty > remainingQty) {
+        return res.status(400).json({ error: `Số lượng trả của ${returnItem.orderItemName} vượt quá số lượng còn lại` });
+      }
     }
 
     const refundAmount = items.reduce((sum, it) => sum + (it.price * it.qty), 0);
@@ -1767,10 +2024,12 @@ app.post('/api/orders/:orderId/return', async (req, res) => {
         });
         for (const recipe of recipeItems) {
           const restoreAmount = recipe.qty * returnItem.qty;
-          const updatedInventory = await prisma.inventory.update({
-            where: { id: recipe.inventoryId },
+          const updated = await prisma.inventory.updateMany({
+            where: { id: recipe.inventoryId, storeId },
             data: { qty: { increment: restoreAmount } }
           });
+          if (updated.count === 0) continue;
+          const updatedInventory = await prisma.inventory.findFirst({ where: { id: recipe.inventoryId, storeId } });
           await prisma.stockTransaction.create({
             data: {
               storeId,
@@ -1816,6 +2075,7 @@ app.post('/api/orders/:orderId/return', async (req, res) => {
 
 // Get return history
 app.get('/api/returns', async (req, res) => {
+  if (!requireRefundAccess(req, res)) return;
   try {
     const returns = await prisma.returnOrder.findMany({
       where: { storeId: req.storeId },
@@ -1902,6 +2162,7 @@ app.get('/api/store/settings', async (req, res) => {
 });
 
 app.put('/api/store/settings', async (req, res) => {
+  if (!requireAdmin(req, res)) return;
   const { name, address, phone, logo, vatRate, pointsRate, currency, printHeader, printFooter, bankId, bankAccountNo, bankAccountName } = req.body;
   try {
     const store = await prisma.store.update({
@@ -1941,6 +2202,7 @@ app.get('/api/orders/search/:orderNumber', async (req, res) => {
 
 // 14. Báo cáo Nhân sự (Staff Analytics)
 app.get('/api/reports/employees', async (req, res) => {
+  if (!requireReportAccess(req, res)) return;
   const storeId = req.storeId;
   const { startDate, endDate } = req.query;
   try {
@@ -1996,6 +2258,7 @@ app.get('/api/reports/employees', async (req, res) => {
 
 // 15. Báo cáo Peak Hours (Time Analysis)
 app.get('/api/reports/time-analysis', async (req, res) => {
+  if (!requireReportAccess(req, res)) return;
   const storeId = req.storeId;
   const { startDate, endDate } = req.query;
   try {
@@ -2065,6 +2328,7 @@ app.get('/api/reports/time-analysis', async (req, res) => {
 
 // 16. Báo cáo Lãi/Lỗ P&L (Profit & Loss)
 app.get('/api/reports/profit-loss', async (req, res) => {
+  if (!requireReportAccess(req, res)) return;
   const storeId = req.storeId;
   const { startDate, endDate } = req.query;
   try {
@@ -2210,6 +2474,7 @@ app.get('/api/promotions', async (req, res) => {
 });
 
 app.post('/api/promotions', async (req, res) => {
+  if (!requireAdmin(req, res)) return;
   const { name, type, conditions, rewards, startDate, endDate, isActive } = req.body;
   try {
     const promotion = await prisma.promotion.create({
@@ -2231,6 +2496,7 @@ app.post('/api/promotions', async (req, res) => {
 });
 
 app.put('/api/promotions/:id', async (req, res) => {
+  if (!requireAdmin(req, res)) return;
   const { name, type, conditions, rewards, startDate, endDate, isActive } = req.body;
   try {
     const data = {};
@@ -2242,9 +2508,15 @@ app.put('/api/promotions/:id', async (req, res) => {
     if (endDate !== undefined) data.endDate = endDate ? new Date(endDate) : null;
     if (isActive !== undefined) data.isActive = isActive;
 
-    const promotion = await prisma.promotion.update({
+    const updated = await prisma.promotion.updateMany({
       where: { id: req.params.id, storeId: req.storeId },
       data
+    });
+    if (updated.count === 0) {
+      return res.status(404).json({ error: 'Không tìm thấy chương trình khuyến mãi cần cập nhật' });
+    }
+    const promotion = await prisma.promotion.findFirst({
+      where: { id: req.params.id, storeId: req.storeId }
     });
     res.json(promotion);
   } catch (err) {
@@ -2253,10 +2525,14 @@ app.put('/api/promotions/:id', async (req, res) => {
 });
 
 app.delete('/api/promotions/:id', async (req, res) => {
+  if (!requireAdmin(req, res)) return;
   try {
-    await prisma.promotion.delete({
+    const deleted = await prisma.promotion.deleteMany({
       where: { id: req.params.id, storeId: req.storeId }
     });
+    if (deleted.count === 0) {
+      return res.status(404).json({ error: 'Không tìm thấy chương trình khuyến mãi cần xóa' });
+    }
     res.json({ success: true });
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -2326,9 +2602,15 @@ app.put('/api/kitchen/orders/:id/status', async (req, res) => {
   }
 
   try {
-    const order = await prisma.order.update({
+    const updated = await prisma.order.updateMany({
       where: { id, storeId },
-      data: { prepStatus },
+      data: { prepStatus }
+    });
+    if (updated.count === 0) {
+      return res.status(404).json({ error: 'Không tìm thấy đơn hàng cần cập nhật trạng thái bếp' });
+    }
+    const order = await prisma.order.findFirst({
+      where: { id, storeId },
       include: { items: true }
     });
     

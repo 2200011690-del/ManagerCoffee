@@ -1,5 +1,8 @@
 const { PrismaClient } = require('@prisma/client');
+const bcrypt = require('bcryptjs');
 const prisma = new PrismaClient();
+const DEMO_ADMIN_EMAIL = 'admin@espresso-lab.vn';
+const DEMO_ADMIN_PASSWORD = 'admin123456';
 
 const INITIAL_MENU = [
   { name: 'Cà phê Đen', price: 29000, category: 'Cà phê', popular: true, prepTime: '5 phút' },
@@ -67,6 +70,8 @@ const RECIPE_SEEDS = {
 };
 
 async function main() {
+  const hashedDemoAdminPassword = await bcrypt.hash(DEMO_ADMIN_PASSWORD, 10);
+
   // 1. Create a default Store
   const store = await prisma.store.upsert({
     where: { code: 'espresso-lab' },
@@ -84,8 +89,20 @@ async function main() {
   // 2. Users
   await prisma.user.upsert({
     where: { storeId_pin: { storeId, pin: '1111' } },
-    update: {},
-    create: { storeId, name: 'Admin Trần', pin: '1111', role: 'admin' },
+    update: {
+      name: 'Admin Trần',
+      email: DEMO_ADMIN_EMAIL,
+      password: hashedDemoAdminPassword,
+      role: 'admin'
+    },
+    create: {
+      storeId,
+      name: 'Admin Trần',
+      pin: '1111',
+      email: DEMO_ADMIN_EMAIL,
+      password: hashedDemoAdminPassword,
+      role: 'admin'
+    },
   });
 
   await prisma.user.upsert({
@@ -220,6 +237,7 @@ async function main() {
   });
 
   console.log('Seed completed for store:', store.name);
+  console.log(`Demo admin: ${DEMO_ADMIN_EMAIL} / ${DEMO_ADMIN_PASSWORD}`);
 }
 
 main()

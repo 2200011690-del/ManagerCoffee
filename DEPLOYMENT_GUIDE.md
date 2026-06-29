@@ -51,10 +51,11 @@ Render cung cấp máy chủ miễn phí (Free Tier) phù hợp cho các dự á
    - **Start Command**: `npm start`
 5. Cuộn xuống phần **Environment Variables**, nhấn **Add Environment Variable** để thêm các biến:
    - `DATABASE_URL`: Dán chuỗi kết nối Supabase từ BƯỚC 1.
-   - `JWT_SECRET`: Copy chuỗi ngẫu nhiên đã được tạo ở file `server/.env.production`.
+   - `DIRECT_URL`: Dán chuỗi kết nối direct/session của Supabase nếu Supabase cung cấp riêng. Nếu chưa có, có thể tạm dùng cùng giá trị với `DATABASE_URL`.
+   - `JWT_SECRET`: Tạo một chuỗi bí mật dài, ngẫu nhiên. Không dùng giá trị demo hoặc giá trị đã commit trong repo.
    - `NODE_ENV`: `production`
    - `PORT`: `10000`
-   - `CORS_ORIGIN`: Bạn có thể để trống (hệ thống sẽ mở cho tất cả domain) hoặc dán link Vercel frontend vào sau khi deploy Vercel thành công.
+   - `CORS_ORIGIN`: Dán link Vercel frontend sau khi deploy Vercel thành công, ví dụ `https://manager-coffee.vercel.app`.
 6. Nhấn **Create Web Service**. Chờ Render build code (Khoảng 2-5 phút).
 7. Khi thành công, copy đường dẫn `.onrender.com` của API (VD: `https://manager-coffee-api.onrender.com`).
 
@@ -72,8 +73,18 @@ Bạn cần đẩy cấu trúc bảng từ mã nguồn lên Supabase trước kh
 3. Chạy lệnh để đẩy cấu trúc và tiêm dữ liệu mẫu:
    ```bash
    npx prisma db push
-   node seed.js
+   node seed.cjs
    ```
+
+4. Quay lại thư mục gốc dự án và chạy smoke test trước khi demo:
+   ```bash
+   cd ..
+   npm run test:smoke
+   npm run test:smoke:sales
+   npm run test:smoke:shifts
+   ```
+
+Smoke test sẽ kiểm tra nhanh đăng nhập admin/staff, chặn request không token, chặn staff vào API quản trị/báo cáo, cho phép staff cập nhật trạng thái bàn, checkout bán hàng, trừ kho theo công thức, trả hàng hoàn kho, QR pending/paid, và ca tiền mặt.
 
 ---
 
@@ -97,5 +108,5 @@ Vercel là nền tảng tốt nhất để host ứng dụng Vite/React.
 
 ---
 
-🎉 **HOÀN TẤT!** 
-Bây giờ bạn đã có thể truy cập đường dẫn của Vercel bằng trình duyệt trên máy tính bảng hoặc iPad để đăng nhập vào POS bằng mã PIN `1111` (Admin) và dùng thử toàn bộ tính năng Realtime trên Cloud.
+🎉 **HOÀN TẤT!**
+Bây giờ bạn có thể truy cập đường dẫn Vercel bằng trình duyệt trên máy tính bảng hoặc iPad. Với dữ liệu seed demo, dùng mã cửa hàng `espresso-lab`, admin `admin@espresso-lab.vn / admin123456`, hoặc nhân viên PIN `2222`.

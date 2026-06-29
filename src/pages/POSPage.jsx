@@ -1,12 +1,11 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import {
   Search, ShoppingCart, Trash2, CreditCard, Banknote, Receipt, Tag,
-  LayoutGrid, X, ArrowLeftRight, User, Gift, SplitSquareVertical, CheckCircle,
+  LayoutGrid, X, ArrowLeftRight, User, Gift,
   Lock, Unlock, Clock, AlertTriangle, Pause, RotateCcw, Percent, Layers
 } from 'lucide-react';
 import { categories } from '../data/coffeeData';
 import { useMenu } from '../context/MenuContext';
-import { useInventory } from '../context/InventoryContext';
 import { useCart } from '../context/CartContext';
 import { useTable } from '../context/TableContext';
 import { useUI } from '../context/UIContext';
@@ -152,11 +151,11 @@ export default function POSPage() {
   const {
     cart, subtotal, vatAmount, total, cartCount,
     addToCart, removeFromCart, updateQty, clearCart, clearCurrentCart,
-    activeTableId, setSelectedTable, setTakeaway, tableHasCart, tableCarts,
+    activeTableId, setSelectedTable, setTakeaway, tableHasCart,
     applyItemDiscount
   } = useCart();
   const { tables, updateTableStatus } = useTable();
-  const { showNotification, notification } = useUI();
+  const { showNotification } = useUI();
   const { addOrder } = useOrderHistory();
   const { visibleMenu } = useMenu();
   const { currentUser } = useAuth();
@@ -188,7 +187,7 @@ export default function POSPage() {
 
   // Cash Shift Handover states
   const [activeShift, setActiveShift] = useState(null);
-  const [isLoadingShift, setIsLoadingShift] = useState(true);
+  const [, setIsLoadingShift] = useState(true);
   const [showOpenShiftModal, setShowOpenShiftModal] = useState(false);
   const [showCloseShiftModal, setShowCloseShiftModal] = useState(false);
   const [openingCashInput, setOpeningCashInput] = useState('0');

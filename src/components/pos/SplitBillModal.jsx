@@ -59,7 +59,6 @@ export default function SplitBillModal({ cart, onClose, onConfirmSplit }) {
         <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
           {cart.map(item => {
             const selectedQty = splitCounts[item.cartItemId] || 0;
-            const remainingQty = item.qty - selectedQty;
             return (
               <div key={item.cartItemId} className="flex items-center justify-between p-3 rounded-xl border border-cream-medium/40 bg-white">
                 <div className="flex-1 min-w-0 pr-4">

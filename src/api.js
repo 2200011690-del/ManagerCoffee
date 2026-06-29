@@ -11,16 +11,11 @@ api.interceptors.request.use((config) => {
     const saved = sessionStorage.getItem('manager_coffee_auth_session');
     if (saved) {
       const user = JSON.parse(saved);
-      if (user) {
-        if (user.token) {
-          config.headers['Authorization'] = `Bearer ${user.token}`;
-        }
-        if (user.storeId) {
-          config.headers['x-store-id'] = user.storeId;
-        }
+      if (user?.token) {
+        config.headers['Authorization'] = `Bearer ${user.token}`;
       }
     }
-  } catch (err) {}
+  } catch {}
   return config;
 });
 

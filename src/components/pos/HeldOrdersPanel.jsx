@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Pause, Play, Clock, X, Package, Trash2 } from 'lucide-react';
 import { api } from '../../api';
 
-export default function HeldOrdersPanel({ onClose, onRecall, currentUser }) {
+export default function HeldOrdersPanel({ onClose, onRecall }) {
   const [heldOrders, setHeldOrders] = useState([]);
   const [loading, setLoading] = useState(true);
 
