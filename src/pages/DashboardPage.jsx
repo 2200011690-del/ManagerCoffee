@@ -3,8 +3,8 @@ import {
   TrendingUp, TrendingDown, Minus as MinusIcon, ShoppingBag, Users, DollarSign,
   Target, Clock, Award, ChevronRight, FileText, Search, Download, Trash2,
   CheckCircle, Banknote, CreditCard, X, AlertTriangle, Package, RefreshCw,
-  Plus, Edit, Truck, Sliders, History, BookOpen, Save, PlusCircle, Check,
-  Tag, MapPin, User
+  Plus, Edit, Truck, Sliders, History, BookOpen, Save, PlusCircle,
+  MapPin
 } from 'lucide-react';
 import { useOrderHistory } from '../context/OrderHistoryContext';
 import { useInventory } from '../context/InventoryContext';

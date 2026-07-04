@@ -1539,6 +1539,14 @@ async function handleCheckout(req, res) {
     broadcast('orderCreated', order, storeId);
   }
 
+  await writeAuditLog(req, 'checkout', 'order', order.id, {
+    orderNumber: order.orderNumber,
+    status: order.status,
+    total: order.total,
+    paymentMethod: order.paymentMethod,
+    itemCount: order.items?.length || 0
+  });
+
   res.json(order);
 }
 
@@ -1555,6 +1563,11 @@ app.put('/api/orders/:id/pay', async (req, res) => {
     if (!updated) {
       return res.status(404).json({ error: 'Không tìm thấy hóa đơn chờ thanh toán hoặc đã thanh toán trước đó' });
     }
+    await writeAuditLog(req, 'pay', 'order', updated.id, {
+      orderNumber: updated.orderNumber,
+      total: updated.total,
+      paymentMethod: updated.paymentMethod
+    });
     res.json(updated);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -1912,6 +1925,7 @@ app.post('/api/suppliers', async (req, res) => {
         address
       }
     });
+    await writeAuditLog(req, 'create', 'supplier', supplier.id, { name: supplier.name });
     res.json(supplier);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -1937,6 +1951,7 @@ app.put('/api/suppliers/:id', async (req, res) => {
       return res.status(404).json({ error: 'Không tìm thấy nhà cung cấp cần cập nhật' });
     }
     const supplier = await prisma.supplier.findFirst({ where: { id, storeId } });
+    await writeAuditLog(req, 'update', 'supplier', id, { fields: Object.keys(req.body || {}) });
     res.json(supplier);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -1954,6 +1969,7 @@ app.delete('/api/suppliers/:id', async (req, res) => {
     if (deleted.count === 0) {
       return res.status(404).json({ error: 'Không tìm thấy nhà cung cấp cần xóa' });
     }
+    await writeAuditLog(req, 'delete', 'supplier', id);
     res.json({ success: true });
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -2933,6 +2949,11 @@ app.post('/api/promotions', async (req, res) => {
         ...data
       }
     });
+    await writeAuditLog(req, 'create', 'promotion', promotion.id, {
+      name: promotion.name,
+      type: promotion.type,
+      isActive: promotion.isActive
+    });
     res.json(promotion);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -2969,6 +2990,11 @@ app.put('/api/promotions/:id', async (req, res) => {
     const promotion = await prisma.promotion.findFirst({
       where: { id: req.params.id, storeId: req.storeId }
     });
+    await writeAuditLog(req, 'update', 'promotion', promotion.id, {
+      fields: Object.keys(req.body || {}),
+      name: promotion.name,
+      isActive: promotion.isActive
+    });
     res.json(promotion);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -2984,6 +3010,7 @@ app.delete('/api/promotions/:id', async (req, res) => {
     if (deleted.count === 0) {
       return res.status(404).json({ error: 'Không tìm thấy chương trình khuyến mãi cần xóa' });
     }
+    await writeAuditLog(req, 'delete', 'promotion', req.params.id);
     res.json({ success: true });
   } catch (err) {
     res.status(400).json({ error: err.message });

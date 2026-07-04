@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Users, Plus, Shield, User, Trash2, Edit2, X, Clock, Calendar, AlertTriangle, CheckCircle2, Camera, Phone } from 'lucide-react';
+import { Users, Plus, Shield, User, Trash2, Edit2, X, Clock, Calendar, Camera, Phone } from 'lucide-react';
 import { api } from '../api';
 
 export default function EmployeeManagementPage() {

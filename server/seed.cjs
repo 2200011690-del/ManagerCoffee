@@ -71,6 +71,8 @@ const RECIPE_SEEDS = {
 
 async function main() {
   const hashedDemoAdminPassword = await bcrypt.hash(DEMO_ADMIN_PASSWORD, 10);
+  const hashedDemoAdminPin = await bcrypt.hash('1111', 10);
+  const hashedDemoStaffPin = await bcrypt.hash('2222', 10);
 
   // 1. Create a default Store
   const store = await prisma.store.upsert({
@@ -87,29 +89,61 @@ async function main() {
   const storeId = store.id;
 
   // 2. Users
-  await prisma.user.upsert({
-    where: { storeId_pin: { storeId, pin: '1111' } },
-    update: {
-      name: 'Admin Trần',
-      email: DEMO_ADMIN_EMAIL,
-      password: hashedDemoAdminPassword,
-      role: 'admin'
-    },
-    create: {
+  const existingAdmin = await prisma.user.findFirst({
+    where: {
       storeId,
-      name: 'Admin Trần',
-      pin: '1111',
-      email: DEMO_ADMIN_EMAIL,
-      password: hashedDemoAdminPassword,
-      role: 'admin'
-    },
+      OR: [
+        { email: DEMO_ADMIN_EMAIL },
+        { name: 'Admin Trần' }
+      ]
+    }
   });
+  if (existingAdmin) {
+    await prisma.user.update({
+      where: { id: existingAdmin.id },
+      data: {
+        name: 'Admin Trần',
+        email: DEMO_ADMIN_EMAIL,
+        password: hashedDemoAdminPassword,
+        role: 'admin',
+        pin: null,
+        pinHash: existingAdmin.pinHash || hashedDemoAdminPin
+      }
+    });
+  } else {
+    await prisma.user.create({
+      data: {
+        storeId,
+        name: 'Admin Trần',
+        pin: null,
+        pinHash: hashedDemoAdminPin,
+        email: DEMO_ADMIN_EMAIL,
+        password: hashedDemoAdminPassword,
+        role: 'admin'
+      }
+    });
+  }
 
-  await prisma.user.upsert({
-    where: { storeId_pin: { storeId, pin: '2222' } },
-    update: {},
-    create: { storeId, name: 'NV Linh', pin: '2222', role: 'staff' },
+  const existingStaff = await prisma.user.findFirst({
+    where: {
+      storeId,
+      name: 'NV Linh'
+    }
   });
+  if (existingStaff) {
+    await prisma.user.update({
+      where: { id: existingStaff.id },
+      data: {
+        pin: null,
+        pinHash: existingStaff.pinHash || hashedDemoStaffPin,
+        role: 'staff'
+      }
+    });
+  } else {
+    await prisma.user.create({
+      data: { storeId, name: 'NV Linh', pin: null, pinHash: hashedDemoStaffPin, role: 'staff' }
+    });
+  }
 
   // 3. Tables
   for (const t of INITIAL_TABLES) {

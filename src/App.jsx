@@ -7,17 +7,26 @@ import { MenuProvider } from './context/MenuContext';
 import { InventoryProvider } from './context/InventoryContext';
 
 import Sidebar from './components/Sidebar';
-import POSPage from './pages/POSPage';
-import TablePage from './pages/TablePage';
-import DashboardPage from './pages/DashboardPage';
-import MenuManagementPage from './pages/MenuManagementPage';
-import EmployeeManagementPage from './pages/EmployeeManagementPage';
-import PromotionManagementPage from './pages/PromotionManagementPage';
-import StoreSettingsPage from './pages/StoreSettingsPage';
 import LockScreen from './pages/LockScreen';
-import { useEffect } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 import { Menu } from 'lucide-react';
-import KitchenPage from './pages/KitchenPage';
+
+const POSPage = lazy(() => import('./pages/POSPage'));
+const TablePage = lazy(() => import('./pages/TablePage'));
+const DashboardPage = lazy(() => import('./pages/DashboardPage'));
+const MenuManagementPage = lazy(() => import('./pages/MenuManagementPage'));
+const EmployeeManagementPage = lazy(() => import('./pages/EmployeeManagementPage'));
+const PromotionManagementPage = lazy(() => import('./pages/PromotionManagementPage'));
+const StoreSettingsPage = lazy(() => import('./pages/StoreSettingsPage'));
+const KitchenPage = lazy(() => import('./pages/KitchenPage'));
+
+function PageFallback() {
+  return (
+    <div className="h-full flex items-center justify-center bg-cream-light text-coffee-medium text-sm font-semibold">
+      Đang tải...
+    </div>
+  );
+}
 
 function AppContent() {
   const { currentView, setView, notification, setIsMobileMenuOpen } = useUI();
@@ -77,7 +86,9 @@ function AppContent() {
           </div>
         )}
         <div className="flex-1 overflow-hidden relative">
-          {currentView === 'kitchen' ? <KitchenPage /> : renderPage()}
+          <Suspense fallback={<PageFallback />}>
+            {currentView === 'kitchen' ? <KitchenPage /> : renderPage()}
+          </Suspense>
         </div>
       </main>
 
