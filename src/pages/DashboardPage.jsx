@@ -6,7 +6,6 @@ import {
   Plus, Edit, Truck, Sliders, History, BookOpen, Save, PlusCircle, Check,
   Tag, MapPin, User
 } from 'lucide-react';
-import { dashboardData } from '../data/coffeeData';
 import { useOrderHistory } from '../context/OrderHistoryContext';
 import { useInventory } from '../context/InventoryContext';
 import { useMenu } from '../context/MenuContext';
@@ -571,13 +570,7 @@ export default function DashboardPage() {
     Array.isArray(liveDashboardData.topItems) && 
     Array.isArray(liveDashboardData.recentOrders);
 
-  const rawDashboard = isDataValid ? liveDashboardData : {
-    today: dashboardData.today,
-    weeklyRevenue: dashboardData.weeklyRevenue,
-    topItems: dashboardData.topItems,
-    recentOrders: dashboardData.recentOrders,
-    thisWeek: dashboardData.thisWeek
-  };
+  const rawDashboard = isDataValid ? liveDashboardData : {};
 
   const { 
     today: rawToday = {}, 
@@ -585,7 +578,7 @@ export default function DashboardPage() {
     topItems: rawTopItems = [], 
     recentOrders: rawRecentOrders = [], 
     thisWeek: rawThisWeek = {}, 
-    shifts: rawShifts = dashboardData.shifts 
+    shifts: rawShifts = [] 
   } = rawDashboard;
 
   // Safe structures to avoid any format/type mismatch crashes

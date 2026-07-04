@@ -74,14 +74,14 @@ const CartItem = React.memo(function CartItem({ item, onRemove, onUpdateQty, onA
         >
           <Percent size={14} />
         </button>
-        <button onClick={() => onUpdateQty(item.cartItemId, -1)} className="min-w-[36px] min-h-[36px] rounded-lg bg-cream-light flex items-center justify-center text-coffee-medium hover:bg-cream-medium transition-colors">
+        <button onClick={() => onUpdateQty(item.cartItemId, -1)} aria-label={`Giảm số lượng ${item.name}`} title="Giảm số lượng" className="min-w-[36px] min-h-[36px] rounded-lg bg-cream-light flex items-center justify-center text-coffee-medium hover:bg-cream-medium transition-colors">
           <Minus size={14} />
         </button>
         <span className="w-6 text-center text-sm font-bold text-coffee-dark">{item.qty}</span>
-        <button onClick={() => onUpdateQty(item.cartItemId, 1)} className="min-w-[36px] min-h-[36px] rounded-lg flex items-center justify-center text-white transition-all" style={{ background: 'linear-gradient(135deg, #A76D42, #C8956C)' }}>
+        <button onClick={() => onUpdateQty(item.cartItemId, 1)} aria-label={`Tăng số lượng ${item.name}`} title="Tăng số lượng" className="min-w-[36px] min-h-[36px] rounded-lg flex items-center justify-center text-white transition-all" style={{ background: 'linear-gradient(135deg, #A76D42, #C8956C)' }}>
           <Plus size={14} />
         </button>
-        <button onClick={() => onRemove(item.cartItemId)} className="min-w-[36px] min-h-[36px] rounded-lg bg-red-50 flex items-center justify-center text-red-500 hover:bg-red-100 transition-colors">
+        <button onClick={() => onRemove(item.cartItemId)} aria-label={`Xóa ${item.name} khỏi giỏ`} title="Xóa món" className="min-w-[36px] min-h-[36px] rounded-lg bg-red-50 flex items-center justify-center text-red-500 hover:bg-red-100 transition-colors">
           <Trash2 size={14} />
         </button>
       </div>

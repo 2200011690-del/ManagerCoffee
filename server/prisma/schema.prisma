@@ -48,6 +48,7 @@ model User {
   storeId String
   store   Store   @relation(fields: [storeId], references: [id], onDelete: Cascade)
   pin     String?  
+  pinHash String?
   email   String? @unique
   password String?
   name    String
@@ -69,6 +70,7 @@ model User {
   hourlyRate   Float    @default(25000)
 
   @@unique([storeId, pin])
+  @@index([storeId])
 }
 
 model Product {
@@ -84,6 +86,7 @@ model Product {
   prepTime    String? @default("5 phút")
   hidden      Boolean @default(false)
   recipes     RecipeItem[]
+  orderItems  OrderItem[]
 
   @@index([storeId])
 }
@@ -140,12 +143,15 @@ model Order {
   @@index([storeId])
   @@index([storeId, timestamp])
   @@index([storeId, employeeId, timestamp])
+  @@index([customerId])
 }
 
 model OrderItem {
   id       String  @id @default(cuid())
   orderId  String
   order    Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId String?
+  product   Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
   name     String
   price    Float
   qty      Int
@@ -156,6 +162,9 @@ model OrderItem {
   discount      Float?  @default(0)  // Discount amount on this item
   discountType  String? // "PERCENT" or "FIXED"
   returnedQty   Int     @default(0)  // Quantity returned
+
+  @@index([orderId])
+  @@index([productId])
 }
 
 model Inventory {
@@ -183,6 +192,7 @@ model RecipeItem {
   qty         Float
 
   @@unique([productId, inventoryId])
+  @@index([inventoryId])
 }
 
 model Supplier {
@@ -216,6 +226,8 @@ model StockTransaction {
   createdAt   DateTime  @default(now())
 
   @@index([storeId])
+  @@index([inventoryId])
+  @@index([supplierId])
 }
 
 model Customer {
@@ -261,6 +273,7 @@ model Attendance {
   imageOut   String?
 
   @@index([storeId])
+  @@index([userId])
 }
 
 model CashShift {
@@ -280,6 +293,7 @@ model CashShift {
   status       String    @default("open") // "open", "closed"
 
   @@index([storeId])
+  @@index([userId])
 }
 
 // Phase 1: Return/Refund
@@ -299,6 +313,7 @@ model ReturnOrder {
   items         ReturnItem[]
 
   @@index([storeId])
+  @@index([orderId])
 }
 
 model ReturnItem {
@@ -309,6 +324,8 @@ model ReturnItem {
   price         Float
   qty           Int
   reason        String?
+
+  @@index([returnOrderId])
 }
 
 // Phase 1: Hold Order (Pending)
@@ -339,6 +356,8 @@ model HeldOrderItem {
   sugar       String?
   ice         String?
   note        String?
+
+  @@index([heldOrderId])
 }
 
 // Phase 1: Split Payment
@@ -349,6 +368,8 @@ model OrderPayment {
   method        String  // "cash", "card", "transfer", "momo", "zalopay"
   amount        Float
   reference     String? // Transaction reference if applicable
+
+  @@index([orderId])
 }
 
 // Phase 3: Advanced Promotions

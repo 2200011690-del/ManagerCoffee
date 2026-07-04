@@ -80,6 +80,277 @@ const isAdminUser = (user) => user?.role === 'admin';
 const canViewReports = (user) => isAdminUser(user) || user?.canViewReports === true;
 const canRefundOrders = (user) => isAdminUser(user) || user?.canRefund === true;
 const canManageUserRecord = (user, userId) => isAdminUser(user) || user?.userId === userId;
+const BCRYPT_HASH_RE = /^\$2[aby]\$\d{2}\$/;
+const storeQueues = new Map();
+
+async function withStoreQueue(storeId, task) {
+  const key = storeId || '__global__';
+  const previous = storeQueues.get(key) || Promise.resolve();
+  let releaseCurrent;
+  const current = new Promise((resolve) => {
+    releaseCurrent = resolve;
+  });
+  const queueEntry = previous.catch(() => {}).then(() => current);
+  storeQueues.set(key, queueEntry);
+
+  await previous.catch(() => {});
+  try {
+    return await task();
+  } finally {
+    releaseCurrent();
+    if (storeQueues.get(key) === queueEntry) {
+      storeQueues.delete(key);
+    }
+  }
+}
+
+function sanitizeUser(user) {
+  if (!user) return user;
+  const { password: _password, pin: _pin, pinHash: _pinHash, ...safeUser } = user;
+  return {
+    ...safeUser,
+    hasPin: Boolean(user.pin || user.pinHash)
+  };
+}
+
+async function userMatchesPin(user, pin) {
+  if (!user || !pin) return false;
+  if (user.pinHash && await bcrypt.compare(pin, user.pinHash)) return true;
+  if (user.pin && BCRYPT_HASH_RE.test(user.pin) && await bcrypt.compare(pin, user.pin)) return true;
+  return user.pin === pin;
+}
+
+async function findUserByPin(storeId, pin) {
+  const users = await prisma.user.findMany({
+    where: { storeId },
+    include: { store: true }
+  });
+  for (const user of users) {
+    if (await userMatchesPin(user, pin)) return user;
+  }
+  return null;
+}
+
+async function isPinAlreadyUsed(storeId, pin, excludeUserId = null) {
+  if (!pin) return false;
+  const users = await prisma.user.findMany({
+    where: {
+      storeId,
+      ...(excludeUserId ? { id: { not: excludeUserId } } : {})
+    }
+  });
+  for (const user of users) {
+    if (await userMatchesPin(user, pin)) return true;
+  }
+  return false;
+}
+
+async function lockStoreCounter(tx, storeId, key) {
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`${key}:${storeId}`}))`;
+}
+
+async function nextOrderNumber(tx, storeId) {
+  await lockStoreCounter(tx, storeId, 'order');
+  const count = await tx.order.count({ where: { storeId } });
+  return `#HD${1001 + count}`;
+}
+
+async function nextReturnNumber(tx, storeId) {
+  await lockStoreCounter(tx, storeId, 'return');
+  const count = await tx.returnOrder.count({ where: { storeId } });
+  return `#TH${1001 + count}`;
+}
+
+function normalizeCartProductId(item) {
+  return item.productId || item.id || null;
+}
+
+function resolveCashAmount(order, fallbackPaymentMethod = null, fallbackTotal = null, payments = null) {
+  const paymentRows = payments || order?.payments || null;
+  if (Array.isArray(paymentRows) && paymentRows.length > 0) {
+    return paymentRows
+      .filter((payment) => payment.method === 'cash')
+      .reduce((sum, payment) => sum + (Number(payment.amount) || 0), 0);
+  }
+  const method = fallbackPaymentMethod || order?.paymentMethod;
+  const totalAmount = Number(fallbackTotal ?? order?.total) || 0;
+  return method === 'cash' ? totalAmount : 0;
+}
+
+async function deductInventoryForItems(tx, storeId, items, orderNumber) {
+  for (const item of items) {
+    const productId = normalizeCartProductId(item);
+    let product = productId ? await tx.product.findFirst({ where: { id: productId, storeId } }) : null;
+    if (!product) {
+      product = await tx.product.findFirst({ where: { storeId, name: item.name } });
+    }
+    if (!product) continue;
+
+    const recipeItems = await tx.recipeItem.findMany({
+      where: { productId: product.id },
+      include: { inventory: true }
+    });
+
+    for (const recipe of recipeItems) {
+      const amount = recipe.qty * item.qty;
+      const inventory = await tx.inventory.findFirst({
+        where: { id: recipe.inventoryId, storeId }
+      });
+      if (!inventory) continue;
+
+      const updatedInventory = await tx.inventory.update({
+        where: { id: recipe.inventoryId },
+        data: { qty: { decrement: amount } }
+      });
+
+      await tx.stockTransaction.create({
+        data: {
+          storeId,
+          inventoryId: recipe.inventoryId,
+          type: 'SALE',
+          qtyChange: -amount,
+          balance: updatedInventory.qty,
+          note: `Bán hàng - HĐ ${orderNumber} (${item.name} x${item.qty})`
+        }
+      });
+    }
+  }
+}
+
+async function applyPaidOrderEffects(tx, storeId, order, options = {}) {
+  const cashAmount = resolveCashAmount(order, order.paymentMethod, order.total, options.payments);
+
+  if (cashAmount > 0 && order.employeeId) {
+    const activeShift = await tx.cashShift.findFirst({
+      where: { storeId, userId: order.employeeId, status: 'open' }
+    });
+    if (activeShift) {
+      await tx.cashShift.update({
+        where: { id: activeShift.id },
+        data: {
+          cashSales: { increment: cashAmount },
+          expectedCash: { increment: cashAmount }
+        }
+      });
+    }
+  }
+
+  if (order.customerId) {
+    const store = await tx.store.findUnique({ where: { id: storeId } });
+    const pointsRate = store?.pointsRate ?? 0.1;
+    const pointsToAdd = Math.floor(order.total * pointsRate);
+    const customer = await tx.customer.findFirst({ where: { id: order.customerId, storeId } });
+    if (customer) {
+      let newPoints = customer.points + pointsToAdd;
+      if (order.usedPoints && order.usedPoints > 0) {
+        newPoints = Math.max(0, newPoints - order.usedPoints);
+      }
+      let newTier = customer.tier;
+      if (newPoints >= 1500) newTier = 'DIAMOND';
+      else if (newPoints >= 500) newTier = 'GOLD';
+
+      await tx.customer.update({
+        where: { id: customer.id },
+        data: { points: newPoints, tier: newTier }
+      });
+    }
+  }
+
+  if (order.tableId) {
+    await tx.table.updateMany({
+      where: { id: order.tableId, storeId },
+      data: { status: 'dirty', occupiedSince: null }
+    });
+  }
+
+  await deductInventoryForItems(tx, storeId, order.items || [], order.orderNumber);
+}
+
+function parseJsonField(value, fieldName) {
+  if (typeof value === 'string') {
+    try {
+      return JSON.parse(value);
+    } catch {
+      throw new Error(`${fieldName} không đúng định dạng JSON`);
+    }
+  }
+  return value || {};
+}
+
+async function validatePromotionPayload(storeId, payload, existingId = null) {
+  const cleanName = String(payload.name || '').trim();
+  if (!cleanName) throw new Error('Tên chương trình khuyến mãi không được để trống');
+
+  const allowedTypes = ['HAPPY_HOUR', 'COMBO', 'BUY_X_GET_Y'];
+  if (!allowedTypes.includes(payload.type)) {
+    throw new Error('Loại khuyến mãi không hợp lệ');
+  }
+
+  const startDate = payload.startDate ? new Date(payload.startDate) : null;
+  const endDate = payload.endDate ? new Date(payload.endDate) : null;
+  if (startDate && Number.isNaN(startDate.getTime())) throw new Error('Ngày bắt đầu không hợp lệ');
+  if (endDate && Number.isNaN(endDate.getTime())) throw new Error('Ngày kết thúc không hợp lệ');
+  if (startDate && endDate && endDate < startDate) {
+    throw new Error('Ngày kết thúc phải sau ngày bắt đầu');
+  }
+
+  const conditions = parseJsonField(payload.conditions, 'Điều kiện khuyến mãi');
+  const rewards = parseJsonField(payload.rewards, 'Phần thưởng khuyến mãi');
+
+  if (payload.type === 'HAPPY_HOUR') {
+    const discountPct = Number(rewards.discountPct);
+    if (!Number.isFinite(discountPct) || discountPct <= 0 || discountPct > 100) {
+      throw new Error('Phần trăm giảm giá Happy Hour phải lớn hơn 0 và không vượt quá 100');
+    }
+    if (!conditions.startHour || !conditions.endHour || conditions.startHour > conditions.endHour) {
+      throw new Error('Khung giờ Happy Hour không hợp lệ');
+    }
+  }
+
+  if (payload.type === 'COMBO') {
+    if (!Array.isArray(conditions.comboProducts) || conditions.comboProducts.length < 2) {
+      throw new Error('Combo phải có ít nhất 2 sản phẩm');
+    }
+    const comboPrice = Number(rewards.comboPrice);
+    if (!Number.isFinite(comboPrice) || comboPrice <= 0) {
+      throw new Error('Giá combo phải lớn hơn 0');
+    }
+  }
+
+  if (payload.type === 'BUY_X_GET_Y') {
+    if (!conditions.buyProductId || !rewards.getProductId) {
+      throw new Error('Khuyến mãi mua X tặng Y cần đủ sản phẩm mua và sản phẩm tặng');
+    }
+    if ((Number(conditions.minQty) || 0) <= 0 || (Number(rewards.freeQty) || 0) <= 0) {
+      throw new Error('Số lượng mua/tặng phải lớn hơn 0');
+    }
+  }
+
+  const isActive = payload.isActive !== undefined ? Boolean(payload.isActive) : true;
+  if (isActive) {
+    const duplicate = await prisma.promotion.findFirst({
+      where: {
+        storeId,
+        isActive: true,
+        name: { equals: cleanName, mode: 'insensitive' },
+        ...(existingId ? { id: { not: existingId } } : {})
+      }
+    });
+    if (duplicate) {
+      throw new Error('Đã có chương trình khuyến mãi đang hoạt động cùng tên');
+    }
+  }
+
+  return {
+    name: cleanName,
+    type: payload.type,
+    conditions: JSON.stringify(conditions),
+    rewards: JSON.stringify(rewards),
+    startDate,
+    endDate,
+    isActive
+  };
+}
 
 async function writeAuditLog(req, action, entity, entityId = null, metadata = {}) {
   if (!req.storeId) return;
@@ -294,12 +565,7 @@ app.get('/api/backup/export', async (req, res) => {
       prisma.auditLog.findMany({ where: { storeId }, orderBy: { createdAt: 'desc' }, take: 5000 })
     ]);
 
-    const safeUsers = users.map((user) => {
-      const safeUser = { ...user };
-      delete safeUser.pin;
-      delete safeUser.password;
-      return safeUser;
-    });
+    const safeUsers = users.map(sanitizeUser);
     const payload = {
       exportedAt: new Date().toISOString(),
       storeId,
@@ -488,10 +754,8 @@ app.post('/api/auth/login-admin', async (req, res) => {
       { expiresIn: '30d' }
     );
 
-    // Trả về thông tin user kèm token (bảo mật: loại bỏ mật khẩu thô)
-    const { password: _pw, ...safeUser } = user;
     return res.json({
-      ...safeUser,
+      ...sanitizeUser(user),
       token
     });
   } catch (err) {
@@ -508,13 +772,8 @@ app.post('/api/auth/login', async (req, res) => {
   }
   
   try {
-    const user = await prisma.user.findFirst({
-      where: {
-        store: { code: storeCode },
-        pin: pin
-      },
-      include: { store: true }
-    });
+    const store = await prisma.store.findUnique({ where: { code: storeCode } });
+    const user = store ? await findUserByPin(store.id, pin) : null;
     
     if (!user) {
       return res.status(401).json({ error: 'Mã cửa hàng hoặc mã PIN không chính xác' });
@@ -541,10 +800,8 @@ app.post('/api/auth/login', async (req, res) => {
       { expiresIn: '30d' }
     );
     
-    // Trả về thông tin user kèm token
-    const { pin: _p, password: _pw, ...safeUser } = user;
     return res.json({
-      ...safeUser,
+      ...sanitizeUser(user),
       token
     });
   } catch (err) {
@@ -555,16 +812,35 @@ app.post('/api/auth/login', async (req, res) => {
 // 1.1 Users (Employee Management)
 app.get('/api/users', async (req, res) => {
   if (!requireAdmin(req, res)) return;
-  const users = await prisma.user.findMany({ where: { storeId: req.storeId } });
-  res.json(users);
+  const users = await prisma.user.findMany({
+    where: { storeId: req.storeId },
+    orderBy: { name: 'asc' }
+  });
+  res.json(users.map(sanitizeUser));
 });
 
 app.post('/api/users', async (req, res) => {
   if (!requireAdmin(req, res)) return;
   try {
-    const user = await prisma.user.create({ data: { ...req.body, storeId: req.storeId } });
+    const { pin, password, ...body } = req.body || {};
+    const cleanPin = String(pin || '').trim();
+    if (cleanPin && !/^\d{4}$/.test(cleanPin)) {
+      return res.status(400).json({ error: 'Mã PIN phải gồm đúng 4 chữ số' });
+    }
+    if (cleanPin && await isPinAlreadyUsed(req.storeId, cleanPin)) {
+      return res.status(400).json({ error: 'Mã PIN đã tồn tại trong cửa hàng này' });
+    }
+    const user = await prisma.user.create({
+      data: {
+        ...body,
+        storeId: req.storeId,
+        pin: null,
+        pinHash: cleanPin ? await bcrypt.hash(cleanPin, 10) : null,
+        ...(password ? { password: await bcrypt.hash(password, 10) } : {})
+      }
+    });
     await writeAuditLog(req, 'create', 'user', user.id, { name: user.name, role: user.role });
-    res.json(user);
+    res.json(sanitizeUser(user));
   } catch (err) {
     res.status(400).json({ error: 'Mã PIN đã tồn tại hoặc lỗi dữ liệu' });
   }
@@ -573,16 +849,32 @@ app.post('/api/users', async (req, res) => {
 app.put('/api/users/:id', async (req, res) => {
   if (!requireAdmin(req, res)) return;
   try {
+    const { pin, password, ...body } = req.body || {};
+    const data = { ...body };
+    const cleanPin = typeof pin === 'string' ? pin.trim() : null;
+    if (cleanPin) {
+      if (!/^\d{4}$/.test(cleanPin)) {
+        return res.status(400).json({ error: 'Mã PIN phải gồm đúng 4 chữ số' });
+      }
+      if (await isPinAlreadyUsed(req.storeId, cleanPin, req.params.id)) {
+        return res.status(400).json({ error: 'Mã PIN đã tồn tại trong cửa hàng này' });
+      }
+      data.pin = null;
+      data.pinHash = await bcrypt.hash(cleanPin, 10);
+    }
+    if (password) {
+      data.password = await bcrypt.hash(password, 10);
+    }
     const updated = await prisma.user.updateMany({
       where: { id: req.params.id, storeId: req.storeId },
-      data: req.body
+      data
     });
     if (updated.count === 0) {
       return res.status(404).json({ error: 'Không tìm thấy nhân viên cần cập nhật' });
     }
     const user = await prisma.user.findFirst({ where: { id: req.params.id, storeId: req.storeId } });
-    await writeAuditLog(req, 'update', 'user', user.id, { fields: Object.keys(req.body || {}) });
-    res.json(user);
+    await writeAuditLog(req, 'update', 'user', user.id, { fields: Object.keys(data || {}) });
+    res.json(sanitizeUser(user));
   } catch (err) {
     res.status(400).json({ error: 'Lỗi cập nhật' });
   }
@@ -646,7 +938,7 @@ app.get('/api/users/salary-report', async (req, res) => {
       const shiftCount = userAttendances.length;
       const totalSalary = Math.round(totalHours * (user.hourlyRate || 25000));
 
-      const { pin: _p, ...safeUser } = user;
+      const safeUser = sanitizeUser(user);
 
       return {
         ...safeUser,
@@ -677,9 +969,7 @@ app.get('/api/users/salary-report', async (req, res) => {
 app.post('/api/attendance/quick', async (req, res) => {
   const { pin, image } = req.body;
   try {
-    const user = await prisma.user.findFirst({
-      where: { storeId: req.storeId, pin }
-    });
+    const user = await findUserByPin(req.storeId, pin);
     if (!user) {
       return res.status(404).json({ error: 'Mã PIN không chính xác hoặc không thuộc chi nhánh này' });
     }
@@ -1004,7 +1294,17 @@ app.get('/api/products', async (req, res) => {
 
 app.post('/api/products', async (req, res) => {
   if (!requireAdmin(req, res)) return;
-  const product = await prisma.product.create({ data: { ...req.body, storeId: req.storeId } });
+  const name = String(req.body?.name || '').trim();
+  if (!name) {
+    return res.status(400).json({ error: 'Tên sản phẩm không được để trống' });
+  }
+  const duplicate = await prisma.product.findFirst({
+    where: { storeId: req.storeId, name: { equals: name, mode: 'insensitive' } }
+  });
+  if (duplicate) {
+    return res.status(400).json({ error: 'Tên sản phẩm đã tồn tại trong cửa hàng này' });
+  }
+  const product = await prisma.product.create({ data: { ...req.body, name, storeId: req.storeId } });
   await writeAuditLog(req, 'create', 'product', product.id, { name: product.name, price: product.price });
   broadcast('productUpdated', { action: 'create', product }, req.storeId);
   res.json(product);
@@ -1012,9 +1312,25 @@ app.post('/api/products', async (req, res) => {
 
 app.put('/api/products/:id', async (req, res) => {
   if (!requireAdmin(req, res)) return;
+  const name = req.body?.name !== undefined ? String(req.body.name || '').trim() : null;
+  if (req.body?.name !== undefined && !name) {
+    return res.status(400).json({ error: 'Tên sản phẩm không được để trống' });
+  }
+  if (name) {
+    const duplicate = await prisma.product.findFirst({
+      where: {
+        storeId: req.storeId,
+        id: { not: req.params.id },
+        name: { equals: name, mode: 'insensitive' }
+      }
+    });
+    if (duplicate) {
+      return res.status(400).json({ error: 'Tên sản phẩm đã tồn tại trong cửa hàng này' });
+    }
+  }
   const updated = await prisma.product.updateMany({
     where: { id: req.params.id, storeId: req.storeId },
-    data: req.body
+    data: { ...req.body, ...(name ? { name } : {}) }
   });
   if (updated.count === 0) {
     return res.status(404).json({ error: 'Không tìm thấy sản phẩm cần cập nhật' });
@@ -1080,101 +1396,28 @@ app.get('/api/orders', async (req, res) => {
 // Helper để xác nhận thanh toán thành công cho đơn hàng pending
 const completeOrderPayment = async (orderId, storeId) => {
   try {
-    const order = await prisma.order.findFirst({
-      where: { id: orderId, storeId, status: 'pending' },
-      include: { items: true }
-    });
-    if (!order) return null;
-
-    // Cập nhật trạng thái sang paid
-    const updatedOrder = await prisma.order.update({
-      where: { id: orderId },
-      data: { status: 'paid' },
-      include: { items: true, employee: true, customer: true }
-    });
-
-    // 1. Cập nhật ca làm việc nếu là tiền mặt
-    if (updatedOrder.paymentMethod === 'cash' && updatedOrder.employeeId) {
-      const activeShift = await prisma.cashShift.findFirst({
-        where: { storeId, userId: updatedOrder.employeeId, status: 'open' }
+    const updatedOrder = await prisma.$transaction(async (tx) => {
+      const order = await tx.order.findFirst({
+        where: { id: orderId, storeId, status: 'pending' },
+        include: { items: true, payments: true }
       });
-      if (activeShift) {
-        await prisma.cashShift.update({
-          where: { id: activeShift.id },
-          data: {
-            cashSales: { increment: updatedOrder.total },
-            expectedCash: { increment: updatedOrder.total }
-          }
-        });
-      }
-    }
+      if (!order) return null;
 
-    // 2. Cộng điểm tích lũy cho khách hàng & trừ đi điểm sử dụng (nếu có)
-    if (updatedOrder.customerId) {
-      const store = await prisma.store.findUnique({ where: { id: storeId } });
-      const pointsRate = store?.pointsRate ?? 0.1;
-      const pointsToAdd = Math.floor(updatedOrder.total * pointsRate);
-      const customer = await prisma.customer.findFirst({ where: { id: updatedOrder.customerId, storeId } });
-      if (customer) {
-        let newPoints = customer.points + pointsToAdd;
-        if (updatedOrder.usedPoints && updatedOrder.usedPoints > 0) {
-          newPoints = Math.max(0, newPoints - updatedOrder.usedPoints);
-        }
-        let newTier = customer.tier;
-        if (newPoints >= 1500) newTier = 'DIAMOND';
-        else if (newPoints >= 500) newTier = 'GOLD';
-        
-        await prisma.customer.update({
-          where: { id: customer.id },
-          data: { points: newPoints, tier: newTier }
-        });
-      }
-    }
+      const paidOrder = await tx.order.update({
+        where: { id: orderId },
+        data: { status: 'paid' },
+        include: { items: true, employee: true, payments: true, customer: true }
+      });
 
-    // 3. Chuyển trạng thái bàn sang dirty (chờ dọn dẹp)
+      await applyPaidOrderEffects(tx, storeId, paidOrder);
+      return paidOrder;
+    }, { maxWait: 10000, timeout: 20000 });
+
+    if (!updatedOrder) return null;
+
     if (updatedOrder.tableId) {
-      await prisma.table.updateMany({
-        where: { id: updatedOrder.tableId, storeId },
-        data: { status: 'dirty', occupiedSince: null }
-      });
       const table = await prisma.table.findFirst({ where: { id: updatedOrder.tableId, storeId } });
       broadcast('tableUpdated', table, storeId);
-    }
-
-    // 4. Trừ kho nguyên liệu theo định lượng công thức (Recipe)
-    for (const c of updatedOrder.items) {
-      // Tìm sản phẩm trong DB theo tên để lấy ID
-      const product = await prisma.product.findFirst({
-        where: { storeId, name: c.name }
-      });
-      if (!product) continue;
-
-      const recipeItems = await prisma.recipeItem.findMany({
-        where: { productId: product.id },
-        include: { inventory: true }
-      });
-      
-      for (const recipe of recipeItems) {
-        const amount = recipe.qty * c.qty;
-        
-        const updated = await prisma.inventory.updateMany({
-          where: { id: recipe.inventoryId, storeId },
-          data: { qty: { decrement: amount } }
-        });
-        if (updated.count === 0) continue;
-        const updatedInventory = await prisma.inventory.findFirst({ where: { id: recipe.inventoryId, storeId } });
-        
-        await prisma.stockTransaction.create({
-          data: {
-            storeId,
-            inventoryId: recipe.inventoryId,
-            type: 'SALE',
-            qtyChange: -amount,
-            balance: updatedInventory.qty,
-            note: `Bán hàng - HĐ ${updatedOrder.orderNumber} (${c.name} x${c.qty})`
-          }
-        });
-      }
     }
 
     // Đồng bộ thông tin qua WebSocket
@@ -1188,7 +1431,7 @@ const completeOrderPayment = async (orderId, storeId) => {
   }
 };
 
-app.post('/api/orders/checkout', async (req, res) => {
+async function handleCheckout(req, res) {
   const { 
     tableId, tableName, cart, subtotal, vatAmount, total, paymentMethod,
     customerId, voucherCode, discountAmount, employeeId,
@@ -1229,153 +1472,78 @@ app.post('/api/orders/checkout', async (req, res) => {
   const dateStr = getVNLocaleDateStr(date);
   const timeStr = getVNTimeStr(date);
   
-  const count = await prisma.order.count({ where: { storeId } });
-  const orderNumber = `#HD${1001 + count}`;
-
-  const order = await prisma.order.create({
-    data: {
-      storeId,
-      orderNumber,
-      tableId,
-      tableName: tableName || 'Mang về',
-      subtotal,
-      vatAmount,
-      total,
-      paymentMethod: payments && payments.length > 1 ? 'mixed' : paymentMethod,
-      status: orderStatus,
-      time: timeStr,
-      date: dateStr,
-      customerId,
-      voucherCode,
-      discountAmount,
-      employeeId,
-      orderDiscount: orderDiscount || 0,
-      orderDiscountType: orderDiscountType || null,
-      discountReason: discountReason || null,
-      usedPoints: usedPoints ? Number(usedPoints) : 0,
-      items: {
-        create: cart.map(item => ({
-          name: item.name,
-          price: item.price,
-          qty: item.qty,
-          sugar: item.sugar,
-          ice: item.ice,
-          note: item.note,
-          discount: item.discount || 0,
-          discountType: item.discountType || null
-        }))
-      },
-      ...(payments && payments.length > 0 ? {
-        payments: {
-          create: payments.map(p => ({
-            method: p.method,
-            amount: Number(p.amount) || 0,
-            reference: p.reference || null
+  const order = await prisma.$transaction(async (tx) => {
+    const orderNumber = await nextOrderNumber(tx, storeId);
+    const createdOrder = await tx.order.create({
+      data: {
+        storeId,
+        orderNumber,
+        tableId,
+        tableName: tableName || 'Mang về',
+        subtotal,
+        vatAmount,
+        total,
+        paymentMethod: payments && payments.length > 1 ? 'mixed' : paymentMethod,
+        status: orderStatus,
+        time: timeStr,
+        date: dateStr,
+        customerId,
+        voucherCode,
+        discountAmount,
+        employeeId,
+        orderDiscount: orderDiscount || 0,
+        orderDiscountType: orderDiscountType || null,
+        discountReason: discountReason || null,
+        usedPoints: usedPoints ? Number(usedPoints) : 0,
+        items: {
+          create: cart.map(item => ({
+            productId: normalizeCartProductId(item),
+            name: item.name,
+            price: item.price,
+            qty: item.qty,
+            sugar: item.sugar,
+            ice: item.ice,
+            note: item.note,
+            discount: item.discount || 0,
+            discountType: item.discountType || null
           }))
-        }
-      } : {})
-    },
-    include: { items: true, employee: true, payments: true, customer: true }
-  });
+        },
+        ...(payments && payments.length > 0 ? {
+          payments: {
+            create: payments.map(p => ({
+              method: p.method,
+              amount: Number(p.amount) || 0,
+              reference: p.reference || null
+            }))
+          }
+        } : {})
+      },
+      include: { items: true, employee: true, payments: true, customer: true }
+    });
 
-  // Nếu trạng thái là paid, thực hiện xử lý trừ kho, cộng điểm và cập nhật ca làm việc lập tức
+    if (orderStatus === 'paid') {
+      await applyPaidOrderEffects(tx, storeId, createdOrder, { payments });
+    }
+
+    return createdOrder;
+  }, { maxWait: 10000, timeout: 20000 });
+
   if (orderStatus === 'paid') {
-    const cashAmount = payments
-      ? payments.filter(p => p.method === 'cash').reduce((s, p) => s + (Number(p.amount) || 0), 0)
-      : (paymentMethod === 'cash' ? total : 0);
-
-    if (cashAmount > 0 && employeeId) {
-      try {
-        const activeShift = await prisma.cashShift.findFirst({
-          where: { storeId, userId: employeeId, status: 'open' }
-        });
-        if (activeShift) {
-          await prisma.cashShift.update({
-            where: { id: activeShift.id },
-            data: {
-              cashSales: { increment: cashAmount },
-              expectedCash: { increment: cashAmount }
-            }
-          });
-        }
-      } catch (err) {
-        console.error('Error updating active shift cash sales:', err);
-      }
-    }
-
-    if (customerId) {
-      const store = await prisma.store.findUnique({ where: { id: storeId } });
-      const pointsRate = store?.pointsRate ?? 0.1;
-      const pointsToAdd = Math.floor(total * pointsRate);
-      const customer = await prisma.customer.findFirst({ where: { id: customerId, storeId } });
-      if (customer) {
-        let newPoints = customer.points + pointsToAdd;
-        if (usedPoints && Number(usedPoints) > 0) {
-          newPoints = Math.max(0, newPoints - Number(usedPoints));
-        }
-        let newTier = customer.tier;
-        if (newPoints >= 1500) newTier = 'DIAMOND';
-        else if (newPoints >= 500) newTier = 'GOLD';
-        
-        await prisma.customer.update({
-          where: { id: customerId },
-          data: { points: newPoints, tier: newTier }
-        });
-      }
-    }
-
     if (tableId) {
-      await prisma.table.updateMany({
-        where: { id: tableId, storeId },
-        data: { status: 'dirty', occupiedSince: null }
-      });
       const table = await prisma.table.findFirst({ where: { id: tableId, storeId } });
       broadcast('tableUpdated', table, storeId);
     }
-
-    try {
-      for (const c of cart) {
-        const product = await prisma.product.findFirst({ where: { id: c.id, storeId } });
-        if (!product) continue;
-
-        const recipeItems = await prisma.recipeItem.findMany({
-          where: { productId: product.id },
-          include: { inventory: true }
-        });
-        
-        for (const recipe of recipeItems) {
-          const amount = recipe.qty * c.qty;
-          const updated = await prisma.inventory.updateMany({
-            where: { id: recipe.inventoryId, storeId },
-            data: { qty: { decrement: amount } }
-          });
-          if (updated.count === 0) continue;
-          const updatedInventory = await prisma.inventory.findFirst({ where: { id: recipe.inventoryId, storeId } });
-          
-          await prisma.stockTransaction.create({
-            data: {
-              storeId,
-              inventoryId: recipe.inventoryId,
-              type: 'SALE',
-              qtyChange: -amount,
-              balance: updatedInventory.qty,
-              note: `Bán hàng - HĐ ${orderNumber} (${c.name} x${c.qty})`
-            }
-          });
-        }
-      }
-    } catch (err) {
-      console.error('Error deducting inventory:', err);
-    }
-
     broadcast('orderCreated', order, storeId);
     broadcast('inventoryUpdated', await prisma.inventory.findMany({ where: { storeId } }), storeId);
   } else {
-    // Với đơn hàng pending, ta phát sự kiện orderCreated nhưng trạng thái sẽ là pending để thu ngân theo dõi
     broadcast('orderCreated', order, storeId);
   }
 
   res.json(order);
+}
+
+app.post('/api/orders/checkout', (req, res, next) => {
+  withStoreQueue(req.storeId, () => handleCheckout(req, res)).catch(next);
 });
 
 // API xác nhận thanh toán thủ công cho đơn hàng pending
@@ -2199,7 +2367,8 @@ app.post('/api/orders/:orderId/return', async (req, res) => {
   const storeId = req.storeId;
   const { orderId } = req.params;
   const { items, reason, refundMethod, employeeId } = req.body;
-  // items: [{ orderItemName, price, qty, reason? }]
+  const refundEmployeeId = employeeId || req.user?.userId || null;
+  // items: [{ orderItemId, orderItemName, price, qty, reason? }]
   try {
     if (!Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ error: 'Vui lòng chọn ít nhất một món cần trả' });
@@ -2213,8 +2382,8 @@ app.post('/api/orders/:orderId/return', async (req, res) => {
       return res.status(404).json({ error: 'Không tìm thấy hóa đơn' });
     }
 
-    if (employeeId) {
-      const employee = await prisma.user.findFirst({ where: { id: employeeId, storeId } });
+    if (refundEmployeeId) {
+      const employee = await prisma.user.findFirst({ where: { id: refundEmployeeId, storeId } });
       if (!employee) {
         return res.status(400).json({ error: 'Nhân viên không thuộc cửa hàng hiện tại' });
       }
@@ -2226,7 +2395,9 @@ app.post('/api/orders/:orderId/return', async (req, res) => {
         return res.status(400).json({ error: 'Số lượng trả hàng không hợp lệ' });
       }
 
-      const orderItem = order.items.find(oi => oi.name === returnItem.orderItemName);
+      const orderItem = returnItem.orderItemId
+        ? order.items.find(oi => oi.id === returnItem.orderItemId)
+        : order.items.find(oi => oi.name === returnItem.orderItemName);
       if (!orderItem) {
         return res.status(400).json({ error: `Món ${returnItem.orderItemName} không thuộc hóa đơn này` });
       }
@@ -2239,65 +2410,66 @@ app.post('/api/orders/:orderId/return', async (req, res) => {
 
     const refundAmount = items.reduce((sum, it) => sum + (it.price * it.qty), 0);
 
-    // Generate return number
-    const returnCount = await prisma.returnOrder.count({ where: { storeId } });
-    const returnNumber = `#TH${1001 + returnCount}`;
+    const returnOrder = await prisma.$transaction(async (tx) => {
+      const returnNumber = await nextReturnNumber(tx, storeId);
+      const createdReturn = await tx.returnOrder.create({
+        data: {
+          storeId,
+          orderId,
+          returnNumber,
+          reason: reason || 'Khách trả hàng',
+          refundAmount,
+          refundMethod: refundMethod || 'cash',
+          employeeId: refundEmployeeId,
+          items: {
+            create: items.map(it => ({
+              orderItemName: it.orderItemName,
+              price: it.price,
+              qty: it.qty,
+              reason: it.reason || null
+            }))
+          }
+        },
+        include: { items: true, order: true }
+      });
 
-    const returnOrder = await prisma.returnOrder.create({
-      data: {
-        storeId,
-        orderId,
-        returnNumber,
-        reason: reason || 'Khách trả hàng',
-        refundAmount,
-        refundMethod: refundMethod || 'cash',
-        employeeId,
-        items: {
-          create: items.map(it => ({
-            orderItemName: it.orderItemName,
-            price: it.price,
-            qty: it.qty,
-            reason: it.reason || null
-          }))
-        }
-      },
-      include: { items: true, order: true }
-    });
+      for (const returnItem of items) {
+        const originalOrderItem = returnItem.orderItemId
+          ? order.items.find(oi => oi.id === returnItem.orderItemId)
+          : order.items.find(oi => oi.name === returnItem.orderItemName);
+        if (!originalOrderItem) continue;
 
-    // Update original order item returnedQty
-    for (const returnItem of items) {
-      const orderItem = order.items.find(oi => oi.name === returnItem.orderItemName);
-      if (orderItem) {
-        await prisma.orderItem.update({
-          where: { id: orderItem.id },
+        await tx.orderItem.update({
+          where: { id: originalOrderItem.id },
           data: { returnedQty: { increment: returnItem.qty } }
         });
-      }
-    }
 
-    // Restore inventory (reverse SALE deduction)
-    try {
-      for (const returnItem of items) {
-        const originalCartItem = order.items.find(oi => oi.name === returnItem.orderItemName);
-        if (!originalCartItem) continue;
-        // Find product by name to get recipes
-        const product = await prisma.product.findFirst({
-          where: { storeId, name: returnItem.orderItemName }
-        });
+        let product = originalOrderItem.productId
+          ? await tx.product.findFirst({ where: { id: originalOrderItem.productId, storeId } })
+          : null;
+        if (!product) {
+          product = await tx.product.findFirst({
+            where: { storeId, name: originalOrderItem.name }
+          });
+        }
         if (!product) continue;
-        const recipeItems = await prisma.recipeItem.findMany({
+
+        const recipeItems = await tx.recipeItem.findMany({
           where: { productId: product.id },
           include: { inventory: true }
         });
         for (const recipe of recipeItems) {
           const restoreAmount = recipe.qty * returnItem.qty;
-          const updated = await prisma.inventory.updateMany({
-            where: { id: recipe.inventoryId, storeId },
+          const inventory = await tx.inventory.findFirst({
+            where: { id: recipe.inventoryId, storeId }
+          });
+          if (!inventory) continue;
+
+          const updatedInventory = await tx.inventory.update({
+            where: { id: recipe.inventoryId },
             data: { qty: { increment: restoreAmount } }
           });
-          if (updated.count === 0) continue;
-          const updatedInventory = await prisma.inventory.findFirst({ where: { id: recipe.inventoryId, storeId } });
-          await prisma.stockTransaction.create({
+          await tx.stockTransaction.create({
             data: {
               storeId,
               inventoryId: recipe.inventoryId,
@@ -2309,18 +2481,13 @@ app.post('/api/orders/:orderId/return', async (req, res) => {
           });
         }
       }
-    } catch (err) {
-      console.error('Error restoring inventory on return:', err);
-    }
 
-    // Refund cash from active shift if applicable
-    if (refundMethod === 'cash' && employeeId) {
-      try {
-        const activeShift = await prisma.cashShift.findFirst({
-          where: { storeId, userId: employeeId, status: 'open' }
+      if ((refundMethod || 'cash') === 'cash' && refundEmployeeId) {
+        const activeShift = await tx.cashShift.findFirst({
+          where: { storeId, userId: refundEmployeeId, status: 'open' }
         });
         if (activeShift) {
-          await prisma.cashShift.update({
+          await tx.cashShift.update({
             where: { id: activeShift.id },
             data: {
               cashSales: { decrement: refundAmount },
@@ -2328,10 +2495,10 @@ app.post('/api/orders/:orderId/return', async (req, res) => {
             }
           });
         }
-      } catch (err) {
-        console.error('Error updating shift on return:', err);
       }
-    }
+
+      return createdReturn;
+    }, { maxWait: 10000, timeout: 20000 });
 
     await writeAuditLog(req, 'return', 'order', orderId, {
       returnOrderId: returnOrder.id,
@@ -2632,10 +2799,14 @@ app.get('/api/reports/profit-loss', async (req, res) => {
       }
     });
     
-    // Map product name to its recipes
-    const productRecipesMap = new Map();
+    // Prefer productId for accuracy; keep name fallback for legacy orders created before productId existed.
+    const productRecipesById = new Map();
+    const productRecipesByName = new Map();
     products.forEach(p => {
-      productRecipesMap.set(p.name, p.recipes);
+      productRecipesById.set(p.id, p.recipes);
+      if (!productRecipesByName.has(p.name)) {
+        productRecipesByName.set(p.name, p.recipes);
+      }
     });
 
     // Fetch all inventories to resolve units/names
@@ -2697,7 +2868,9 @@ app.get('/api/reports/profit-loss', async (req, res) => {
       totalRevenue += order.total;
 
       for (const item of order.items) {
-        const recipes = productRecipesMap.get(item.name) || [];
+        const recipes = (item.productId ? productRecipesById.get(item.productId) : null)
+          || productRecipesByName.get(item.name)
+          || [];
 
         for (const recipe of recipes) {
           const avgCost = getWeightedAverageCostFast(recipe.inventoryId);
@@ -2752,18 +2925,12 @@ app.get('/api/promotions', async (req, res) => {
 
 app.post('/api/promotions', async (req, res) => {
   if (!requireAdmin(req, res)) return;
-  const { name, type, conditions, rewards, startDate, endDate, isActive } = req.body;
   try {
+    const data = await validatePromotionPayload(req.storeId, req.body || {});
     const promotion = await prisma.promotion.create({
       data: {
         storeId: req.storeId,
-        name,
-        type,
-        conditions: typeof conditions === 'string' ? conditions : JSON.stringify(conditions),
-        rewards: typeof rewards === 'string' ? rewards : JSON.stringify(rewards),
-        startDate: startDate ? new Date(startDate) : null,
-        endDate: endDate ? new Date(endDate) : null,
-        isActive: isActive !== undefined ? isActive : true
+        ...data
       }
     });
     res.json(promotion);
@@ -2774,16 +2941,23 @@ app.post('/api/promotions', async (req, res) => {
 
 app.put('/api/promotions/:id', async (req, res) => {
   if (!requireAdmin(req, res)) return;
-  const { name, type, conditions, rewards, startDate, endDate, isActive } = req.body;
   try {
-    const data = {};
-    if (name !== undefined) data.name = name;
-    if (type !== undefined) data.type = type;
-    if (conditions !== undefined) data.conditions = typeof conditions === 'string' ? conditions : JSON.stringify(conditions);
-    if (rewards !== undefined) data.rewards = typeof rewards === 'string' ? rewards : JSON.stringify(rewards);
-    if (startDate !== undefined) data.startDate = startDate ? new Date(startDate) : null;
-    if (endDate !== undefined) data.endDate = endDate ? new Date(endDate) : null;
-    if (isActive !== undefined) data.isActive = isActive;
+    const existing = await prisma.promotion.findFirst({
+      where: { id: req.params.id, storeId: req.storeId }
+    });
+    if (!existing) {
+      return res.status(404).json({ error: 'Không tìm thấy chương trình khuyến mãi cần cập nhật' });
+    }
+    const merged = {
+      name: req.body?.name !== undefined ? req.body.name : existing.name,
+      type: req.body?.type !== undefined ? req.body.type : existing.type,
+      conditions: req.body?.conditions !== undefined ? req.body.conditions : existing.conditions,
+      rewards: req.body?.rewards !== undefined ? req.body.rewards : existing.rewards,
+      startDate: req.body?.startDate !== undefined ? req.body.startDate : existing.startDate,
+      endDate: req.body?.endDate !== undefined ? req.body.endDate : existing.endDate,
+      isActive: req.body?.isActive !== undefined ? req.body.isActive : existing.isActive
+    };
+    const data = await validatePromotionPayload(req.storeId, merged, req.params.id);
 
     const updated = await prisma.promotion.updateMany({
       where: { id: req.params.id, storeId: req.storeId },
@@ -2854,11 +3028,13 @@ app.get('/api/customers/:id/history', async (req, res) => {
 app.get('/api/kitchen/orders', async (req, res) => {
   const storeId = req.storeId;
   try {
+    const todayStart = getVNStartOfDay(getVNDateStr());
     const orders = await prisma.order.findMany({
       where: {
         storeId,
         prepStatus: { in: ['pending', 'preparing'] },
-        status: { in: ['paid', 'pending'] }
+        status: { in: ['paid', 'pending'] },
+        timestamp: { gte: todayStart }
       },
       orderBy: { timestamp: 'asc' },
       include: { items: true }
@@ -3166,6 +3342,15 @@ app.post('/api/print', (req, res) => {
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
+});
+
+app.use((err, req, res, next) => {
+  console.error('[API_ERROR]', err);
+  if (res.headersSent) return next(err);
+  res.status(err.status || 500).json({
+    error: IS_PRODUCTION ? 'Lỗi hệ thống. Vui lòng thử lại sau.' : err.message,
+    code: err.code || 'INTERNAL_ERROR'
+  });
 });
 
 const PORT = process.env.PORT || 5000;

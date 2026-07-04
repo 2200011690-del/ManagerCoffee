@@ -65,6 +65,8 @@ const ProductGrid = React.memo(function ProductGrid({ items, onAddToCart, onSele
                 <span className="font-bold text-primary-600 text-sm">{item.price.toLocaleString('vi-VN')}đ</span>
                 <button
                   onClick={e => { e.stopPropagation(); onAddToCart(item, '100%', 'Nhiều đá', ''); }}
+                  aria-label={`Thêm ${item.name} vào giỏ`}
+                  title={`Thêm ${item.name}`}
                   className="w-8 h-8 rounded-lg bg-primary-600 hover:bg-primary-700 flex items-center justify-center text-white transition-all hover:scale-105 active:scale-95 shadow-sm"
                 >
                   <Plus size={16} />

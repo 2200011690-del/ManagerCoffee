@@ -347,6 +347,23 @@ export default function POSPage() {
   const pointsDiscount = pointsToDeduct * 1000;
   const finalTotal = tempTotal - pointsDiscount > 0 ? tempTotal - pointsDiscount : 0;
 
+  const finalizePaidCart = (order) => {
+    if (activeTableId) {
+      updateTableStatus(activeTableId, 'dirty');
+    }
+
+    if (order?.isSplit) {
+      order.items.forEach(splitItem => {
+        updateQty(splitItem.cartItemId, -splitItem.qty);
+      });
+    } else {
+      clearCurrentCart(activeTableId);
+    }
+
+    loadActiveShift();
+    setMobileTab('menu');
+  };
+
   // ---- Checkout Handlers ----
   const handleConfirmPayment = async (splitPayments = null) => {
     const isEvent = splitPayments && (splitPayments.nativeEvent || splitPayments.target);
@@ -407,6 +424,7 @@ export default function POSPage() {
         usedPoints: pointsToDeduct
       });
       setPendingOrder(newOrder);
+      finalizePaidCart(newOrder);
       setShowPayConfirm(false);
       setShowSplitPayment(false);
       setShowThermal(true);
@@ -423,9 +441,11 @@ export default function POSPage() {
       // Gọi API cập nhật trạng thái hóa đơn sang paid
       const paidOrder = await api.put(`/orders/${pendingOrder.id}/pay`);
       setPendingOrder(paidOrder);
+      finalizePaidCart(paidOrder);
     } catch (err) {
       // Fallback nếu webhook đã xử lý xong trước và API trả về 404
       console.log('Order already paid via webhook.');
+      finalizePaidCart(pendingOrder);
     }
     setShowQRModal(false);
     setShowThermal(true);
@@ -494,25 +514,9 @@ export default function POSPage() {
   };
 
   const handleFinishCheckout = () => {
-    // Set table to dirty if applicable
-    if (activeTableId) {
-      updateTableStatus(activeTableId, 'dirty');
-    }
-    
-    if (pendingOrder?.isSplit) {
-      // If it's a split bill, update the remaining cart by deducting split items
-      pendingOrder.items.forEach(splitItem => {
-        updateQty(splitItem.cartItemId, -splitItem.qty);
-      });
-    } else {
-      clearCurrentCart(activeTableId);
-    }
-    
     setShowThermal(false);
     setPendingOrder(null);
     showNotification('Thanh toán thành công! 🎉', 'success');
-    loadActiveShift();
-    setMobileTab('menu');
   };
 
   // Customer History & Recommendation (Phase 3)
@@ -612,6 +616,7 @@ export default function POSPage() {
     });
     newOrder.isSplit = true;
     setPendingOrder(newOrder);
+    finalizePaidCart(newOrder);
     setShowSplitBill(false);
     setShowThermal(true);
   };

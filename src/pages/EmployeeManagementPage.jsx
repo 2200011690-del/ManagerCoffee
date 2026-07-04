@@ -254,7 +254,7 @@ export default function EmployeeManagementPage() {
     setEditingUser(u);
     setFormData({
       name: u.name,
-      pin: u.pin,
+      pin: '',
       role: u.role,
       canApplyDiscount: u.canApplyDiscount !== undefined ? u.canApplyDiscount : true,
       canRefund: u.canRefund !== undefined ? u.canRefund : true,
@@ -394,7 +394,9 @@ export default function EmployeeManagementPage() {
                   )}
                   
                   <div className="mt-auto border-t border-gray-100 pt-3 flex items-center justify-between">
-                    <p className="text-xs text-gray-500 font-mono flex items-center gap-1">PIN: <span className="font-bold text-gray-700 tracking-widest">{u.pin}</span></p>
+                    <p className="text-xs text-gray-500 font-mono flex items-center gap-1">
+                      PIN: <span className="font-bold text-gray-700 tracking-widest">{u.hasPin ? 'Đã thiết lập' : 'Chưa thiết lập'}</span>
+                    </p>
                     <div className="flex gap-2">
                       <button onClick={() => openEdit(u)} className="p-1.5 text-gray-400 hover:text-coffee-accent transition-colors">
                         <Edit2 size={16} />
@@ -741,8 +743,10 @@ export default function EmployeeManagementPage() {
                   <input required type="text" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="input-field w-full min-h-[44px]" placeholder="VD: Nguyễn Văn A" />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-gray-500 mb-1.5 uppercase font-sans">Mã PIN (4 chữ số)</label>
-                  <input required type="text" pattern="\d{4}" value={formData.pin} onChange={e => setFormData({...formData, pin: e.target.value})} className="input-field w-full min-h-[44px] font-mono tracking-widest" placeholder="VD: 1234" maxLength={4} />
+                  <label className="block text-xs font-bold text-gray-500 mb-1.5 uppercase font-sans">
+                    {editingUser ? 'Mã PIN mới (nếu muốn đổi)' : 'Mã PIN (4 chữ số)'}
+                  </label>
+                  <input required={!editingUser} type="text" pattern="\d{4}" value={formData.pin} onChange={e => setFormData({...formData, pin: e.target.value})} className="input-field w-full min-h-[44px] font-mono tracking-widest" placeholder={editingUser ? 'Để trống nếu không đổi' : 'VD: 1234'} maxLength={4} />
                 </div>
               </div>
 

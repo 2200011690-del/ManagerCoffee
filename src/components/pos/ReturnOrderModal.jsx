@@ -7,7 +7,7 @@ export default function ReturnOrderModal({ onClose, onSuccess }) {
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [selectedItems, setSelectedItems] = useState({}); // { itemName: qty }
+  const [selectedItems, setSelectedItems] = useState({}); // { orderItemId: { orderItemName, price, qty } }
   const [reason, setReason] = useState('');
   const [refundMethod, setRefundMethod] = useState('cash');
   const [processing, setProcessing] = useState(false);
@@ -34,19 +34,19 @@ export default function ReturnOrderModal({ onClose, onSuccess }) {
     const maxReturnQty = item.qty - (item.returnedQty || 0);
     if (maxReturnQty <= 0) return;
     setSelectedItems(prev => {
-      const current = prev[item.name];
+      const current = prev[item.id];
       if (current) {
-        const { [item.name]: _, ...rest } = prev;
+        const { [item.id]: _, ...rest } = prev;
         return rest;
       }
-      return { ...prev, [item.name]: { qty: maxReturnQty, price: item.price } };
+      return { ...prev, [item.id]: { orderItemId: item.id, orderItemName: item.name, qty: maxReturnQty, price: item.price } };
     });
   };
 
-  const updateReturnQty = (itemName, qty) => {
+  const updateReturnQty = (orderItemId, qty) => {
     setSelectedItems(prev => ({
       ...prev,
-      [itemName]: { ...prev[itemName], qty: Math.max(1, qty) }
+      [orderItemId]: { ...prev[orderItemId], qty: Math.max(1, qty) }
     }));
   };
 
@@ -63,8 +63,9 @@ export default function ReturnOrderModal({ onClose, onSuccess }) {
     setProcessing(true);
     setError('');
     try {
-      const items = Object.entries(selectedItems).map(([orderItemName, val]) => ({
-        orderItemName,
+      const items = Object.values(selectedItems).map((val) => ({
+        orderItemId: val.orderItemId,
+        orderItemName: val.orderItemName,
         price: val.price,
         qty: val.qty,
         reason
@@ -166,7 +167,7 @@ export default function ReturnOrderModal({ onClose, onSuccess }) {
                     <div className="space-y-2">
                       {order.items.map(item => {
                         const maxReturnQty = item.qty - (item.returnedQty || 0);
-                        const isSelected = !!selectedItems[item.name];
+                        const isSelected = !!selectedItems[item.id];
                         const isFullyReturned = maxReturnQty <= 0;
                         return (
                           <div key={item.id}
@@ -187,19 +188,19 @@ export default function ReturnOrderModal({ onClose, onSuccess }) {
                             </div>
                             {isSelected && (
                               <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
-                                <button onClick={() => updateReturnQty(item.name, selectedItems[item.name].qty - 1)}
+                                <button onClick={() => updateReturnQty(item.id, selectedItems[item.id].qty - 1)}
                                   className="w-7 h-7 rounded bg-red-100 flex items-center justify-center text-red-600">
                                   <span className="text-xs font-bold">−</span>
                                 </button>
-                                <span className="w-6 text-center text-xs font-bold">{selectedItems[item.name].qty}</span>
-                                <button onClick={() => updateReturnQty(item.name, Math.min(selectedItems[item.name].qty + 1, maxReturnQty))}
+                                <span className="w-6 text-center text-xs font-bold">{selectedItems[item.id].qty}</span>
+                                <button onClick={() => updateReturnQty(item.id, Math.min(selectedItems[item.id].qty + 1, maxReturnQty))}
                                   className="w-7 h-7 rounded bg-red-100 flex items-center justify-center text-red-600">
                                   <span className="text-xs font-bold">+</span>
                                 </button>
                               </div>
                             )}
                             <span className="text-sm font-bold text-coffee-accent flex-shrink-0">
-                              {(item.price * (isSelected ? selectedItems[item.name].qty : item.qty)).toLocaleString('vi-VN')}đ
+                              {(item.price * (isSelected ? selectedItems[item.id].qty : item.qty)).toLocaleString('vi-VN')}đ
                             </span>
                           </div>
                         );

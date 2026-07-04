@@ -1,0 +1,622 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Báo cáo rà soát Manager Coffee</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f7f4ef;
+      --paper: #fffdf9;
+      --text: #1f2933;
+      --muted: #64748b;
+      --border: #e5ded4;
+      --accent: #9a5a2e;
+      --danger: #b42318;
+      --warn: #b7791f;
+      --ok: #15803d;
+      --code: #f1ede7;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+      line-height: 1.6;
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    main {
+      width: min(980px, 100%);
+      margin: 0 auto;
+      padding: 18px 14px 48px;
+    }
+
+    header {
+      background: #2f1f17;
+      color: #fffaf3;
+      padding: 24px 18px;
+      border-radius: 12px;
+      margin-bottom: 16px;
+    }
+
+    h1, h2, h3 {
+      line-height: 1.25;
+      margin: 0 0 10px;
+    }
+
+    h1 {
+      font-size: clamp(24px, 7vw, 40px);
+      letter-spacing: 0;
+    }
+
+    h2 {
+      font-size: 22px;
+      margin-top: 4px;
+      color: #2f1f17;
+    }
+
+    h3 {
+      font-size: 18px;
+      color: #3f2a1f;
+      margin-top: 16px;
+    }
+
+    p { margin: 8px 0; }
+
+    a {
+      color: var(--accent);
+      font-weight: 700;
+      word-break: break-word;
+    }
+
+    code {
+      background: var(--code);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 1px 5px;
+      font-size: 0.92em;
+      word-break: break-word;
+    }
+
+    section {
+      background: var(--paper);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+      margin: 14px 0;
+      box-shadow: 0 1px 3px rgba(47, 31, 23, 0.06);
+    }
+
+    ul, ol {
+      padding-left: 22px;
+      margin: 8px 0;
+    }
+
+    li { margin: 7px 0; }
+
+    .meta {
+      color: #ecd9c6;
+      margin-top: 10px;
+      font-size: 14px;
+    }
+
+    .summary {
+      font-size: 17px;
+      background: #fff7ed;
+      border-left: 5px solid var(--accent);
+    }
+
+    .badge-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 30px;
+      padding: 4px 9px;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 700;
+      background: #f1ede7;
+      color: #3f2a1f;
+    }
+
+    .p0 { color: var(--danger); }
+    .p1 { color: var(--warn); }
+    .p2 { color: #2563eb; }
+    .ok { color: var(--ok); }
+
+    .callout {
+      padding: 12px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: #fbf6ee;
+      margin: 10px 0;
+    }
+
+    .callout.danger {
+      background: #fff1f1;
+      border-color: #ffd2d2;
+    }
+
+    .callout.warn {
+      background: #fff8e6;
+      border-color: #f5d48a;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .card {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px;
+      background: #fffaf3;
+    }
+
+    .card strong {
+      color: #2f1f17;
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    .checklist li {
+      list-style: none;
+      position: relative;
+      padding-left: 28px;
+    }
+
+    .checklist li::before {
+      content: "□";
+      position: absolute;
+      left: 0;
+      top: 0;
+      color: var(--accent);
+      font-weight: 800;
+    }
+
+    .small {
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    @media (max-width: 720px) {
+      main { padding: 10px 10px 36px; }
+      header { padding: 20px 14px; border-radius: 10px; }
+      section { padding: 14px; border-radius: 10px; }
+      .grid { grid-template-columns: 1fr; }
+      h2 { font-size: 20px; }
+      h3 { font-size: 17px; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>Báo cáo rà soát Manager Coffee</h1>
+      <p>Đánh giá lỗi, việc cần sửa, tính năng nên thêm và lộ trình nâng cấp web app POS/F&amp;B.</p>
+      <p class="meta">Ngày lập: 03/07/2026 · Dự án: D:\ManagerCoffee · Bản đọc tốt trên điện thoại</p>
+      <div class="badge-row">
+        <span class="badge">POS/F&amp;B</span>
+        <span class="badge">Kiểm API + UI</span>
+        <span class="badge">Bảo mật</span>
+        <span class="badge">Kho + ca tiền</span>
+        <span class="badge">Lộ trình nâng cấp</span>
+      </div>
+    </header>
+
+    <section class="summary">
+      <h2>Kết luận ngắn gọn</h2>
+      <p><strong>Manager Coffee đã có nền POS/F&amp;B khá rõ</strong>: bán hàng, bàn/phòng, bếp, menu, kho, công thức, ca tiền, nhân sự, khách hàng, khuyến mãi, trả hàng, thanh toán QR và báo cáo.</p>
+      <p><strong>Nhưng app chưa nên coi là ngang hàng KiotViet, Sapo, iPOS hoặc POS365.</strong> Hiện tại phù hợp hơn với MVP, demo hoặc beta nội bộ. Trước khi bán thật cần sửa các lỗi có thể gây sai tiền, sai kho, lặp đơn, lộ dữ liệu và sai báo cáo.</p>
+      <p>Muốn lên mức sản phẩm thương mại, cần đi qua 3 tầng: sửa lỗi sống còn, làm hệ thống đáng tin khi vận hành thật, rồi mới thêm tính năng cạnh tranh.</p>
+    </section>
+
+    <section>
+      <h2>1. Những gì đã kiểm</h2>
+      <h3>Kiểm tra nền</h3>
+      <ul>
+        <li><code>npm run lint</code>: pass, nhưng còn nhiều warning về hook deps, unused vars/imports và fast refresh.</li>
+        <li><code>npm run build</code>: pass, nhưng bundle frontend lớn, file JS chính khoảng 666 KB và Vite cảnh báo chunk trên 500 KB.</li>
+        <li><code>npm run build --prefix server</code>: pass, Prisma generate/db push thành công.</li>
+        <li><code>npm audit --audit-level=moderate</code>: root project có advisory moderate qua dev dependency Prisma; server package audit không có vulnerability.</li>
+        <li>Smoke tests đã chạy và pass: <code>test:smoke</code>, <code>test:smoke:sales</code>, <code>test:smoke:shifts</code>.</li>
+      </ul>
+
+      <h3>Kiểm API</h3>
+      <ul>
+        <li>Đã rà 68 API route trong <code>server/index.js</code>.</li>
+        <li>Đã kiểm nhóm auth, users, attendance, customers, products, tables, orders, inventory, recipe, dashboard, returns, held orders, promotions, kitchen, payments.</li>
+        <li>Harness API riêng: 142 check, 141 pass. Một check fail do kỳ vọng test khác response thực tế, không phải lỗi nghiệp vụ lớn.</li>
+        <li>Đã tạo store test riêng và cleanup. Xác nhận không còn store <code>codex-audit-*</code>.</li>
+      </ul>
+
+      <h3>Kiểm UI</h3>
+      <ul>
+        <li>Đã mở app local và kiểm các màn: Bán hàng POS, Sơ đồ bàn, Nhà bếp, Báo cáo, Quản lý Menu, Khuyến mãi, Nhân sự, Cài đặt.</li>
+        <li>Mobile viewport 390x844: POS và cart mobile dùng được, thêm món được, mở giỏ hàng được, nút thanh toán hiện được.</li>
+      </ul>
+
+      <h3>Chưa thể kiểm thật trong máy này</h3>
+      <ul>
+        <li>Máy in LAN, máy in bếp/bar/tem thật.</li>
+        <li>Thanh toán PayOS/ngân hàng thật.</li>
+        <li>Hóa đơn điện tử thật.</li>
+        <li>Tablet/POS hardware thật.</li>
+        <li>Tải production với nhiều máy bán hàng đồng thời.</li>
+        <li>Mạng chập chờn/offline thật trong quán.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>2. Lỗi P0 - Phải sửa trước khi bán thật</h2>
+
+      <div class="callout danger">
+        <h3 class="p0">P0.1. Race condition tạo số hóa đơn</h3>
+        <p>Checkout đang tạo số hóa đơn bằng cách đếm số order: <code>order.count()</code>, rồi sinh <code>#HD...</code>. Khi nhiều thu ngân/thiet bị checkout cùng lúc, hai request có thể sinh cùng một mã hóa đơn và gây lỗi unique constraint.</p>
+        <p><strong>Vị trí:</strong> <code>server/index.js</code>, khoảng dòng 1232-1235.</p>
+        <p><strong>Tác động:</strong> giao dịch giờ cao điểm có thể fail 500, thu ngân phải bấm lại, dễ gây lặp thao tác.</p>
+        <p><strong>Cần sửa:</strong> dùng counter/sequence riêng theo store trong transaction, hoặc mã có timestamp + suffix an toàn; thêm idempotency key cho checkout.</p>
+      </div>
+
+      <div class="callout danger">
+        <h3 class="p0">P0.2. Đóng modal hóa đơn nhưng giỏ hàng vẫn còn</h3>
+        <p>Sau checkout, order đã được lưu. Nhưng nếu bấm đóng/hủy modal hóa đơn, cart vẫn giữ lại.</p>
+        <p><strong>Vị trí:</strong> <code>src/pages/POSPage.jsx</code>, khoảng dòng 1135-1139.</p>
+        <p><strong>Tác động:</strong> có thể tạo đơn trùng, trừ kho trùng, sai doanh thu và sai ca tiền.</p>
+        <p><strong>Cần sửa:</strong> khi order tạo thành công thì clear/lock cart ngay. Modal hóa đơn chỉ dùng để in/xem lại, không quyết định việc clear cart.</p>
+      </div>
+
+      <div class="callout danger">
+        <h3 class="p0">P0.3. API users lộ password hash và PIN</h3>
+        <p>Endpoint <code>/api/users</code> trả thẳng dữ liệu user từ DB, gồm cả <code>password</code> hash và <code>pin</code>.</p>
+        <p><strong>Vị trí:</strong> <code>server/index.js</code>, khoảng dòng 556-559.</p>
+        <p><strong>Tác động:</strong> dữ liệu nhạy cảm bị lộ qua API/DevTools. Nếu token admin bị lộ, kẻ xấu lấy được hash/PIN.</p>
+        <p><strong>Cần sửa:</strong> sanitize response, không trả password/PIN, hash PIN, thêm flow reset PIN.</p>
+      </div>
+
+      <div class="callout danger">
+        <h3 class="p0">P0.4. UI nhân sự hiển thị PIN nhân viên</h3>
+        <p>Trang nhân sự hiển thị PIN trực tiếp.</p>
+        <p><strong>Vị trí:</strong> <code>src/pages/EmployeeManagementPage.jsx</code>, khoảng dòng 397.</p>
+        <p><strong>Tác động:</strong> ai nhìn màn hình cũng có thể đọc PIN, làm mất ý nghĩa bảo mật.</p>
+        <p><strong>Cần sửa:</strong> chỉ hiển thị <code>****</code>, thêm nút đặt lại PIN, log thao tác reset PIN.</p>
+      </div>
+
+      <div class="callout danger">
+        <h3 class="p0">P0.5. Sản phẩm trùng tên nhưng kho/tài chính tìm theo tên</h3>
+        <p>DB demo hiện có 29 món trùng tên “Sinh tố bơ”. Trong khi trừ kho, trả hàng và P&amp;L lại tìm product theo <code>name</code>.</p>
+        <p><strong>Vị trí:</strong> <code>server/index.js</code> khoảng dòng 1147, 2285, 2638. <code>OrderItem</code> trong <code>schema.prisma</code> chỉ lưu <code>name</code>, chưa lưu <code>productId</code>.</p>
+        <p><strong>Tác động:</strong> trừ sai nguyên liệu, hoàn sai kho, báo cáo lãi/lỗ sai, không audit được món gốc nếu đổi tên.</p>
+        <p><strong>Cần sửa:</strong> thêm <code>productId</code> vào <code>OrderItem</code>, dùng ID cho mọi logic kho/return/P&amp;L, chặn trùng tên hoặc thêm SKU/code.</p>
+      </div>
+
+      <div class="callout danger">
+        <h3 class="p0">P0.6. Dashboard có nguy cơ hiển thị số liệu mock</h3>
+        <p>Dashboard import dữ liệu mock và fallback sang mock khi live data invalid/fail.</p>
+        <p><strong>Vị trí:</strong> <code>src/data/coffeeData.js</code> khoảng dòng 202; <code>src/pages/DashboardPage.jsx</code> khoảng dòng 574-579.</p>
+        <p><strong>Tác động:</strong> chủ quán có thể nhìn doanh thu, món bán chạy, đơn gần đây giả.</p>
+        <p><strong>Cần sửa:</strong> production không được fallback sang mock. Nếu API fail thì hiển thị lỗi/empty state rõ ràng. Demo mode phải tách bằng flag riêng.</p>
+      </div>
+    </section>
+
+    <section>
+      <h2>3. Lỗi P1 - Cần sửa sớm để vận hành ổn định</h2>
+      <ul>
+        <li><strong>Checkout/return/pay chưa transaction hóa đầy đủ:</strong> tạo order, trừ kho, update ca tiền, điểm khách hàng, trạng thái bàn và payment cần nằm trong transaction hoặc có rollback/retry rõ.</li>
+        <li><strong>Ca tiền UI có thể stale:</strong> backend tăng <code>cashSales</code>/<code>expectedCash</code> nhưng modal đóng ca có thể hiển thị số cũ. Cần refresh shift khi mở modal và sau mỗi cash checkout.</li>
+        <li><strong>Kitchen backlog đơn cũ:</strong> màn bếp có nhiều order cũ pending rất lâu. Cần lifecycle pending → preparing → ready → served/cancelled và lọc theo ngày/ca.</li>
+        <li><strong>Khuyến mãi cho phép dữ liệu bất thường:</strong> thấy nhiều chương trình trùng và có mức 100%. Cần validate percent, ngày hiệu lực, duplicate active, quyền áp dụng giảm lớn.</li>
+        <li><strong>Thiếu index cho nhiều foreign key:</strong> cần thêm index cho <code>Attendance.userId</code>, <code>CashShift.userId</code>, <code>Order.customerId</code>, <code>OrderItem.orderId</code>, <code>OrderPayment.orderId</code>, <code>ReturnItem.returnOrderId</code>, <code>StockTransaction.inventoryId</code>, <code>supplierId</code>...</li>
+        <li><strong>Error response chưa chuẩn:</strong> một số lỗi backend trả HTML 500 thay vì JSON. Cần error middleware chung trả <code>{ error, code, details }</code>.</li>
+        <li><strong>DB/pooler/network failure cần UX tốt hơn:</strong> cần health check DB, retry/backoff có giới hạn, UI offline/degraded rõ ràng, không fallback mock.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>4. P2 - Chất lượng code, UX, accessibility</h2>
+      <ul>
+        <li><strong>Nút icon không có accessible name:</strong> ví dụ nút thêm món trong <code>ProductGrid.jsx</code>. Cần thêm <code>aria-label</code>/<code>title</code>.</li>
+        <li><strong>UX mobile/tablet cần mượt hơn:</strong> mobile dùng được nhưng thanh bàn/category cuộn ngang dài, nhiều nút icon nhỏ và thiếu label.</li>
+        <li><strong>Màn hình bếp cắt đứt điều hướng:</strong> vào Kitchen thì sidebar biến mất, phải quay lại POS mới đi tiếp.</li>
+        <li><strong>Bundle frontend lớn:</strong> cần code split theo route/view, lazy load Dashboard/Employee/Menu/Reports.</li>
+        <li><strong>Lint warning:</strong> cần dọn hook deps, unused imports/vars, fast-refresh warning để giảm bug ngầm.</li>
+        <li><strong>Demo credential/PIN:</strong> chỉ nên hiện trong dev/demo mode, production không được hiển thị.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>5. Bảo mật và SaaS hardening</h2>
+      <div class="grid">
+        <div class="card">
+          <strong>Auth/session</strong>
+          JWT secret bắt buộc production, refresh/session expiry rõ, logout all devices, rate limit login admin/PIN, lockout khi sai PIN nhiều lần.
+        </div>
+        <div class="card">
+          <strong>PIN/password</strong>
+          Hash PIN, không trả PIN về client, reset PIN thay vì xem PIN, policy password admin, force change lần đầu.
+        </div>
+        <div class="card">
+          <strong>RBAC chi tiết</strong>
+          Quyền xem báo cáo, sửa/xóa món, sửa giá, áp dụng khuyến mãi lớn, hoàn tiền, đóng ca, quản lý kho, quản lý nhân viên.
+        </div>
+        <div class="card">
+          <strong>Audit log</strong>
+          Ghi lại ai sửa giá, hủy món, hoàn tiền, mở/đóng ca, điều chỉnh kho, đổi quyền nhân viên, đổi cấu hình thanh toán/máy in.
+        </div>
+        <div class="card">
+          <strong>Multi-tenant isolation</strong>
+          Store A không đọc/sửa được Store B; JWT không bị header <code>x-store-id</code> override; mọi route phải filter <code>storeId</code>.
+        </div>
+        <div class="card">
+          <strong>Backup/restore</strong>
+          Backup DB tự động, restore drill, export dữ liệu từng store, soft delete/audit cho dữ liệu quan trọng.
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>6. Database và data model nên nâng cấp</h2>
+      <ul>
+        <li><strong>Product/OrderItem:</strong> thêm <code>Product.sku</code> hoặc <code>code</code>, thêm <code>OrderItem.productId</code>, snapshot tên/giá tại thời điểm bán.</li>
+        <li><strong>Order numbering:</strong> thêm bảng <code>StoreCounter(storeId, key, value)</code>, increment trong transaction, format theo ngày/ca nếu cần.</li>
+        <li><strong>Inventory:</strong> đơn vị tính chuẩn, batch/lot nếu quản lý hạn dùng, tồn tối thiểu, kiểm kê định kỳ, giá vốn bình quân/FIFO.</li>
+        <li><strong>Payment:</strong> idempotency key, provider transaction id, trạng thái pending/paid/failed/expired/refunded, verify webhook signature.</li>
+        <li><strong>Returns/refunds:</strong> reason bắt buộc, quyền approve refund, partial refund theo payment method, ảnh hưởng kho/ca tiền rõ ràng.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>7. Test nên bổ sung</h2>
+      <h3>Unit/integration test</h3>
+      <ul>
+        <li>Checkout cash, checkout QR pending → paid, mixed payment, split bill.</li>
+        <li>Hold order → restore → checkout.</li>
+        <li>Return partial/full.</li>
+        <li>Cash shift open/close/discrepancy.</li>
+        <li>Product recipe deduction.</li>
+        <li>Duplicate product prevention.</li>
+        <li>Promotion application.</li>
+        <li>Role permission.</li>
+      </ul>
+      <h3>Concurrency test</h3>
+      <ul>
+        <li>10-50 checkout đồng thời cùng store.</li>
+        <li>Payment webhook đến trước/sau frontend poll.</li>
+        <li>2 thu ngân đóng ca/sửa order đồng thời.</li>
+        <li>2 người import/adjust kho đồng thời.</li>
+      </ul>
+      <h3>E2E browser test</h3>
+      <ul>
+        <li>Login admin/staff.</li>
+        <li>POS add item → checkout → cart clear.</li>
+        <li>Reprint bill.</li>
+        <li>Table order.</li>
+        <li>Kitchen status.</li>
+        <li>Dashboard không mock khi API fail.</li>
+        <li>Employee page không hiển thị PIN.</li>
+        <li>Mobile/tablet layout.</li>
+      </ul>
+      <h3>Security test</h3>
+      <ul>
+        <li>Store isolation.</li>
+        <li>Token missing/expired.</li>
+        <li>Staff access admin routes bị chặn.</li>
+        <li>Brute-force PIN bị rate limit.</li>
+        <li>API users không trả password/PIN.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>8. Tính năng nên thêm để tiến gần KiotViet/Sapo/iPOS/POS365</h2>
+      <div class="grid">
+        <div class="card">
+          <strong>QR order tại bàn</strong>
+          Mỗi bàn có QR riêng, khách quét để gọi món, order gửi thẳng thu ngân và bếp, hỗ trợ trả trước/trả sau.
+        </div>
+        <div class="card">
+          <strong>Offline-first POS</strong>
+          Mất mạng vẫn tạo đơn, in bill, in bếp; có queue sync và xử lý conflict khi có mạng lại.
+        </div>
+        <div class="card">
+          <strong>Hóa đơn điện tử và thuế</strong>
+          Xuất hóa đơn điện tử từ máy tính tiền, lưu mã tra cứu, đồng bộ dữ liệu thuế, báo cáo hộ kinh doanh/doanh nghiệp.
+        </div>
+        <div class="card">
+          <strong>Tích hợp giao đồ ăn</strong>
+          GrabFood, ShopeeFood, Web Order riêng, đồng bộ menu/gia/trạng thái món, đối soát doanh thu online.
+        </div>
+        <div class="card">
+          <strong>CRM và loyalty</strong>
+          Hồ sơ khách hàng, lịch sử mua, tích điểm, hạng thành viên, voucher, sinh nhật, chiến dịch chăm sóc.
+        </div>
+        <div class="card">
+          <strong>Đa chi nhánh</strong>
+          Dashboard tổng, báo cáo từng chi nhánh, kho từng chi nhánh, chuyển kho, menu/giá theo chi nhánh.
+        </div>
+        <div class="card">
+          <strong>Quản lý thiết bị và in ấn</strong>
+          Máy in thu ngân, bếp/bar, tem ly, mapping món → khu vực in, retry khi in lỗi, mẫu in tùy biến.
+        </div>
+        <div class="card">
+          <strong>Báo cáo nâng cao</strong>
+          Food cost, lãi/lỗ theo món, doanh thu theo giờ, hiệu suất nhân viên, tỷ lệ hủy/return/refund, tồn kho sắp hết.
+        </div>
+        <div class="card">
+          <strong>Nhân sự nâng cao</strong>
+          Ca làm, chấm công, tính lương, hoa hồng/thưởng, hiệu suất theo order/doanh thu, lịch sử thao tác.
+        </div>
+        <div class="card">
+          <strong>Reservation/đặt bàn</strong>
+          Đặt bàn theo giờ, đặt cọc, ghi chú khách, nhắc lịch, gán bàn khi khách đến.
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>9. Đối chiếu với đối thủ</h2>
+      <h3>KiotViet</h3>
+      <p>Nguồn tham khảo:</p>
+      <ul>
+        <li><a href="https://www.kiotviet.vn/phan-mem-quan-ly-nha-hang/">Phần mềm quản lý nhà hàng KiotViet</a></li>
+        <li><a href="https://www.kiotviet.vn/huong-dan-su-dung-kiotviet/fnb-thuc-don-dien-tu/goi-mon-qua-ma-qr/">Gọi món qua mã QR KiotViet</a></li>
+        <li><a href="https://www.kiotviet.vn/huong-dan-su-dung-kiotviet/fnb-che-bien/thong-bao-che-bien/">Thông báo chế biến KiotViet</a></li>
+      </ul>
+      <p><strong>Khoảng cách:</strong> Manager Coffee có POS, bàn, bếp, kho, ca tiền, nhưng còn thiếu QR order hoàn chỉnh, thông báo bếp chuẩn, role/hủy món chuẩn, kênh online, thuế/HĐĐT, ecosystem và độ ổn định.</p>
+
+      <h3>Sapo FnB</h3>
+      <p>Nguồn tham khảo:</p>
+      <ul>
+        <li><a href="https://www.sapo.vn/phan-mem-quan-ly-nha-hang.html">Sapo phần mềm quản lý nhà hàng</a></li>
+        <li><a href="https://help.sapo.vn/qr-order-tren-phan-mem-sapo-fnb">QR order trên Sapo FnB</a></li>
+      </ul>
+      <p><strong>Khoảng cách:</strong> Sapo có offline, order tại bàn, QR order, bếp/bar, GrabFood/ShopeeFood, HĐĐT/thuế, app quản lý từ xa. Manager Coffee chưa có offline sync thật, chưa có kênh online/giao đồ ăn, dashboard còn rủi ro mock.</p>
+
+      <h3>iPOS</h3>
+      <p>Nguồn tham khảo:</p>
+      <ul>
+        <li><a href="https://ipos.vn/">iPOS.vn</a></li>
+        <li><a href="https://ipos.vn/giai-phap-menu-dien-tu/">Menu điện tử iPOS</a></li>
+        <li><a href="https://ipos.vn/phan-mem-quan-ly-quan-cafe-toi-uu/">Phần mềm quản lý quán cafe iPOS</a></li>
+      </ul>
+      <p><strong>Khoảng cách:</strong> iPOS là ecosystem F&amp;B gồm bán hàng, O2O QR, inventory, HRM, CRM, accounting, WebOrder, giao hàng/thanh toán. Manager Coffee mới có lõi POS nội bộ, chưa thành ecosystem.</p>
+
+      <h3>POS365</h3>
+      <p>Nguồn tham khảo:</p>
+      <ul>
+        <li><a href="https://www.pos365.vn/nganh-nghe/phan-mem-quan-ly-nha-hang">POS365 phần mềm quản lý nhà hàng</a></li>
+        <li><a href="https://www.pos365.vn/">POS365</a></li>
+      </ul>
+      <p><strong>Khoảng cách:</strong> POS365 nhấn mạnh sơ đồ bàn realtime, định lượng nguyên liệu, đa phương thức thanh toán, HĐĐT, báo cáo, CRM, offline sync, app quản lý. Manager Coffee có một số nền tảng tương tự, nhưng cần sửa logic và nâng độ tin cậy trước.</p>
+    </section>
+
+    <section>
+      <h2>10. Lộ trình đề xuất</h2>
+      <h3>Giai đoạn 1: Sửa lỗi sống còn</h3>
+      <ul>
+        <li>Sửa order number transaction-safe.</li>
+        <li>Clear/lock cart sau khi order tạo thành công.</li>
+        <li>Sanitize <code>/api/users</code>.</li>
+        <li>Ẩn PIN, hash PIN, reset PIN flow.</li>
+        <li>Thêm <code>productId</code> vào <code>OrderItem</code>.</li>
+        <li>Chặn duplicate product hoặc thêm SKU.</li>
+        <li>Bỏ fallback mock dashboard trong production.</li>
+        <li>Dùng transaction cho checkout/pay/return.</li>
+      </ul>
+
+      <h3>Giai đoạn 2: Làm app đáng tin khi vận hành thật</h3>
+      <ul>
+        <li>Thêm FK indexes.</li>
+        <li>Chuẩn hóa error JSON.</li>
+        <li>Idempotency cho checkout/payment.</li>
+        <li>Audit log.</li>
+        <li>KDS lifecycle rõ.</li>
+        <li>Khuyến mãi validation.</li>
+        <li>Ca tiền refresh chuẩn.</li>
+        <li>Test E2E và concurrency.</li>
+        <li>Monitoring backend/DB/payment.</li>
+      </ul>
+
+      <h3>Giai đoạn 3: Nâng UX và hiệu năng</h3>
+      <ul>
+        <li>Tablet-first POS.</li>
+        <li>Cải thiện mobile cart.</li>
+        <li>Accessibility labels.</li>
+        <li>Code split frontend.</li>
+        <li>Dọn lint warning.</li>
+        <li>Cải thiện navigation Kitchen.</li>
+        <li>Dashboard có loading/error/empty rõ.</li>
+      </ul>
+
+      <h3>Giai đoạn 4: Thêm tính năng cạnh tranh</h3>
+      <ul>
+        <li>QR order tại bàn.</li>
+        <li>Offline-first sync.</li>
+        <li>HĐĐT/thuế.</li>
+        <li>GrabFood/ShopeeFood/Web Order.</li>
+        <li>CRM/loyalty/voucher.</li>
+        <li>Đa chi nhánh.</li>
+        <li>Quản lý thiết bị in.</li>
+        <li>Báo cáo food cost/lãi lỗ nâng cao.</li>
+      </ul>
+
+      <h3>Giai đoạn 5: SaaS/thương mại hóa</h3>
+      <ul>
+        <li>Subscription/billing.</li>
+        <li>Tenant provisioning.</li>
+        <li>Backup/restore.</li>
+        <li>Data export/import.</li>
+        <li>SLA/monitoring.</li>
+        <li>Onboarding store.</li>
+        <li>Support/admin console.</li>
+        <li>Security review định kỳ.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>11. Checklist tổng hợp</h2>
+      <h3>Bắt buộc trước production</h3>
+      <ul class="checklist">
+        <li>Sửa order number race condition.</li>
+        <li>Clear cart đúng sau checkout.</li>
+        <li>Sanitize user API.</li>
+        <li>Ẩn/hash/reset PIN.</li>
+        <li>Thêm <code>productId</code> vào <code>OrderItem</code>.</li>
+        <li>Bỏ logic tìm product bằng <code>name</code>.</li>
+        <li>Transaction cho checkout/pay/return.</li>
+        <li>Bỏ mock dashboard production.</li>
+        <li>Validate promotion.</li>
+        <li>Fix cash shift stale UI.</li>
+        <li>Fix kitchen backlog/filter.</li>
+        <li>Thêm FK indexes.</li>
+        <li>Error handler JSON.</li>
+        <li>Test store isolation.</li>
+      </ul>
+
+      <h3>Nên làm trong bản beta nghiêm túc</h3>
+      <ul class="checklist">
+        <li>E2E Playwright cho luồng POS.</li>
+        <li>Concurrency test checkout.</li>
+        <li>Audit log.</li>
+        <li>RBAC chi tiết.</li>
+        <li>Rate limit auth/PIN.</li>
+        <li>Code split.</li>
+        <li>Accessibility label.</li>
+        <li>Monitoring/logging.</li>
+        <li>Backup/restore.</li>
+      </ul>
+
+      <h3>Nên làm để cạnh tranh</h3>
+      <ul class="checklist">
+        <li>QR order.</li>
+        <li>Offline sync.</li>
+        <li>HĐĐT/thuế.</li>
+        <li>Tích hợp giao đồ ăn.</li>
+        <li>CRM/loyalty.</li>
+        <li>Đa chi nhánh.</li>
+        <li>Quản lý máy in.</li>
+        <li>Báo cáo food cost/lãi lỗ.</li>
+        <li>App/tablet optimized.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>12. Đánh giá cuối</h2>
+      <p>Manager Coffee không phải là app vô dụng. Khung sản phẩm đã có nhiều module đúng hướng F&amp;B. Nhưng app POS không được đánh giá chỉ bằng việc “có màn hình” hay “bấm được”. POS phải đúng khi đông khách, không mất tiền, không sai kho, không lộ PIN, không hiển thị báo cáo giả, và không chết khi 2 người cùng checkout.</p>
+      <p>Nếu sửa hết P0/P1, app có thể lên mức beta vận hành nội bộ khá ổn. Nếu thêm offline, QR order, HĐĐT, CRM, giao đồ ăn, đa chi nhánh, audit/monitoring và UX tablet tốt, lúc đó mới có cơ sở nói đến việc cạnh tranh với các sản phẩm lớn.</p>
+      <p class="small">File này là bản HTML tĩnh, có thể mở bằng trình duyệt trên điện thoại sau khi chuyển file sang máy hoặc đưa lên hosting/nội bộ.</p>
+    </section>
+  </main>
+</body>
+</html>
