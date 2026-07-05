@@ -153,30 +153,45 @@ async function main() {
     });
     assert(emptyCheckout.status === 400, 'Checkout gio hang rong phai bi chan', emptyCheckout);
 
+    const checkoutClientRequestId = `smoke-checkout-${Date.now()}`;
+    const checkoutPayload = {
+      tableId: null,
+      tableName: 'Mang về',
+      cart: [{
+        id: product.id,
+        name: product.name,
+        price: product.price,
+        qty: 1,
+        sugar: '100%',
+        ice: 'Nhiều đá',
+        note: '',
+      }],
+      subtotal,
+      vatAmount,
+      total,
+      paymentMethod: 'cash',
+      employeeId: staffUser.id,
+      clientRequestId: checkoutClientRequestId,
+    };
+
     const checkout = await request('/api/orders/checkout', {
       method: 'POST',
-      headers: auth(staffToken),
-      body: JSON.stringify({
-        tableId: null,
-        tableName: 'Mang về',
-        cart: [{
-          id: product.id,
-          name: product.name,
-          price: product.price,
-          qty: 1,
-          sugar: '100%',
-          ice: 'Nhiều đá',
-          note: '',
-        }],
-        subtotal,
-        vatAmount,
-        total,
-        paymentMethod: 'cash',
-        employeeId: staffUser.id,
-      }),
+      headers: { ...auth(staffToken), 'Idempotency-Key': checkoutClientRequestId },
+      body: JSON.stringify(checkoutPayload),
     });
     assert(checkout.status === 200 && checkout.body?.status === 'paid', 'Checkout tien mat phai tao hoa don paid', checkout);
     assert(Array.isArray(checkout.body?.items) && checkout.body.items.length === 1, 'Hoa don phai co 1 dong san pham', checkout);
+
+    const duplicateCheckout = await request('/api/orders/checkout', {
+      method: 'POST',
+      headers: { ...auth(staffToken), 'Idempotency-Key': checkoutClientRequestId },
+      body: JSON.stringify(checkoutPayload),
+    });
+    assert(
+      duplicateCheckout.status === 200 && duplicateCheckout.body?.id === checkout.body.id,
+      'Checkout lap lai cung clientRequestId phai tra ve hoa don cu, khong tao hoa don moi',
+      duplicateCheckout
+    );
 
     const orders = await request('/api/orders', {
       headers: auth(staffToken),

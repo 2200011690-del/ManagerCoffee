@@ -97,6 +97,9 @@ async function main() {
     const health = await request('/api/health');
     assert(health.status === 200 && health.body?.ok === true, 'Health endpoint public phai hoat dong', health);
 
+    const ready = await request('/api/ready');
+    assert(ready.status === 200 && ready.body?.ok === true, 'Ready endpoint public phai kiem tra duoc database', ready);
+
     const noAuthUsers = await request('/api/users');
     assert(noAuthUsers.status === 401, 'API quan tri phai chan request khong token', noAuthUsers);
 
@@ -159,6 +162,15 @@ async function main() {
     });
     assert(systemStatus.status === 200 && systemStatus.body?.ok === true, 'Admin phai xem duoc system status', systemStatus);
 
+    const integrationsStatus = await request('/api/integrations/status', {
+      headers: { Authorization: `Bearer ${adminToken}` },
+    });
+    assert(
+      integrationsStatus.status === 200 && integrationsStatus.body?.payments?.vietQr,
+      'Admin phai xem duoc trang thai tich hop',
+      integrationsStatus
+    );
+
     const auditLogsAsStaff = await request('/api/audit-logs', {
       headers: { Authorization: `Bearer ${staffToken}` },
     });
@@ -178,6 +190,17 @@ async function main() {
       'Backup khong duoc lo PIN/password nhan vien',
       backup.body.users
     );
+
+    const restoreDryRun = await request('/api/backup/restore-catalog', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${adminToken}` },
+      body: JSON.stringify({
+        backup: backup.body,
+        confirmStoreCode: backup.body.store.code,
+        dryRun: true,
+      }),
+    });
+    assert(restoreDryRun.status === 200 && restoreDryRun.body?.dryRun === true, 'Restore catalog dry-run phai hoat dong', restoreDryRun);
 
     console.log('Smoke auth test passed.');
   } finally {

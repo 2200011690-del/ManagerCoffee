@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Settings, Save, Globe, Receipt, Gift, Percent, RefreshCw, AlertTriangle, CreditCard, Image as ImageIcon } from 'lucide-react';
+import { Settings, Save, Globe, Receipt, Gift, Percent, RefreshCw, AlertTriangle, CreditCard, Image as ImageIcon, Plug, CheckCircle } from 'lucide-react';
 import { api } from '../api';
 import { useUI } from '../context/UIContext';
 
@@ -10,6 +10,7 @@ export default function StoreSettingsPage() {
   const [saving, setSaving] = useState(false);
   const [printerIp, setPrinterIp] = useState(localStorage.getItem('lan_printer_ip') || '');
   const [testingPrint, setTestingPrint] = useState(false);
+  const [integrationStatus, setIntegrationStatus] = useState(null);
   const [settings, setSettings] = useState({
     name: '',
     code: '',
@@ -47,12 +48,27 @@ export default function StoreSettingsPage() {
           bankAccountName: data.bankAccountName || ''
         });
       }
+      try {
+        const status = await api.get('/integrations/status');
+        setIntegrationStatus(status);
+      } catch {
+        setIntegrationStatus(null);
+      }
     } catch {
       showNotification('Không thể tải cấu hình cửa hàng', 'error');
     } finally {
       setLoading(false);
     }
   };
+
+  const statusBadge = (ready, pendingText = 'Cần cấu hình') => (
+    <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold ${
+      ready ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-amber-50 text-amber-700 border border-amber-100'
+    }`}>
+      {ready ? <CheckCircle size={13} /> : <AlertTriangle size={13} />}
+      {ready ? 'Sẵn sàng' : pendingText}
+    </span>
+  );
 
   useEffect(() => {
     fetchSettings();
@@ -220,6 +236,19 @@ export default function StoreSettingsPage() {
           >
             <Receipt size={18} />
             <span>Thiết bị in LAN</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('integrations')}
+            className={`w-full min-h-[44px] flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold transition-all ${
+              activeTab === 'integrations'
+                ? 'bg-coffee-accent text-white shadow-md shadow-coffee-accent/20'
+                : 'text-coffee-medium hover:bg-cream-light/80 hover:text-coffee-dark'
+            }`}
+          >
+            <Plug size={18} />
+            <span>Tích hợp ngoài</span>
           </button>
         </div>
 
@@ -502,6 +531,67 @@ export default function StoreSettingsPage() {
                   <p className="text-[10px] text-coffee-medium/60 leading-relaxed">
                     * Lưu ý: Máy in phải kết nối chung mạng LAN với thiết bị này. Nếu bỏ trống, hệ thống sẽ tự động in bằng hộp thoại in của trình duyệt làm phương án dự phòng.
                   </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'integrations' && (
+            <div className="space-y-6 animate-fade-in">
+              <div className="border-b border-coffee-light/10 pb-4">
+                <h2 className="text-lg font-bold text-coffee-dark">Trạng thái tích hợp ngoài</h2>
+                <p className="text-xs text-coffee-medium/70">Theo dõi cấu hình thanh toán, hóa đơn điện tử, kênh giao đồ ăn và thiết bị tại quầy.</p>
+              </div>
+
+              <div className="divide-y divide-coffee-light/10 rounded-2xl border border-coffee-light/10 overflow-hidden">
+                <div className="flex items-center justify-between gap-4 p-4 bg-[#FCFBF8]">
+                  <div>
+                    <p className="text-sm font-bold text-coffee-dark">QR ngân hàng</p>
+                    <p className="text-xs text-coffee-medium/70 mt-0.5">
+                      {integrationStatus?.payments?.vietQr?.bankId || settings.bankId || 'Chưa chọn ngân hàng'} · {integrationStatus?.payments?.vietQr?.hasAccountNo ? 'Đã có số tài khoản' : 'Thiếu số tài khoản'}
+                    </p>
+                  </div>
+                  {statusBadge(Boolean(integrationStatus?.payments?.vietQr?.configured))}
+                </div>
+
+                <div className="flex items-center justify-between gap-4 p-4 bg-white">
+                  <div>
+                    <p className="text-sm font-bold text-coffee-dark">Webhook thanh toán</p>
+                    <p className="text-xs text-coffee-medium/70 mt-0.5">
+                      Đối soát theo mã cửa hàng; fallback toàn hệ thống chỉ bật trong dev/test.
+                    </p>
+                  </div>
+                  {statusBadge(Boolean(integrationStatus?.payments?.webhook?.protected), 'Nên thêm secret')}
+                </div>
+
+                <div className="flex items-center justify-between gap-4 p-4 bg-[#FCFBF8]">
+                  <div>
+                    <p className="text-sm font-bold text-coffee-dark">Hóa đơn điện tử</p>
+                    <p className="text-xs text-coffee-medium/70 mt-0.5">
+                      {integrationStatus?.invoice?.provider || 'Chưa chọn nhà cung cấp HĐĐT'}
+                    </p>
+                  </div>
+                  {statusBadge(Boolean(integrationStatus?.invoice?.configured))}
+                </div>
+
+                <div className="flex items-center justify-between gap-4 p-4 bg-white">
+                  <div>
+                    <p className="text-sm font-bold text-coffee-dark">GrabFood / ShopeeFood</p>
+                    <p className="text-xs text-coffee-medium/70 mt-0.5">
+                      GrabFood: {integrationStatus?.delivery?.grabFood?.configured ? 'đã cấu hình' : 'thiếu API key'} · ShopeeFood: {integrationStatus?.delivery?.shopeeFood?.configured ? 'đã cấu hình' : 'thiếu API key'}
+                    </p>
+                  </div>
+                  {statusBadge(Boolean(integrationStatus?.delivery?.grabFood?.configured && integrationStatus?.delivery?.shopeeFood?.configured))}
+                </div>
+
+                <div className="flex items-center justify-between gap-4 p-4 bg-[#FCFBF8]">
+                  <div>
+                    <p className="text-sm font-bold text-coffee-dark">Máy in bill LAN</p>
+                    <p className="text-xs text-coffee-medium/70 mt-0.5">
+                      {printerIp ? `IP quầy này: ${printerIp}` : 'Chưa lưu IP máy in trên trình duyệt này'}
+                    </p>
+                  </div>
+                  {statusBadge(Boolean(printerIp), 'Dùng in trình duyệt')}
                 </div>
               </div>
             </div>

@@ -10,6 +10,8 @@
     "test:smoke": "node scripts/smoke-auth.cjs",
     "test:smoke:sales": "node scripts/smoke-sales.cjs",
     "test:smoke:shifts": "node scripts/smoke-shifts.cjs",
+    "backup:store": "node scripts/backup-store.cjs",
+    "restore:catalog": "node scripts/restore-store-catalog.cjs",
     "migrate:pins": "node scripts/migrate-pin-hashes.cjs",
     "preview": "vite preview",
     "server": "npm run start --prefix server",

@@ -9,82 +9,82 @@ generator client {
 }
 
 model Store {
-  id        String   @id @default(cuid())
-  name      String
-  code      String   @unique // e.g. espresso-lab
-  address   String?
-  phone     String?
-  logo      String?
-  vatRate   Float    @default(0.08) // 8% VAT
-  pointsRate Float   @default(0.1)  // 10% of total = points
-  currency  String   @default("VNĐ")
-  printHeader String? // Custom header text for receipts
-  printFooter String? // Custom footer text for receipts
+  id              String   @id @default(cuid())
+  name            String
+  code            String   @unique // e.g. espresso-lab
+  address         String?
+  phone           String?
+  logo            String?
+  vatRate         Float    @default(0.08) // 8% VAT
+  pointsRate      Float    @default(0.1) // 10% of total = points
+  currency        String   @default("VNĐ")
+  printHeader     String? // Custom header text for receipts
+  printFooter     String? // Custom footer text for receipts
   bankId          String?  @default("MB")
   bankAccountNo   String?  @default("")
   bankAccountName String?  @default("")
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
 
-  users      User[]
-  products   Product[]
-  tables     Table[]
-  orders     Order[]
-  customers  Customer[]
-  vouchers   Voucher[]
-  inventories Inventory[]
-  suppliers   Supplier[]
+  users        User[]
+  products     Product[]
+  tables       Table[]
+  orders       Order[]
+  customers    Customer[]
+  vouchers     Voucher[]
+  inventories  Inventory[]
+  suppliers    Supplier[]
   transactions StockTransaction[]
-  attendances Attendance[]
-  cashShifts  CashShift[]
+  attendances  Attendance[]
+  cashShifts   CashShift[]
   returnOrders ReturnOrder[]
   heldOrders   HeldOrder[]
-  promotions     Promotion[]
-  auditLogs      AuditLog[]
+  promotions   Promotion[]
+  auditLogs    AuditLog[]
 }
 
 model User {
-  id      String  @id @default(cuid())
-  storeId String
-  store   Store   @relation(fields: [storeId], references: [id], onDelete: Cascade)
-  pin     String?  
-  pinHash String?
-  email   String? @unique
-  password String?
-  name    String
-  role             String  // "admin" or "staff"
-  canApplyDiscount Boolean @default(true)
-  canRefund        Boolean @default(true)
-  canViewReports   Boolean @default(false)
-  maxDiscountPct   Float   @default(100.0)
+  id               String       @id @default(cuid())
+  storeId          String
+  store            Store        @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  pin              String?
+  pinHash          String?
+  email            String?      @unique
+  password         String?
+  name             String
+  role             String // "admin" or "staff"
+  canApplyDiscount Boolean      @default(true)
+  canRefund        Boolean      @default(true)
+  canViewReports   Boolean      @default(false)
+  maxDiscountPct   Float        @default(100.0)
   orders           Order[]
   attendances      Attendance[]
   cashShifts       CashShift[]
 
   // Profiles
-  phone        String?
-  address      String?
-  cccd         String?
-  dateOfBirth  String?
-  startDate    String?
-  hourlyRate   Float    @default(25000)
+  phone       String?
+  address     String?
+  cccd        String?
+  dateOfBirth String?
+  startDate   String?
+  hourlyRate  Float   @default(25000)
 
   @@unique([storeId, pin])
   @@index([storeId])
 }
 
 model Product {
-  id          String  @id @default(cuid())
+  id          String       @id @default(cuid())
   storeId     String
-  store       Store   @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  store       Store        @relation(fields: [storeId], references: [id], onDelete: Cascade)
   name        String
   price       Float
   category    String
   description String?
   image       String?
-  popular     Boolean @default(false)
-  prepTime    String? @default("5 phút")
-  hidden      Boolean @default(false)
+  popular     Boolean      @default(false)
+  prepTime    String?      @default("5 phút")
+  hidden      Boolean      @default(false)
   recipes     RecipeItem[]
   orderItems  OrderItem[]
 
@@ -105,41 +105,43 @@ model Table {
 }
 
 model Order {
-  id             String      @id @default(cuid())
-  storeId        String
-  store          Store       @relation(fields: [storeId], references: [id], onDelete: Cascade)
-  orderNumber    String      
-  tableId        String?
-  tableName      String
-  subtotal       Float
-  vatAmount      Float
-  total          Float
-  paymentMethod  String      // "cash", "card", "mixed"
-  status         String      @default("paid") // "pending", "paid", "cancelled", "returned"
-  prepStatus     String      @default("pending") // "pending", "preparing", "completed"
-  time           String
-  date           String
-  timestamp      DateTime    @default(now())
-  items          OrderItem[]
+  id              String      @id @default(cuid())
+  storeId         String
+  store           Store       @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  orderNumber     String
+  clientRequestId String?
+  tableId         String?
+  tableName       String
+  subtotal        Float
+  vatAmount       Float
+  total           Float
+  paymentMethod   String // "cash", "card", "mixed"
+  status          String      @default("paid") // "pending", "paid", "cancelled", "returned"
+  prepStatus      String      @default("pending") // "pending", "preparing", "completed"
+  time            String
+  date            String
+  timestamp       DateTime    @default(now())
+  items           OrderItem[]
 
   customerId     String?
-  customer       Customer?   @relation(fields: [customerId], references: [id])
+  customer       Customer? @relation(fields: [customerId], references: [id])
   voucherCode    String?
-  discountAmount Float?      @default(0)
+  discountAmount Float?    @default(0)
   employeeId     String?
-  employee       User?       @relation(fields: [employeeId], references: [id])
+  employee       User?     @relation(fields: [employeeId], references: [id])
 
   // Phase 1: Flexible discount fields
-  orderDiscount     Float?    @default(0)  // Discount value on entire order
-  orderDiscountType String?   // "PERCENT" or "FIXED"
-  discountReason    String?   // Reason for discount (anti-fraud)
-  usedPoints        Int?      @default(0)
+  orderDiscount     Float?  @default(0) // Discount value on entire order
+  orderDiscountType String? // "PERCENT" or "FIXED"
+  discountReason    String? // Reason for discount (anti-fraud)
+  usedPoints        Int?    @default(0)
 
   // Relations
-  returnOrders   ReturnOrder[]
-  payments       OrderPayment[]
+  returnOrders ReturnOrder[]
+  payments     OrderPayment[]
 
   @@unique([storeId, orderNumber])
+  @@unique([storeId, clientRequestId])
   @@index([storeId])
   @@index([storeId, timestamp])
   @@index([storeId, employeeId, timestamp])
@@ -147,35 +149,35 @@ model Order {
 }
 
 model OrderItem {
-  id       String  @id @default(cuid())
-  orderId  String
-  order    Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  productId String?
-  product   Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
-  name     String
-  price    Float
-  qty      Int
-  sugar    String?
-  ice      String?
-  note     String?
+  id           String   @id @default(cuid())
+  orderId      String
+  order        Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId    String?
+  product      Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  name         String
+  price        Float
+  qty          Int
+  sugar        String?
+  ice          String?
+  note         String?
   // Phase 1: Per-item discount
-  discount      Float?  @default(0)  // Discount amount on this item
-  discountType  String? // "PERCENT" or "FIXED"
-  returnedQty   Int     @default(0)  // Quantity returned
+  discount     Float?   @default(0) // Discount amount on this item
+  discountType String? // "PERCENT" or "FIXED"
+  returnedQty  Int      @default(0) // Quantity returned
 
   @@index([orderId])
   @@index([productId])
 }
 
 model Inventory {
-  id       String  @id @default(cuid())
-  storeId  String
-  store    Store   @relation(fields: [storeId], references: [id], onDelete: Cascade)
-  name     String
-  unit     String
-  qty      Float
-  minQty   Float
-  icon     String?
+  id      String  @id @default(cuid())
+  storeId String
+  store   Store   @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  name    String
+  unit    String
+  qty     Float
+  minQty  Float
+  icon    String?
 
   recipes      RecipeItem[]
   transactions StockTransaction[]
@@ -204,7 +206,7 @@ model Supplier {
   email     String?
   address   String?
   createdAt DateTime @default(now())
-  
+
   transactions StockTransaction[]
 
   @@index([storeId])
@@ -216,7 +218,7 @@ model StockTransaction {
   store       Store     @relation(fields: [storeId], references: [id], onDelete: Cascade)
   inventoryId String
   inventory   Inventory @relation(fields: [inventoryId], references: [id], onDelete: Cascade)
-  type        String    // "IMPORT", "EXPORT", "ADJUST", "SALE"
+  type        String // "IMPORT", "EXPORT", "ADJUST", "SALE"
   qtyChange   Float
   balance     Float
   cost        Float?
@@ -235,7 +237,7 @@ model Customer {
   storeId   String
   store     Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
   name      String
-  phone     String   
+  phone     String
   points    Int      @default(0)
   tier      String   @default("SILVER") // SILVER, GOLD, DIAMOND
   createdAt DateTime @default(now())
@@ -248,8 +250,8 @@ model Voucher {
   id            String    @id @default(cuid())
   storeId       String
   store         Store     @relation(fields: [storeId], references: [id], onDelete: Cascade)
-  code          String    
-  type          String    // PERCENT, FIXED
+  code          String
+  type          String // PERCENT, FIXED
   value         Float
   minOrderValue Float     @default(0)
   maxDiscount   Float?
@@ -267,7 +269,7 @@ model Attendance {
   user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   clockIn    DateTime  @default(now())
   clockOut   DateTime?
-  date       String    // YYYY-MM-DD
+  date       String // YYYY-MM-DD
   totalHours Float?
   imageIn    String?
   imageOut   String?
@@ -298,19 +300,19 @@ model CashShift {
 
 // Phase 1: Return/Refund
 model ReturnOrder {
-  id            String       @id @default(cuid())
-  storeId       String
-  store         Store        @relation(fields: [storeId], references: [id], onDelete: Cascade)
-  orderId       String
-  order         Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  returnNumber  String       // e.g. #TH001
-  reason        String
-  refundAmount  Float
-  refundMethod  String       // "cash", "card", "store_credit"
-  employeeId    String?
-  status        String       @default("completed") // "completed", "cancelled"
-  createdAt     DateTime     @default(now())
-  items         ReturnItem[]
+  id           String       @id @default(cuid())
+  storeId      String
+  store        Store        @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  orderId      String
+  order        Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  returnNumber String // e.g. #TH001
+  reason       String
+  refundAmount Float
+  refundMethod String // "cash", "card", "store_credit"
+  employeeId   String?
+  status       String       @default("completed") // "completed", "cancelled"
+  createdAt    DateTime     @default(now())
+  items        ReturnItem[]
 
   @@index([storeId])
   @@index([orderId])
@@ -330,17 +332,17 @@ model ReturnItem {
 
 // Phase 1: Hold Order (Pending)
 model HeldOrder {
-  id          String          @id @default(cuid())
-  storeId     String
-  store       Store           @relation(fields: [storeId], references: [id], onDelete: Cascade)
-  tableId     String?
-  tableName   String          @default("Mang về")
-  note        String?
-  employeeId  String?
+  id           String          @id @default(cuid())
+  storeId      String
+  store        Store           @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  tableId      String?
+  tableName    String          @default("Mang về")
+  note         String?
+  employeeId   String?
   employeeName String?
-  customerId  String?
-  createdAt   DateTime        @default(now())
-  items       HeldOrderItem[]
+  customerId   String?
+  createdAt    DateTime        @default(now())
+  items        HeldOrderItem[]
 
   @@index([storeId])
 }
@@ -362,29 +364,29 @@ model HeldOrderItem {
 
 // Phase 1: Split Payment
 model OrderPayment {
-  id            String  @id @default(cuid())
-  orderId       String
-  order         Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  method        String  // "cash", "card", "transfer", "momo", "zalopay"
-  amount        Float
-  reference     String? // Transaction reference if applicable
+  id        String  @id @default(cuid())
+  orderId   String
+  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  method    String // "cash", "card", "transfer", "momo", "zalopay"
+  amount    Float
+  reference String? // Transaction reference if applicable
 
   @@index([orderId])
 }
 
 // Phase 3: Advanced Promotions
 model Promotion {
-  id          String    @id @default(cuid())
-  storeId     String
-  store       Store     @relation(fields: [storeId], references: [id], onDelete: Cascade)
-  name        String
-  type        String    // "HAPPY_HOUR", "COMBO", "BUY_X_GET_Y"
-  conditions  String    // JSON config string
-  rewards     String    // JSON config string
-  startDate   DateTime?
-  endDate     DateTime?
-  isActive    Boolean   @default(true)
-  createdAt   DateTime  @default(now())
+  id         String    @id @default(cuid())
+  storeId    String
+  store      Store     @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  name       String
+  type       String // "HAPPY_HOUR", "COMBO", "BUY_X_GET_Y"
+  conditions String // JSON config string
+  rewards    String // JSON config string
+  startDate  DateTime?
+  endDate    DateTime?
+  isActive   Boolean   @default(true)
+  createdAt  DateTime  @default(now())
 
   @@index([storeId])
 }

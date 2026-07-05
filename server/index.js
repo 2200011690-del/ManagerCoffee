@@ -74,7 +74,19 @@ function getVNLocaleDateStr(date = new Date()) {
 // ===== END TIMEZONE HELPERS =====
 
 app.use(cors({ origin: allowedOrigins, credentials: true }));
-app.use(express.json());
+app.use(express.json({ limit: process.env.JSON_BODY_LIMIT || '5mb' }));
+
+app.use((req, res, next) => {
+  const startedAt = Date.now();
+  res.on('finish', () => {
+    if (!req.path.startsWith('/api/')) return;
+    const durationMs = Date.now() - startedAt;
+    if (durationMs > 1000) {
+      console.warn(`[SLOW_API] ${req.method} ${req.originalUrl} ${res.statusCode} ${durationMs}ms`);
+    }
+  });
+  next();
+});
 
 const isAdminUser = (user) => user?.role === 'admin';
 const canViewReports = (user) => isAdminUser(user) || user?.canViewReports === true;
@@ -163,6 +175,46 @@ async function nextReturnNumber(tx, storeId) {
 
 function normalizeCartProductId(item) {
   return item.productId || item.id || null;
+}
+
+function hasText(value) {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
+function envConfigured(...keys) {
+  return keys.every((key) => hasText(process.env[key]));
+}
+
+function sanitizeClientRequestId(value) {
+  if (!value) return null;
+  const clean = String(value).trim();
+  if (!clean) return null;
+  return clean.replace(/[^a-zA-Z0-9._:-]/g, '').slice(0, 128) || null;
+}
+
+function amountsMatch(webhookAmount, orderTotal) {
+  if (webhookAmount === undefined || webhookAmount === null || webhookAmount === '') return true;
+  const parsedWebhookAmount = Number(webhookAmount);
+  const parsedOrderTotal = Number(orderTotal);
+  if (!Number.isFinite(parsedWebhookAmount) || !Number.isFinite(parsedOrderTotal)) return false;
+  return Math.abs(parsedWebhookAmount - parsedOrderTotal) <= 1;
+}
+
+function isPrivateLanIp(ip) {
+  const parts = String(ip || '').trim().split('.').map((part) => Number(part));
+  if (parts.length !== 4 || parts.some((part) => !Number.isInteger(part) || part < 0 || part > 255)) return false;
+  const [a, b] = parts;
+  return a === 10 || a === 127 || (a === 192 && b === 168) || (a === 172 && b >= 16 && b <= 31);
+}
+
+function safeArray(value) {
+  return Array.isArray(value) ? value : [];
+}
+
+function nullableDate(value) {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
 }
 
 function resolveCashAmount(order, fallbackPaymentMethod = null, fallbackTotal = null, payments = null) {
@@ -430,6 +482,7 @@ app.use((req, res, next) => {
   // Cho phép bỏ qua kiểm tra đăng nhập/đăng ký/webhook PayOS
   if (
     req.path === '/api/health' ||
+    req.path === '/api/ready' ||
     req.path === '/api/auth/login' || 
     req.path === '/api/auth/login-admin' ||
     req.path === '/api/auth/register-store' ||
@@ -469,10 +522,22 @@ app.use((req, res, next) => {
 // --- API ENDPOINTS ---
 
 app.get('/api/health', async (req, res) => {
+  res.json({
+    ok: true,
+    status: 'live',
+    service: 'manager-coffee-api',
+    env: process.env.NODE_ENV || 'development',
+    uptimeSec: Math.round(process.uptime()),
+    time: new Date().toISOString()
+  });
+});
+
+app.get('/api/ready', async (req, res) => {
   try {
     await prisma.$queryRaw`SELECT 1`;
     res.json({
       ok: true,
+      status: 'ready',
       service: 'manager-coffee-api',
       env: process.env.NODE_ENV || 'development',
       time: new Date().toISOString()
@@ -518,6 +583,65 @@ app.get('/api/system/status', async (req, res) => {
         openShifts,
         lowStockItems,
         pendingOrders
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.get('/api/integrations/status', async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  try {
+    const store = await prisma.store.findUnique({
+      where: { id: req.storeId },
+      select: {
+        bankId: true,
+        bankAccountNo: true,
+        bankAccountName: true
+      }
+    });
+
+    res.json({
+      ok: true,
+      time: new Date().toISOString(),
+      payments: {
+        vietQr: {
+          configured: Boolean(store?.bankId && store?.bankAccountNo),
+          bankId: store?.bankId || null,
+          hasAccountNo: Boolean(store?.bankAccountNo),
+          hasAccountName: Boolean(store?.bankAccountName)
+        },
+        webhook: {
+          provider: 'payos-or-bank-webhook',
+          protected: envConfigured('PAYMENT_WEBHOOK_SECRET'),
+          scopedByStoreCode: true,
+          unscopedFallbackEnabled: !IS_PRODUCTION && process.env.PAYMENT_WEBHOOK_ALLOW_UNSCOPED_MATCH === '1'
+        },
+        simulation: {
+          enabled: !IS_PRODUCTION
+        }
+      },
+      invoice: {
+        provider: process.env.EINVOICE_PROVIDER || null,
+        configured: envConfigured('EINVOICE_PROVIDER', 'EINVOICE_API_URL', 'EINVOICE_API_KEY'),
+        needsRealProviderContract: true
+      },
+      delivery: {
+        grabFood: {
+          configured: envConfigured('GRABFOOD_API_URL', 'GRABFOOD_API_KEY')
+        },
+        shopeeFood: {
+          configured: envConfigured('SHOPEEFOOD_API_URL', 'SHOPEEFOOD_API_KEY')
+        },
+        webOrder: {
+          configured: envConfigured('WEB_ORDER_SECRET')
+        }
+      },
+      printer: {
+        lanEscpos: true,
+        browserFallback: true,
+        deviceConfigScope: 'this-browser'
       }
     });
   } catch (err) {
@@ -598,6 +722,207 @@ app.get('/api/backup/export', async (req, res) => {
     res.json(payload);
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/backup/restore-catalog', async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const { backup, confirmStoreCode, dryRun = false } = req.body || {};
+
+  if (!backup || typeof backup !== 'object') {
+    return res.status(400).json({ error: 'Thiếu dữ liệu backup hợp lệ để khôi phục' });
+  }
+
+  try {
+    const storeId = req.storeId;
+    const currentStore = await prisma.store.findUnique({ where: { id: storeId } });
+    if (!currentStore) return res.status(404).json({ error: 'Cửa hàng không tồn tại' });
+    if (confirmStoreCode !== currentStore.code) {
+      return res.status(400).json({ error: `Để khôi phục catalog, confirmStoreCode phải đúng bằng "${currentStore.code}"` });
+    }
+
+    const products = safeArray(backup.products);
+    const tables = safeArray(backup.tables);
+    const inventory = safeArray(backup.inventory);
+    const suppliers = safeArray(backup.suppliers);
+    const vouchers = safeArray(backup.vouchers);
+    const promotions = safeArray(backup.promotions);
+    const summary = {
+      products: products.length,
+      tables: tables.length,
+      inventory: inventory.length,
+      suppliers: suppliers.length,
+      vouchers: vouchers.length,
+      promotions: promotions.length,
+      recipes: products.reduce((sum, product) => sum + safeArray(product.recipes).length, 0)
+    };
+
+    if (dryRun) {
+      return res.json({ ok: true, dryRun: true, wouldRestore: summary });
+    }
+
+    await prisma.$transaction(async (tx) => {
+      const existingProducts = await tx.product.findMany({
+        where: { storeId },
+        select: { id: true }
+      });
+      const existingProductIds = existingProducts.map((product) => product.id);
+
+      if (existingProductIds.length > 0) {
+        await tx.recipeItem.deleteMany({ where: { productId: { in: existingProductIds } } });
+      }
+      await tx.promotion.deleteMany({ where: { storeId } });
+      await tx.voucher.deleteMany({ where: { storeId } });
+      await tx.table.deleteMany({ where: { storeId } });
+      await tx.stockTransaction.deleteMany({ where: { storeId } });
+      await tx.product.deleteMany({ where: { storeId } });
+      await tx.inventory.deleteMany({ where: { storeId } });
+      await tx.supplier.deleteMany({ where: { storeId } });
+
+      const sourceStore = backup.store || {};
+      await tx.store.update({
+        where: { id: storeId },
+        data: {
+          name: sourceStore.name || currentStore.name,
+          address: sourceStore.address ?? currentStore.address,
+          phone: sourceStore.phone ?? currentStore.phone,
+          logo: sourceStore.logo ?? currentStore.logo,
+          vatRate: Number.isFinite(Number(sourceStore.vatRate)) ? Number(sourceStore.vatRate) : currentStore.vatRate,
+          pointsRate: Number.isFinite(Number(sourceStore.pointsRate)) ? Number(sourceStore.pointsRate) : currentStore.pointsRate,
+          currency: sourceStore.currency || currentStore.currency,
+          printHeader: sourceStore.printHeader ?? currentStore.printHeader,
+          printFooter: sourceStore.printFooter ?? currentStore.printFooter,
+          bankId: sourceStore.bankId ?? currentStore.bankId,
+          bankAccountNo: sourceStore.bankAccountNo ?? currentStore.bankAccountNo,
+          bankAccountName: sourceStore.bankAccountName ?? currentStore.bankAccountName
+        }
+      });
+
+      if (tables.length > 0) {
+        await tx.table.createMany({
+          data: tables.map((table) => ({
+            id: table.id || undefined,
+            storeId,
+            name: table.name || 'Bàn',
+            zone: table.zone || 'Khu vực chính',
+            capacity: Number(table.capacity) || 2,
+            status: table.status || 'available',
+            occupiedSince: table.occupiedSince || null
+          }))
+        });
+      }
+
+      if (suppliers.length > 0) {
+        await tx.supplier.createMany({
+          data: suppliers.map((supplier) => ({
+            id: supplier.id || undefined,
+            storeId,
+            name: supplier.name || 'Nhà cung cấp',
+            phone: supplier.phone || null,
+            email: supplier.email || null,
+            address: supplier.address || null,
+            createdAt: nullableDate(supplier.createdAt) || new Date()
+          }))
+        });
+      }
+
+      if (inventory.length > 0) {
+        await tx.inventory.createMany({
+          data: inventory.map((item) => ({
+            id: item.id || undefined,
+            storeId,
+            name: item.name || 'Nguyên liệu',
+            unit: item.unit || 'đơn vị',
+            qty: Number(item.qty) || 0,
+            minQty: Number(item.minQty) || 0,
+            icon: item.icon || null
+          }))
+        });
+      }
+
+      if (products.length > 0) {
+        await tx.product.createMany({
+          data: products.map((product) => ({
+            id: product.id || undefined,
+            storeId,
+            name: product.name || 'Sản phẩm',
+            price: Number(product.price) || 0,
+            category: product.category || 'Khác',
+            description: product.description || null,
+            image: product.image || null,
+            popular: Boolean(product.popular),
+            prepTime: product.prepTime || '5 phút',
+            hidden: Boolean(product.hidden)
+          }))
+        });
+
+        const recipeRows = products.flatMap((product) =>
+          safeArray(product.recipes)
+            .filter((recipe) => recipe.productId && recipe.inventoryId)
+            .map((recipe) => ({
+              id: recipe.id || undefined,
+              productId: recipe.productId,
+              inventoryId: recipe.inventoryId,
+              qty: Number(recipe.qty) || 0
+            }))
+        );
+        if (recipeRows.length > 0) {
+          await tx.recipeItem.createMany({ data: recipeRows, skipDuplicates: true });
+        }
+      }
+
+      if (vouchers.length > 0) {
+        await tx.voucher.createMany({
+          data: vouchers.map((voucher) => ({
+            id: voucher.id || undefined,
+            storeId,
+            code: String(voucher.code || '').trim().toUpperCase(),
+            type: voucher.type === 'FIXED' ? 'FIXED' : 'PERCENT',
+            value: Number(voucher.value) || 0,
+            minOrderValue: Number(voucher.minOrderValue) || 0,
+            maxDiscount: voucher.maxDiscount === null || voucher.maxDiscount === undefined ? null : Number(voucher.maxDiscount),
+            expiryDate: nullableDate(voucher.expiryDate),
+            isActive: voucher.isActive !== false
+          })).filter((voucher) => voucher.code)
+        });
+      }
+
+      if (promotions.length > 0) {
+        await tx.promotion.createMany({
+          data: promotions.map((promotion) => ({
+            id: promotion.id || undefined,
+            storeId,
+            name: promotion.name || 'Khuyến mãi',
+            type: promotion.type || 'HAPPY_HOUR',
+            conditions: typeof promotion.conditions === 'string' ? promotion.conditions : JSON.stringify(promotion.conditions || {}),
+            rewards: typeof promotion.rewards === 'string' ? promotion.rewards : JSON.stringify(promotion.rewards || {}),
+            startDate: nullableDate(promotion.startDate),
+            endDate: nullableDate(promotion.endDate),
+            isActive: promotion.isActive !== false,
+            createdAt: nullableDate(promotion.createdAt) || new Date()
+          }))
+        });
+      }
+
+      await tx.auditLog.create({
+        data: {
+          storeId,
+          userId: req.user?.userId || null,
+          userName: req.user?.name || null,
+          userRole: req.user?.role || null,
+          action: 'restore',
+          entity: 'backupCatalog',
+          entityId: storeId,
+          metadata: JSON.stringify(summary),
+          ip: req.ip || null,
+          userAgent: req.headers['user-agent'] || null
+        }
+      });
+    }, { maxWait: 10000, timeout: 30000 });
+
+    res.json({ ok: true, restored: summary });
+  } catch (err) {
+    res.status(500).json({ error: 'Không thể khôi phục catalog: ' + err.message });
   }
 });
 
@@ -1438,10 +1763,22 @@ async function handleCheckout(req, res) {
     orderDiscount, orderDiscountType, discountReason,
     payments,
     status, // "pending" hoặc "paid"
-    usedPoints
+    usedPoints,
+    clientRequestId: bodyClientRequestId
   } = req.body;
   const storeId = req.storeId;
   const orderStatus = status || 'paid';
+  const clientRequestId = sanitizeClientRequestId(bodyClientRequestId || req.headers['idempotency-key']);
+
+  if (clientRequestId) {
+    const existingOrder = await prisma.order.findFirst({
+      where: { storeId, clientRequestId },
+      include: { items: true, employee: true, payments: true, customer: true }
+    });
+    if (existingOrder) {
+      return res.json(existingOrder);
+    }
+  }
 
   if (!Array.isArray(cart) || cart.length === 0) {
     return res.status(400).json({ error: 'Giỏ hàng trống hoặc không hợp lệ' });
@@ -1471,13 +1808,26 @@ async function handleCheckout(req, res) {
   const date = new Date();
   const dateStr = getVNLocaleDateStr(date);
   const timeStr = getVNTimeStr(date);
+  let reusedIdempotentOrder = false;
   
   const order = await prisma.$transaction(async (tx) => {
+    if (clientRequestId) {
+      const existingOrder = await tx.order.findFirst({
+        where: { storeId, clientRequestId },
+        include: { items: true, employee: true, payments: true, customer: true }
+      });
+      if (existingOrder) {
+        reusedIdempotentOrder = true;
+        return existingOrder;
+      }
+    }
+
     const orderNumber = await nextOrderNumber(tx, storeId);
     const createdOrder = await tx.order.create({
       data: {
         storeId,
         orderNumber,
+        clientRequestId,
         tableId,
         tableName: tableName || 'Mang về',
         subtotal,
@@ -1528,6 +1878,10 @@ async function handleCheckout(req, res) {
     return createdOrder;
   }, { maxWait: 10000, timeout: 20000 });
 
+  if (reusedIdempotentOrder) {
+    return res.json(order);
+  }
+
   if (orderStatus === 'paid') {
     if (tableId) {
       const table = await prisma.table.findFirst({ where: { id: tableId, storeId } });
@@ -1541,6 +1895,7 @@ async function handleCheckout(req, res) {
 
   await writeAuditLog(req, 'checkout', 'order', order.id, {
     orderNumber: order.orderNumber,
+    clientRequestId: order.clientRequestId,
     status: order.status,
     total: order.total,
     paymentMethod: order.paymentMethod,
@@ -3112,8 +3467,10 @@ function normalizeString(str) {
 app.post('/api/payments/create-qr', async (req, res) => {
   const { amount, orderNumber } = req.body;
   const storeId = req.storeId;
+  const numericAmount = Number(amount);
+  const cleanOrderNumber = String(orderNumber || '').trim();
   
-  if (!amount || !orderNumber) {
+  if (!Number.isFinite(numericAmount) || numericAmount <= 0 || !cleanOrderNumber) {
     return res.status(400).json({ error: 'Thiếu số tiền hoặc mã đơn hàng' });
   }
 
@@ -3136,18 +3493,18 @@ app.post('/api/payments/create-qr', async (req, res) => {
     }
 
     // Tạo mã nội dung chuyển khoản đặc trưng cho từng cửa hàng: storeCode-orderNumber
-    const transferContent = `${store.code}-${orderNumber}`;
+    const transferContent = `${store.code}-${cleanOrderNumber}`;
 
     // Tạo mã VietQR qua API miễn phí của VietQR.io (compact2: chỉ hiển thị QR và số tiền tối giản)
-    const qrUrl = `https://img.vietqr.io/image/${bankId}-${bankAccountNo}-compact2.png?amount=${amount}&addInfo=${encodeURIComponent(transferContent)}&accountName=${encodeURIComponent(bankAccountName)}`;
+    const qrUrl = `https://img.vietqr.io/image/${bankId}-${bankAccountNo}-compact2.png?amount=${Math.round(numericAmount)}&addInfo=${encodeURIComponent(transferContent)}&accountName=${encodeURIComponent(bankAccountName)}`;
 
     res.json({
       qrUrl,
       bankId,
       bankAccountNo,
       bankAccountName,
-      amount,
-      orderNumber,
+      amount: numericAmount,
+      orderNumber: cleanOrderNumber,
       transferContent
     });
   } catch (err) {
@@ -3156,6 +3513,7 @@ app.post('/api/payments/create-qr', async (req, res) => {
 });
 
 app.post('/api/payments/simulate-success', async (req, res) => {
+  if (IS_PRODUCTION && !requireAdmin(req, res)) return;
   const { orderNumber } = req.body;
   const storeId = req.storeId;
   if (!orderNumber) return res.status(400).json({ error: 'Thiếu mã đơn hàng cần mô phỏng' });
@@ -3181,12 +3539,20 @@ app.post('/api/payments/simulate-success', async (req, res) => {
 });
 
 app.post('/api/payments/payos-webhook', async (req, res) => {
+  if (process.env.PAYMENT_WEBHOOK_SECRET) {
+    const providedSecret = req.headers['x-webhook-secret'] || req.headers['x-payos-secret'];
+    if (providedSecret !== process.env.PAYMENT_WEBHOOK_SECRET) {
+      return res.status(401).json({ success: false, error: 'Webhook secret không hợp lệ' });
+    }
+  }
+
   const payload = req.body;
   console.log('PayOS Webhook received payload:', payload);
   
   const data = payload.data;
   if (data) {
     const description = data.description;
+    const webhookAmount = data.amount ?? data.transferAmount ?? data.paymentAmount;
     if (description) {
       try {
         const normalizedDesc = normalizeString(description);
@@ -3213,25 +3579,41 @@ app.post('/api/payments/payos-webhook', async (req, res) => {
           // Đối chiếu mã đơn hàng (đã loại bỏ ký tự đặc biệt)
           const pendingOrder = pendingOrders.find(o => normalizeString(o.orderNumber) === matchedOrderNumber);
           if (pendingOrder) {
-            await completeOrderPayment(pendingOrder.id, pendingOrder.storeId);
+            if (!amountsMatch(webhookAmount, pendingOrder.total)) {
+              console.warn(`[PAYOS] Từ chối webhook sai số tiền cho đơn ${pendingOrder.orderNumber}. Webhook=${webhookAmount}, order=${pendingOrder.total}`);
+              return res.json({ success: true, ignored: true, reason: 'amount_mismatch' });
+            }
+            const paidOrder = await completeOrderPayment(pendingOrder.id, pendingOrder.storeId);
             console.log(`[PAYOS] Đã đối soát đơn hàng ${pendingOrder.orderNumber} cho store ${matchedStore.name} thành công.`);
+            if (paidOrder) {
+              await prisma.auditLog.create({
+                data: {
+                  storeId: pendingOrder.storeId,
+                  action: 'webhook_pay',
+                  entity: 'order',
+                  entityId: pendingOrder.id,
+                  metadata: JSON.stringify({ orderNumber: pendingOrder.orderNumber, amount: webhookAmount ?? null, provider: 'payos' })
+                }
+              });
+            }
             broadcast('paymentSuccess', { orderNumber: pendingOrder.orderNumber }, pendingOrder.storeId);
             return res.json({ success: true });
           }
         }
         
-        // Fallback: Tìm đơn hàng trùng khớp mã đơn hàng trên toàn hệ thống
-        const allPendingOrders = await prisma.order.findMany({
-          where: { status: 'pending' }
-        });
-        const matchedFallback = allPendingOrders.find(o => {
-          const oNorm = normalizeString(o.orderNumber);
-          return normalizedDesc.includes(oNorm);
-        });
-        if (matchedFallback) {
-          await completeOrderPayment(matchedFallback.id, matchedFallback.storeId);
-          console.log(`[PAYOS - Fallback] Đã đối soát đơn hàng ${matchedFallback.orderNumber} của store ${matchedFallback.storeId} thành công.`);
-          broadcast('paymentSuccess', { orderNumber: matchedFallback.orderNumber }, matchedFallback.storeId);
+        if (!IS_PRODUCTION && process.env.PAYMENT_WEBHOOK_ALLOW_UNSCOPED_MATCH === '1') {
+          const allPendingOrders = await prisma.order.findMany({
+            where: { status: 'pending' }
+          });
+          const matchedFallback = allPendingOrders.find(o => {
+            const oNorm = normalizeString(o.orderNumber);
+            return normalizedDesc.includes(oNorm) && amountsMatch(webhookAmount, o.total);
+          });
+          if (matchedFallback) {
+            await completeOrderPayment(matchedFallback.id, matchedFallback.storeId);
+            console.log(`[PAYOS - Dev Fallback] Đã đối soát đơn hàng ${matchedFallback.orderNumber} của store ${matchedFallback.storeId} thành công.`);
+            broadcast('paymentSuccess', { orderNumber: matchedFallback.orderNumber }, matchedFallback.storeId);
+          }
         }
       } catch (err) {
         console.error('[PAYOS] Lỗi khi hoàn tất thanh toán từ webhook:', err);
@@ -3246,6 +3628,16 @@ app.post('/api/print', (req, res) => {
   if (!ip) {
     return res.status(400).json({ error: 'Thiếu địa chỉ IP máy in' });
   }
+  const numericPort = Number(port);
+  if (!Number.isInteger(numericPort) || numericPort < 1 || numericPort > 65535) {
+    return res.status(400).json({ error: 'Cổng máy in không hợp lệ' });
+  }
+  if (!isPrivateLanIp(ip)) {
+    return res.status(400).json({ error: 'Chỉ cho phép kết nối máy in qua địa chỉ IP LAN/private' });
+  }
+  if (!order || !Array.isArray(order.items)) {
+    return res.status(400).json({ error: 'Thiếu dữ liệu hóa đơn cần in' });
+  }
 
   // Tiếng Việt không dấu helper
   function removeAccents(str) {
@@ -3258,9 +3650,15 @@ app.post('/api/print', (req, res) => {
 
   try {
     const client = new net.Socket();
+    let responded = false;
+    const sendOnce = (status, body) => {
+      if (responded) return;
+      responded = true;
+      res.status(status).json(body);
+    };
     client.setTimeout(3000); // 3 seconds timeout
 
-    client.connect(port, ip, () => {
+    client.connect(numericPort, ip, () => {
       // Send ESC/POS commands
       const commands = [];
       
@@ -3352,18 +3750,18 @@ app.post('/api/print', (req, res) => {
       // Write to TCP socket
       client.write(Buffer.concat(commands), () => {
         client.end();
-        res.json({ success: true, message: 'Đã gửi lệnh in thành công' });
+        sendOnce(200, { success: true, message: 'Đã gửi lệnh in thành công' });
       });
     });
 
     client.on('error', (err) => {
       console.error('Lỗi kết nối máy in:', err.message);
-      res.status(500).json({ error: `Không thể kết nối tới máy in tại IP ${ip}:9100. Vui lòng kiểm tra dây mạng và nguồn điện.` });
+      sendOnce(500, { error: `Không thể kết nối tới máy in tại IP ${ip}:${numericPort}. Vui lòng kiểm tra dây mạng và nguồn điện.` });
     });
 
     client.on('timeout', () => {
       client.destroy();
-      res.status(500).json({ error: `Kết nối tới máy in tại IP ${ip}:9100 bị quá hạn (Timeout).` });
+      sendOnce(500, { error: `Kết nối tới máy in tại IP ${ip}:${numericPort} bị quá hạn (Timeout).` });
     });
 
   } catch (err) {

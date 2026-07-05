@@ -1,9 +1,16 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { api } from '../api';
 import { socket } from '../socket';
-import { saveOfflineOrder, getOfflineOrders, deleteOfflineOrder } from '../utils/db';
+import { saveOfflineOrder, getOfflineOrders, deleteOfflineOrder, createClientRequestId } from '../utils/db';
 
 const OrderHistoryContext = createContext(null);
+
+function withClientRequestId(orderData) {
+  return {
+    ...orderData,
+    clientRequestId: orderData.clientRequestId || createClientRequestId()
+  };
+}
 
 export function OrderHistoryProvider({ children }) {
   const [orderHistory, setOrderHistory] = useState([]);
@@ -26,7 +33,9 @@ export function OrderHistoryProvider({ children }) {
 
     try {
       const offlineOrders = await getOfflineOrders();
-      const merged = [...offlineOrders, ...onlineOrders];
+      const onlineRequestIds = new Set(onlineOrders.map(order => order.clientRequestId).filter(Boolean));
+      const pendingOfflineOrders = offlineOrders.filter(order => !onlineRequestIds.has(order.clientRequestId));
+      const merged = [...pendingOfflineOrders, ...onlineOrders];
       setOrderHistory(merged);
     } catch (dbErr) {
       console.error('Không thể nạp đơn offline:', dbErr);
@@ -37,10 +46,12 @@ export function OrderHistoryProvider({ children }) {
   };
 
   const addOrder = useCallback(async (orderData) => {
+    const orderPayload = withClientRequestId(orderData);
+
     // Nếu thiết bị mất mạng vật lý
     if (!navigator.onLine) {
       try {
-        const offlineOrder = await saveOfflineOrder(orderData);
+        const offlineOrder = await saveOfflineOrder(orderPayload);
         setOrderHistory(prev => [offlineOrder, ...prev]);
         return offlineOrder;
       } catch (dbErr) {
@@ -51,14 +62,16 @@ export function OrderHistoryProvider({ children }) {
 
     // Nếu có mạng, thử gửi lên server
     try {
-      const newOrder = await api.post('/orders/checkout', orderData);
+      const newOrder = await api.post('/orders/checkout', orderPayload, {
+        headers: { 'Idempotency-Key': orderPayload.clientRequestId }
+      });
       return newOrder;
     } catch (err) {
       console.error('Lỗi thanh toán online, thử lưu offline:', err);
       const isNetworkError = !err.response || err.code === 'ERR_NETWORK' || err.message === 'Network Error';
       if (isNetworkError) {
         try {
-          const offlineOrder = await saveOfflineOrder(orderData);
+          const offlineOrder = await saveOfflineOrder(orderPayload);
           setOrderHistory(prev => [offlineOrder, ...prev]);
           return offlineOrder;
         } catch (dbErr) {
@@ -82,8 +95,19 @@ export function OrderHistoryProvider({ children }) {
       for (const order of offlineOrders) {
         try {
           // Loại bỏ thông tin ID tạm offline để server sinh ID thật
-          const { tempId, isOffline, id, timestamp, date, time, orderNumber, ...serverData } = order;
-          const newOrder = await api.post('/orders/checkout', serverData);
+          const {
+            tempId,
+            isOffline: _isOffline,
+            id: _id,
+            timestamp: _timestamp,
+            date: _date,
+            time: _time,
+            orderNumber: _orderNumber,
+            ...serverData
+          } = order;
+          const newOrder = await api.post('/orders/checkout', serverData, {
+            headers: { 'Idempotency-Key': serverData.clientRequestId }
+          });
 
           // Xóa khỏi IndexedDB cục bộ
           await deleteOfflineOrder(tempId);
@@ -112,7 +136,7 @@ export function OrderHistoryProvider({ children }) {
     const handleOrderCreated = (order) => {
       // Tránh trùng lặp đơn vừa được đồng bộ
       setOrderHistory(prev => {
-        if (prev.some(o => o.id === order.id || o.orderNumber === order.orderNumber)) {
+        if (prev.some(o => o.id === order.id || o.orderNumber === order.orderNumber || (order.clientRequestId && o.clientRequestId === order.clientRequestId))) {
           return prev;
         }
         return [order, ...prev];
