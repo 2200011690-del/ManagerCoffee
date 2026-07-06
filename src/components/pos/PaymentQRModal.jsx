@@ -62,7 +62,7 @@ export default function PaymentQRModal({ amount, orderNumber, onSuccess, onFail 
   return (
     <div className="fixed inset-0 z-[120] flex items-center justify-center p-4"
       style={{ background: 'rgba(26,15,10,0.7)', backdropFilter: 'blur(8px)' }}>
-      <div className="bg-white rounded-lg shadow-2xl w-full max-w-md overflow-hidden animate-slide-up border border-cream-medium/40">
+      <div className="bg-white rounded-lg shadow-coffee-lg w-full max-w-md overflow-hidden animate-slide-up border border-cream-medium/40">
         
         {/* Header */}
         <div className="px-6 py-4 border-b border-cream-medium/40 flex items-center justify-between">

@@ -12,14 +12,15 @@ export default function ItemModal({ item, onClose, onConfirm }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in bg-black/60 backdrop-blur-sm">
-      <div className="bg-surface-bg rounded-lg shadow-2xl w-full max-w-md overflow-hidden animate-slide-up border border-[#E2E8F0]">
+      <div className="bg-surface-bg rounded-lg shadow-coffee-lg w-full max-w-md overflow-hidden animate-slide-up border border-[#E2E8F0]">
         {/* Image & Header Overlay */}
         <div className="relative h-56 overflow-hidden">
           {item.image ? (
             <img src={item.image} alt={item.name} className="w-full h-full object-cover transition-transform duration-700 hover:scale-105" />
           ) : (
-            <div className="w-full h-full bg-gradient-to-br from-[#0F172A] to-[#475569] flex items-center justify-center text-white font-display font-bold">
-              ☕ {item.name}
+            <div className="w-full h-full bg-gradient-to-br from-[#0F172A] to-[#475569] flex flex-col items-center justify-center gap-2 text-white font-display font-bold text-center px-5">
+              <ShoppingCart size={30} className="opacity-90" />
+              <span>{item.name}</span>
             </div>
           )}
           <div className="absolute inset-0 bg-gradient-to-t from-[#0F172A]/90 via-[#0F172A]/40 to-transparent" />

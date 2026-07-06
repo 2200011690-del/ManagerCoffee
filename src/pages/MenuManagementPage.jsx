@@ -120,7 +120,7 @@ function ItemForm({ initial, onSave, onClose }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in"
       style={{ background: 'rgba(26,15,10,0.65)', backdropFilter: 'blur(6px)' }}>
-      <div className="bg-white rounded-lg shadow-2xl w-full max-w-lg flex flex-col max-h-[90vh] animate-slide-up">
+      <div className="bg-white rounded-lg shadow-coffee-lg w-full max-w-lg flex flex-col max-h-[90vh] animate-slide-up">
         <div className="px-5 py-4 border-b border-cream-medium/40 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2">
             <ChefHat size={18} className="text-coffee-accent" />
@@ -306,13 +306,13 @@ export default function MenuManagementPage() {
   const statsHidden  = menuList.filter(i => i.hidden).length;
 
   return (
-    <div className="h-full overflow-y-auto bg-cream-warm">
-      <div className="p-6 max-w-6xl mx-auto">
+    <div className="page-shell">
+      <div className="page-container">
         {/* Header */}
-        <div className="mb-6 flex items-start justify-between flex-wrap gap-3">
+        <div className="page-header">
           <div>
-            <h1 className="font-display font-bold text-2xl text-coffee-dark">Quản lý Thực đơn</h1>
-            <p className="text-coffee-light text-sm mt-1">
+            <h1 className="page-title">Quản lý thực đơn</h1>
+            <p className="page-subtitle">
               {menuList.length} món tổng · <span className="text-green-600 font-semibold">{statsVisible} đang hiển thị</span>
               {statsHidden > 0 && <> · <span className="text-yellow-600 font-semibold">{statsHidden} đã ẩn</span></>}
             </p>
@@ -327,7 +327,7 @@ export default function MenuManagementPage() {
         </div>
 
         {/* Toolbar */}
-        <div className="flex items-center gap-3 mb-5 flex-wrap">
+        <div className="toolbar-card flex items-center gap-3 flex-wrap">
           <div className="relative flex-1 min-w-[200px] max-w-sm">
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-coffee-light" />
             <input
@@ -452,7 +452,7 @@ export default function MenuManagementPage() {
       {deleteConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in"
           style={{ background: 'rgba(26,15,10,0.65)', backdropFilter: 'blur(6px)' }}>
-          <div className="bg-white rounded-lg shadow-2xl w-full max-w-sm p-6 animate-slide-up text-center">
+          <div className="bg-white rounded-lg shadow-coffee-lg w-full max-w-sm p-6 animate-slide-up text-center">
             <div className="w-14 h-14 rounded-lg bg-red-50 flex items-center justify-center mx-auto mb-4">
               <AlertTriangle size={26} className="text-red-500" />
             </div>

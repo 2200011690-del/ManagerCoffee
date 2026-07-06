@@ -262,14 +262,14 @@ export default function PromotionManagementPage() {
   };
 
   return (
-    <div className="h-full bg-cream-light overflow-y-auto p-6 md:p-8">
-      <div className="max-w-6xl mx-auto space-y-6">
+    <div className="page-shell">
+      <div className="page-container">
         
         {/* Header */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div className="page-header">
           <div>
-            <h1 className="text-3xl font-display font-bold text-coffee-dark mb-1">Chương trình Khuyến mãi</h1>
-            <p className="text-coffee-medium text-sm">Thiết lập giờ vàng giảm giá, các gói combo, chính sách mua X tặng Y và mã giảm giá</p>
+            <h1 className="page-title">Chương trình khuyến mãi</h1>
+            <p className="page-subtitle">Thiết lập giờ vàng giảm giá, combo, mua X tặng Y và mã giảm giá</p>
           </div>
           {activeSubTab === 'auto' ? (
             <button onClick={() => { resetForm(); setIsModalOpen(true); }} className="btn-primary min-h-[44px] px-5 flex items-center gap-2">
@@ -291,28 +291,20 @@ export default function PromotionManagementPage() {
         </div>
 
         {/* Sub-tab switcher bar */}
-        <div className="flex bg-cream-medium/20 rounded-lg p-1 gap-1 w-fit border border-cream-medium/30">
+        <div className="tab-strip w-fit max-w-full overflow-x-auto">
           <button
             onClick={() => setActiveSubTab('auto')}
-            className={`min-h-[36px] px-4 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ${
-              activeSubTab === 'auto'
-                ? 'bg-coffee-dark text-white shadow'
-                : 'text-coffee-medium hover:text-coffee-dark'
-            }`}
+            className={`tab-button whitespace-nowrap flex items-center gap-1.5 ${activeSubTab === 'auto' ? 'tab-button-active' : 'tab-button-inactive'}`}
           >
             <Gift size={13} />
-            Khuyến mãi tự động (Giờ vàng/Combo)
+            Tự động
           </button>
           <button
             onClick={() => setActiveSubTab('vouchers')}
-            className={`min-h-[36px] px-4 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ${
-              activeSubTab === 'vouchers'
-                ? 'bg-coffee-dark text-white shadow'
-                : 'text-coffee-medium hover:text-coffee-dark'
-            }`}
+            className={`tab-button whitespace-nowrap flex items-center gap-1.5 ${activeSubTab === 'vouchers' ? 'tab-button-active' : 'tab-button-inactive'}`}
           >
             <Tag size={13} />
-            Mã giảm giá (Voucher)
+            Mã giảm giá
           </button>
         </div>
 
@@ -449,10 +441,10 @@ export default function PromotionManagementPage() {
               </div>
             </div>
 
-            <div className="overflow-x-auto rounded-lg border border-gray-150 bg-white">
+            <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white">
               <table className="w-full text-sm text-left">
                 <thead>
-                  <tr className="bg-gray-50 border-b border-gray-150">
+                  <tr className="bg-gray-50 border-b border-gray-200">
                     <th className="px-4 py-3 font-semibold text-gray-700">Mã khuyến mãi</th>
                     <th className="px-4 py-3 font-semibold text-gray-700">Loại giảm giá</th>
                     <th className="px-4 py-3 font-semibold text-gray-700 text-right">Mức giảm</th>
@@ -475,16 +467,16 @@ export default function PromotionManagementPage() {
                               {v.code}
                             </span>
                           </td>
-                          <td className="px-4 py-3.5 text-gray-650">
+                          <td className="px-4 py-3.5 text-gray-600">
                             {v.type === 'PERCENT' ? 'Giảm theo phần trăm (%)' : 'Giảm tiền mặt trực tiếp'}
                           </td>
                           <td className="px-4 py-3.5 text-right font-bold text-gray-900">
                             {v.value !== undefined && v.value !== null ? (v.type === 'PERCENT' ? `${v.value}%` : `${Number(v.value).toLocaleString('vi-VN')}đ`) : '0đ'}
                           </td>
-                          <td className="px-4 py-3.5 text-right text-gray-650">
+                          <td className="px-4 py-3.5 text-right text-gray-600">
                             {v.minOrderValue !== undefined && v.minOrderValue !== null ? `${Number(v.minOrderValue).toLocaleString('vi-VN')}đ` : '0đ'}
                           </td>
-                          <td className="px-4 py-3.5 text-right text-gray-650">
+                          <td className="px-4 py-3.5 text-right text-gray-600">
                             {v.maxDiscount !== undefined && v.maxDiscount !== null ? `${Number(v.maxDiscount).toLocaleString('vi-VN')}đ` : 'Không giới hạn'}
                           </td>
                           <td className="px-4 py-3.5 text-center text-gray-500 text-xs">
@@ -547,7 +539,7 @@ export default function PromotionManagementPage() {
       {/* Promotion Form Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-fade-in overflow-y-auto">
-          <div className="bg-white rounded-lg w-full max-w-lg shadow-2xl overflow-hidden my-8">
+          <div className="bg-white rounded-lg w-full max-w-lg shadow-coffee-lg overflow-hidden my-8">
             <div className="p-5 border-b border-gray-100 flex justify-between items-center bg-cream-light/30">
               <h2 className="font-display font-bold text-coffee-dark text-lg flex items-center gap-2">
                 <Gift className="text-coffee-accent" size={20} />
@@ -767,7 +759,7 @@ export default function PromotionManagementPage() {
       {/* MODAL: THÊM MỚI VOUCHER */}
       {showAddVouch && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 backdrop-blur-sm p-4 animate-fade-in">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md shadow-2xl">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md shadow-coffee-lg">
             <div className="flex items-center justify-between border-b border-gray-100 pb-3 mb-4">
               <h3 className="font-bold text-coffee-dark text-lg">Tạo mã giảm giá mới</h3>
               <button onClick={() => setShowAddVouch(false)} className="p-1 text-gray-400 hover:bg-gray-100 rounded-full">
@@ -870,7 +862,7 @@ export default function PromotionManagementPage() {
       {/* MODAL: SỬA VOUCHER */}
       {showEditVouch && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 backdrop-blur-sm p-4 animate-fade-in">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md shadow-2xl">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md shadow-coffee-lg">
             <div className="flex items-center justify-between border-b border-gray-100 pb-3 mb-4">
               <h3 className="font-bold text-coffee-dark text-lg">Cập nhật mã giảm giá</h3>
               <button onClick={() => setShowEditVouch(false)} className="p-1 text-gray-400 hover:bg-gray-100 rounded-full">

@@ -44,7 +44,7 @@ function TablePickerPanel({ onClose }) {
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 animate-fade-in"
       style={{ background: 'rgba(26,15,10,0.6)', backdropFilter: 'blur(5px)' }}>
-      <div className="bg-white rounded-lg shadow-2xl w-full max-w-lg animate-slide-up">
+      <div className="bg-white rounded-lg shadow-coffee-lg w-full max-w-lg animate-slide-up">
         <div className="px-5 py-4 border-b border-cream-medium/50 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <LayoutGrid size={18} className="text-coffee-accent" />
@@ -274,7 +274,7 @@ export default function POSPage() {
 
   // Get table name for display
   const activeTable = tables.find(t => t.id === activeTableId);
-  const tableLabel = activeTableId ? (activeTable?.name ?? activeTableId) : 'Mang về';
+  const tableLabel = activeTableId ? (activeTable?.name || 'Bàn chưa xác định') : 'Mang về';
 
   const handleAddItem = (item, sugar, ice, note, qty = 1) => {
     console.log('[DEBUG] handleAddItem:', item.name, 'table:', activeTableId, 'status:', activeTable?.status);
@@ -368,7 +368,7 @@ export default function POSPage() {
   const handleConfirmPayment = async (splitPayments = null) => {
     const isEvent = splitPayments && (splitPayments.nativeEvent || splitPayments.target);
     const actualSplitPayments = isEvent ? null : splitPayments;
-    const tableName = activeTableId ? (activeTable?.name ?? activeTableId) : 'Mang về';
+    const tableName = activeTableId ? (activeTable?.name || 'Bàn chưa xác định') : 'Mang về';
     
     setCheckingOut(true);
     // Nếu thanh toán chuyển khoản QR -> Tạo hóa đơn ở trạng thái PENDING trước
@@ -460,7 +460,7 @@ export default function POSPage() {
   const handleHoldOrder = async () => {
     if (cart.length === 0) return;
     try {
-      const tableName = activeTableId ? (activeTable?.name ?? activeTableId) : 'Mang về';
+      const tableName = activeTableId ? (activeTable?.name || 'Bàn chưa xác định') : 'Mang về';
       await api.post('/held-orders', {
         tableId: activeTableId,
         tableName,
@@ -600,7 +600,7 @@ export default function POSPage() {
 
   const handleConfirmSplit = async (selectedItems, splitSubtotal, splitVatAmount, splitTotal) => {
     const splitFinalTotal = splitTotal - discountAmount > 0 ? splitTotal - discountAmount : 0;
-    const tableName = activeTableId ? (activeTable?.name ?? activeTableId) : 'Mang về';
+    const tableName = activeTableId ? (activeTable?.name || 'Bàn chưa xác định') : 'Mang về';
     const newOrder = await addOrder({
       tableId: activeTableId,
       tableName,
@@ -708,17 +708,6 @@ export default function POSPage() {
           <ProductGrid items={filteredItems} onAddToCart={handleAddItem} onSelectItem={setSelectedItem} />
         </div>
 
-        {/* Phím tắt cheat-sheet */}
-        <div className="hidden lg:flex px-6 py-2 border-t border-cream-medium/40 bg-white/70 items-center justify-between text-[11px] text-coffee-medium flex-shrink-0">
-          <div className="flex gap-4">
-            <span><kbd className="px-1.5 py-0.5 bg-gray-100 border border-gray-300 rounded font-mono text-[10px] shadow-sm font-bold text-gray-700 bg-white mr-1">F1</kbd>Tiền mặt</span>
-            <span><kbd className="px-1.5 py-0.5 bg-gray-100 border border-gray-300 rounded font-mono text-[10px] shadow-sm font-bold text-gray-700 bg-white mr-1">F2</kbd>Thẻ / QR</span>
-            <span><kbd className="px-1.5 py-0.5 bg-gray-100 border border-gray-300 rounded font-mono text-[10px] shadow-sm font-bold text-gray-700 bg-white mr-1">F3</kbd>Giữ đơn</span>
-            <span><kbd className="px-1.5 py-0.5 bg-gray-100 border border-gray-300 rounded font-mono text-[10px] shadow-sm font-bold text-gray-700 bg-white mr-1">F9</kbd>Tìm món</span>
-            <span><kbd className="px-1.5 py-0.5 bg-gray-100 border border-gray-300 rounded font-mono text-[10px] shadow-sm font-bold text-gray-700 bg-white mx-1">+</kbd>/<kbd className="px-1.5 py-0.5 bg-gray-100 border border-gray-300 rounded font-mono text-[10px] shadow-sm font-bold text-gray-700 bg-white mx-1">-</kbd>Tăng/Giảm món đầu</span>
-          </div>
-          <span className="font-semibold text-coffee-accent hidden sm:inline">Phím tắt nhanh POS</span>
-        </div>
       </div>
 
       {/* ======== RIGHT: Cart Panel ======== */}
@@ -1450,7 +1439,7 @@ export default function POSPage() {
       {/* Customer History Modal (Phase 3) */}
       {showCustomerHistoryModal && customer && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/45 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white rounded-lg shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[85vh] animate-slide-up border border-cream-medium/30">
+          <div className="bg-white rounded-lg shadow-coffee-lg w-full max-w-lg overflow-hidden flex flex-col max-h-[85vh] animate-slide-up border border-cream-medium/30">
             <div className="px-6 py-4.5 border-b border-gray-100 flex justify-between items-center bg-cream-light/30">
               <div>
                 <h3 className="font-display font-bold text-coffee-dark text-lg">Lịch sử & Gợi ý món: {customer.name}</h3>
@@ -1511,7 +1500,7 @@ export default function POSPage() {
                     ) : (
                       <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1">
                         {customerHistory.orders.map((ord, idx) => (
-                          <div key={idx} className="p-3 border border-gray-150 rounded-lg bg-gray-50/50 hover:bg-gray-50 transition-colors">
+                          <div key={idx} className="p-3 border border-gray-200 rounded-lg bg-gray-50/50 hover:bg-gray-50 transition-colors">
                             <div className="flex justify-between items-center text-xs font-bold text-coffee-dark mb-1.5">
                               <span>HĐ: {ord.orderNumber}</span>
                               <span className="text-coffee-accent">{ord.total.toLocaleString()}đ</span>

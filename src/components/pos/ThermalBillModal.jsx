@@ -77,7 +77,7 @@ export default function ThermalBillModal({ order, store: propStore, onConfirm, o
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 animate-fade-in"
       style={{ background: 'rgba(26,15,10,0.75)', backdropFilter: 'blur(8px)' }}>
-      <div className="relative bg-white rounded-lg shadow-2xl w-full max-w-sm animate-slide-up flex flex-col" style={{ maxHeight: '90vh' }}>
+      <div className="relative bg-white rounded-lg shadow-coffee-lg w-full max-w-sm animate-slide-up flex flex-col" style={{ maxHeight: '90vh' }}>
         {/* Close */}
         <button onClick={onClose}
           className="absolute top-3 right-3 min-w-[36px] min-h-[36px] rounded-full bg-gray-100 flex items-center justify-center text-gray-500 hover:bg-gray-200 transition z-10">

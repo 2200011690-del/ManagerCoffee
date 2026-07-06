@@ -136,7 +136,7 @@ export default function QuickAttendanceModal({ onClose }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-fade-in">
-      <div className="relative w-full max-w-sm mx-4 bg-gray-900/90 border border-gray-850 rounded-lg shadow-2xl overflow-hidden p-6 transition-all duration-300 transform scale-100">
+      <div className="relative w-full max-w-sm mx-4 bg-gray-900/90 border border-gray-850 rounded-lg shadow-coffee-lg overflow-hidden p-6 transition-all duration-300 transform scale-100">
         
         {/* Shutter flash overlay */}
         {flash && (

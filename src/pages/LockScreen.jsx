@@ -126,7 +126,7 @@ export default function LockScreen() {
     }
 
     if (adminPassword.length < 6) {
-      setRegError('Mật khẩu Admin phải tối thiểu 6 ký tự.');
+      setRegError('Mật khẩu quản trị phải tối thiểu 6 ký tự.');
       return;
     }
 
@@ -139,7 +139,7 @@ export default function LockScreen() {
     setRegLoading(true);
     try {
       await api.post('/auth/register-store', regForm);
-      setRegSuccess('Đăng ký cửa hàng thành công! Vui lòng đăng nhập bằng tài khoản Admin mới.');
+      setRegSuccess('Đăng ký cửa hàng thành công. Vui lòng đăng nhập bằng tài khoản quản trị mới.');
       setStoreCode(code);
       setTempStoreCode(code);
       localStorage.setItem('manager_coffee_store_code', code);
@@ -484,7 +484,7 @@ export default function LockScreen() {
       {/* --- Modal đăng ký cửa hàng --- */}
       {showRegister && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in">
-          <div className="bg-slate-900 border border-slate-800 rounded-lg shadow-2xl w-full max-w-sm overflow-hidden animate-slide-up">
+          <div className="bg-slate-900 border border-slate-800 rounded-lg shadow-coffee-lg w-full max-w-sm overflow-hidden animate-slide-up">
             <div className="px-6 py-4 border-b border-slate-800 flex items-center gap-3">
               <button
                 onClick={() => { setShowRegister(false); setRegError(''); }}
@@ -564,7 +564,7 @@ export default function LockScreen() {
 
               {regSuccess && (
                 <div className="text-green-400 text-xs font-medium bg-green-950/40 p-2.5 rounded-lg border border-green-900/50">
-                  ✓ {regSuccess}
+                  {regSuccess}
                 </div>
               )}
 

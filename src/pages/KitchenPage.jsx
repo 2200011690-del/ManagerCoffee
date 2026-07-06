@@ -150,7 +150,7 @@ export default function KitchenPage() {
             <h1 className="font-bold text-lg leading-tight uppercase tracking-wider text-white">
               {currentUser?.store?.name || 'Manager Coffee'} - Quầy Bếp / Pha chế
             </h1>
-            <p className="text-xs text-slate-400">Hệ thống hiển thị và quản lý đơn hàng bếp realtime</p>
+            <p className="text-xs text-slate-400">Theo dõi và xử lý đơn bếp theo thời gian thực</p>
           </div>
         </div>
 
@@ -181,7 +181,7 @@ export default function KitchenPage() {
             <button
               onClick={() => setView('pos')}
               className="w-10 h-10 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 hover:bg-slate-700 hover:text-white flex items-center justify-center transition-all"
-              title="Quay lại bán hàng (POS)"
+              title="Quay lại bán hàng"
             >
               <ArrowLeft size={18} />
             </button>

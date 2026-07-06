@@ -24,17 +24,17 @@ function TableCard({ table, onGoToPOS, onMarkClean, tableCarts, isEditMode, onEd
     available: {
       border: 'border-green-200',
       bg: 'bg-white hover:bg-green-50/60',
-      topBar: 'bg-gradient-to-r from-green-400 to-emerald-500',
+      topBar: 'bg-emerald-500',
       badge: 'bg-green-100 text-green-700',
       label: 'Trống',
       icon: <Sparkles size={14} className="text-green-500" />,
       btnLabel: 'Mở bàn',
-      btnClass: 'bg-gradient-to-r from-green-500 to-emerald-500 text-white hover:from-green-600 hover:to-emerald-600',
+      btnClass: 'bg-emerald-600 text-white hover:bg-emerald-700',
     },
     occupied: {
       border: 'border-pink-200',
       bg: 'bg-white hover:bg-pink-50/40',
-      topBar: 'bg-gradient-to-r from-pink-400 to-rose-500',
+      topBar: 'bg-rose-500',
       badge: 'bg-pink-100 text-pink-700',
       label: 'Có khách',
       icon: <Users size={14} className="text-pink-500" />,
@@ -44,7 +44,7 @@ function TableCard({ table, onGoToPOS, onMarkClean, tableCarts, isEditMode, onEd
     dirty: {
       border: 'border-yellow-200',
       bg: 'bg-yellow-50/60 hover:bg-yellow-100/60',
-      topBar: 'bg-gradient-to-r from-yellow-400 to-amber-400',
+      topBar: 'bg-amber-400',
       badge: 'bg-yellow-100 text-yellow-700',
       label: 'Chưa dọn',
       icon: <RefreshCw size={14} className="text-yellow-600" />,
@@ -255,7 +255,7 @@ export default function TablePage() {
         <div className="flex items-center justify-between mb-4">
           <div>
             <h1 className="font-display font-bold text-2xl text-coffee-dark">Sơ đồ bàn</h1>
-            <p className="text-coffee-light text-sm mt-0.5">Bấm vào bàn để gọi món hoặc thu tiền</p>
+            <p className="text-coffee-light text-sm mt-0.5">Theo dõi trạng thái bàn và đơn đang phục vụ</p>
           </div>
           <div className="flex items-center gap-3">
             <button
@@ -267,11 +267,11 @@ export default function TablePage() {
                   : 'bg-coffee-accent/10 text-coffee-accent border-coffee-accent/20 hover:bg-coffee-accent/20'
               }`}
             >
-              {isEditMode ? 'Thoát Chế độ sửa' : 'Chế độ chỉnh sửa'}
+              {isEditMode ? 'Thoát chỉnh sửa' : 'Chỉnh sửa sơ đồ'}
             </button>
             <div className="flex items-center gap-1.5 bg-cream-light px-3 py-1.5 rounded-lg text-xs text-coffee-medium">
               <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse-soft" />
-              Realtime
+              Đang đồng bộ
             </div>
           </div>
         </div>
@@ -316,7 +316,7 @@ export default function TablePage() {
             <button
               type="button"
               onClick={handleAddClick}
-              className="min-h-[36px] px-4 bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all shadow-md shadow-green-500/15"
+              className="min-h-[36px] px-4 bg-primary-600 hover:bg-primary-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm"
             >
               <Plus size={14} />
               Thêm bàn mới
@@ -399,7 +399,7 @@ export default function TablePage() {
       {/* Add / Edit Table Modal */}
       {showModal && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 animate-fade-in" style={{ background: 'rgba(26,15,10,0.4)', backdropFilter: 'blur(4px)' }}>
-          <div className="bg-white rounded-lg border border-cream-medium/40 shadow-2xl w-full max-w-sm overflow-hidden animate-slide-up">
+          <div className="bg-white rounded-lg border border-cream-medium/40 shadow-coffee-lg w-full max-w-sm overflow-hidden animate-slide-up">
             {/* Modal Header */}
             <div className="px-5 py-4 border-b border-cream-light flex justify-between items-center">
               <h3 className="font-bold text-coffee-dark text-base">

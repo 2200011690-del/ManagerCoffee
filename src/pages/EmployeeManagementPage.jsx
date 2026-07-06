@@ -286,14 +286,14 @@ export default function EmployeeManagementPage() {
   };
 
   return (
-    <div className="h-full bg-cream-light overflow-y-auto p-6 md:p-8">
-      <div className="max-w-6xl mx-auto space-y-6">
+    <div className="page-shell">
+      <div className="page-container">
         
         {/* Header */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div className="page-header">
           <div>
-            <h1 className="text-3xl font-display font-bold text-coffee-dark mb-1">Quản lý Nhân sự</h1>
-            <p className="text-coffee-medium text-sm">Thiết lập nhân viên, theo dõi lịch sử chấm công và bàn giao két tiền mặt</p>
+            <h1 className="page-title">Quản lý nhân sự</h1>
+            <p className="page-subtitle">Thiết lập nhân viên, theo dõi lịch sử chấm công và bàn giao két tiền mặt</p>
           </div>
           {(activeTab === 'staff' || activeTab === 'salary') && (
             <button onClick={openAdd} className="btn-primary min-h-[44px] px-5 flex items-center gap-2">
@@ -309,35 +309,31 @@ export default function EmployeeManagementPage() {
           )}
         </div>
 
-        {/* Custom Tab Panel */}
-        <div className="flex border-b border-cream-medium/40 gap-6">
+        {/* Tab Panel */}
+        <div className="tab-strip w-fit max-w-full overflow-x-auto">
           <button
             onClick={() => setActiveTab('staff')}
-            className={`pb-3 font-semibold text-sm transition-all relative ${activeTab === 'staff' ? 'text-coffee-accent font-bold' : 'text-coffee-light hover:text-coffee-dark'}`}
+            className={`tab-button whitespace-nowrap ${activeTab === 'staff' ? 'tab-button-active' : 'tab-button-inactive'}`}
           >
             Danh sách nhân viên
-            {activeTab === 'staff' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-coffee-accent rounded-full" />}
           </button>
           <button
             onClick={() => setActiveTab('attendance')}
-            className={`pb-3 font-semibold text-sm transition-all relative ${activeTab === 'attendance' ? 'text-coffee-accent font-bold' : 'text-coffee-light hover:text-coffee-dark'}`}
+            className={`tab-button whitespace-nowrap ${activeTab === 'attendance' ? 'tab-button-active' : 'tab-button-inactive'}`}
           >
             Bảng công điểm danh
-            {activeTab === 'attendance' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-coffee-accent rounded-full" />}
           </button>
           <button
             onClick={() => setActiveTab('shifts')}
-            className={`pb-3 font-semibold text-sm transition-all relative ${activeTab === 'shifts' ? 'text-coffee-accent font-bold' : 'text-coffee-light hover:text-coffee-dark'}`}
+            className={`tab-button whitespace-nowrap ${activeTab === 'shifts' ? 'tab-button-active' : 'tab-button-inactive'}`}
           >
             Lịch sử giao ca
-            {activeTab === 'shifts' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-coffee-accent rounded-full" />}
           </button>
           <button
             onClick={() => setActiveTab('salary')}
-            className={`pb-3 font-semibold text-sm transition-all relative ${activeTab === 'salary' ? 'text-coffee-accent font-bold' : 'text-coffee-light hover:text-coffee-dark'}`}
+            className={`tab-button whitespace-nowrap ${activeTab === 'salary' ? 'tab-button-active' : 'tab-button-inactive'}`}
           >
             Bảng tính lương
-            {activeTab === 'salary' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-coffee-accent rounded-full" />}
           </button>
         </div>
 
@@ -452,7 +448,7 @@ export default function EmployeeManagementPage() {
                             {log.imageIn && (
                               <div className="relative group">
                                 <Camera size={14} className="text-primary-500 cursor-pointer hover:scale-110 transition-transform" />
-                                <div className="hidden group-hover:block absolute bottom-6 left-1/2 -translate-x-1/2 bg-gray-950 border border-gray-800 p-1 rounded-lg shadow-2xl z-50 w-24 h-24">
+                                <div className="hidden group-hover:block absolute bottom-6 left-1/2 -translate-x-1/2 bg-gray-950 border border-gray-800 p-1 rounded-lg shadow-coffee-lg z-50 w-24 h-24">
                                   <img src={log.imageIn} alt="Clock In" className="w-full h-full object-cover rounded-md scale-x-[-1]" />
                                 </div>
                               </div>
@@ -468,7 +464,7 @@ export default function EmployeeManagementPage() {
                               {log.imageOut && (
                                 <div className="relative group">
                                   <Camera size={14} className="text-amber-500 cursor-pointer hover:scale-110 transition-transform" />
-                                  <div className="hidden group-hover:block absolute bottom-6 left-1/2 -translate-x-1/2 bg-gray-950 border border-gray-800 p-1 rounded-lg shadow-2xl z-50 w-24 h-24">
+                                  <div className="hidden group-hover:block absolute bottom-6 left-1/2 -translate-x-1/2 bg-gray-950 border border-gray-800 p-1 rounded-lg shadow-coffee-lg z-50 w-24 h-24">
                                     <img src={log.imageOut} alt="Clock Out" className="w-full h-full object-cover rounded-md scale-x-[-1]" />
                                   </div>
                                 </div>
@@ -727,7 +723,7 @@ export default function EmployeeManagementPage() {
       {/* Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white rounded-lg w-full max-w-xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
+          <div className="bg-white rounded-lg w-full max-w-xl shadow-coffee-lg overflow-hidden max-h-[90vh] flex flex-col">
             <div className="p-5 border-b border-gray-100 flex justify-between items-center bg-cream-light/30 flex-shrink-0">
               <h2 className="font-display font-bold text-coffee-dark text-lg">
                 {editingUser ? 'Sửa thông tin nhân sự' : 'Thêm nhân sự mới'}
@@ -860,7 +856,7 @@ export default function EmployeeManagementPage() {
       {/* Attendance Modal */}
       {isAttendanceModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white rounded-lg w-full max-w-md shadow-2xl overflow-hidden">
+          <div className="bg-white rounded-lg w-full max-w-md shadow-coffee-lg overflow-hidden">
             <div className="p-5 border-b border-gray-100 flex justify-between items-center bg-cream-light/30">
               <h2 className="font-display font-bold text-coffee-dark text-lg">
                 {editingAttendance ? 'Sửa giờ công' : 'Thêm ngày công thủ công'}
@@ -927,7 +923,7 @@ export default function EmployeeManagementPage() {
       {/* Profile Details Modal */}
       {profileUser && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white rounded-lg w-full max-w-md shadow-2xl overflow-hidden">
+          <div className="bg-white rounded-lg w-full max-w-md shadow-coffee-lg overflow-hidden">
             <div className="p-5 border-b border-gray-100 flex justify-between items-center bg-cream-light/30">
               <h2 className="font-display font-bold text-coffee-dark text-lg">
                 Hồ sơ lý lịch nhân sự
@@ -986,7 +982,7 @@ export default function EmployeeManagementPage() {
       {/* Attendance Detail Modal for salary */}
       {selectedSalaryDetail && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white rounded-lg w-full max-w-lg shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
+          <div className="bg-white rounded-lg w-full max-w-lg shadow-coffee-lg overflow-hidden flex flex-col max-h-[85vh]">
             <div className="p-5 border-b border-gray-100 flex justify-between items-center bg-cream-light/30 flex-shrink-0">
               <div>
                 <h2 className="font-display font-bold text-coffee-dark text-lg">

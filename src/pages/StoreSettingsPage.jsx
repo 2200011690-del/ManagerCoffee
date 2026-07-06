@@ -282,30 +282,31 @@ export default function StoreSettingsPage() {
   }
 
   return (
-    <div className="h-full overflow-y-auto bg-surface-bg p-6 lg:p-8">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-2xl font-bold text-coffee-dark flex items-center gap-2.5">
-            <Settings className="text-coffee-medium" /> Cấu hình cửa hàng
-          </h1>
-          <p className="text-coffee-medium/70 text-sm mt-1">
-            Thiết lập thông tin cửa hàng, mẫu hóa đơn in ấn và chính sách tích điểm.
-          </p>
+    <div className="page-shell">
+      <div className="page-container">
+        {/* Header */}
+        <div className="page-header">
+          <div>
+            <h1 className="page-title flex items-center gap-2.5">
+              <Settings className="text-coffee-medium" /> Cấu hình cửa hàng
+            </h1>
+            <p className="page-subtitle">
+              Thiết lập thông tin cửa hàng, mẫu hóa đơn in ấn và chính sách tích điểm.
+            </p>
+          </div>
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="min-h-[44px] px-5 py-2.5 bg-primary-600 hover:bg-primary-700 text-white rounded-lg font-semibold shadow-sm flex items-center gap-2 active:scale-98 transition-all disabled:opacity-50 disabled:pointer-events-none"
+          >
+            {saving ? (
+              <RefreshCw className="w-4 h-4 animate-spin" />
+            ) : (
+              <Save className="w-4 h-4" />
+            )}
+            <span>Lưu cấu hình</span>
+          </button>
         </div>
-        <button
-          onClick={handleSave}
-          disabled={saving}
-          className="min-h-[44px] px-5 py-2.5 bg-primary-600 hover:bg-primary-700 text-white rounded-lg font-semibold shadow-sm flex items-center gap-2 active:scale-98 transition-all disabled:opacity-50 disabled:pointer-events-none"
-        >
-          {saving ? (
-            <RefreshCw className="w-4 h-4 animate-spin" />
-          ) : (
-            <Save className="w-4 h-4" />
-          )}
-          <span>Lưu cấu hình</span>
-        </button>
-      </div>
 
       <div className="max-w-6xl bg-white rounded-lg border border-surface-border shadow-card overflow-hidden flex flex-col md:flex-row min-h-[500px]">
         {/* Sidebar Tabs */}
@@ -520,7 +521,7 @@ export default function StoreSettingsPage() {
                 <div className="space-y-1">
                   <h4 className="text-xs font-bold text-coffee-dark">Mẹo tùy chỉnh hóa đơn:</h4>
                   <p className="text-xs text-coffee-medium/80 leading-relaxed">
-                    Bạn có thể sử dụng ký tự xuống dòng để phân dòng cho các thông tin như Tên Wifi, Mật khẩu, hoặc Thông điệp khuyến mãi để hóa đơn trông chuyên nghiệp nhất khi in ra.
+                    Nội dung bổ sung sẽ được in dưới phần tổng tiền trên hóa đơn.
                   </p>
                 </div>
               </div>
@@ -812,6 +813,7 @@ export default function StoreSettingsPage() {
             </div>
           )}
         </form>
+        </div>
       </div>
     </div>
   );

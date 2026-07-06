@@ -117,7 +117,7 @@ export default function SplitPaymentModal({ total, onClose, onConfirm }) {
           remaining > 0 ? 'bg-amber-50 border border-amber-200 text-amber-800' :
           'bg-red-50 border border-red-200 text-red-800'
         }`}>
-          <span>{remaining > 0 ? 'Còn thiếu:' : remaining < 0 ? 'Thanh toán thừa:' : 'Đã đủ ✓'}</span>
+          <span>{remaining > 0 ? 'Còn thiếu:' : remaining < 0 ? 'Thanh toán thừa:' : 'Đã đủ'}</span>
           {!isValid && <span className="font-mono">{Math.abs(remaining).toLocaleString('vi-VN')}đ</span>}
           {isValid && <CheckCircle size={18} className="text-green-600" />}
         </div>

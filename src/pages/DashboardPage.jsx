@@ -242,7 +242,7 @@ function OrderHistoryTab() {
       {detailOrder && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in"
           style={{ background: 'rgba(26,15,10,0.6)', backdropFilter: 'blur(5px)' }}>
-          <div className="bg-white rounded-lg shadow-2xl w-full max-w-md animate-slide-up">
+          <div className="bg-white rounded-lg shadow-coffee-lg w-full max-w-md animate-slide-up">
             <div className="px-5 py-4 border-b border-cream-medium/40 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <CheckCircle size={18} className="text-green-500" />
@@ -332,7 +332,9 @@ function InventoryRow({ item, pct, isLow, isCritical, onRestock }) {
     <tr className={`border-b border-cream-medium/30 transition-colors ${isCritical ? 'bg-red-50' : isLow ? 'bg-yellow-50' : 'hover:bg-cream-light/30'}`}>
       <td className="px-4 py-3">
         <div className="flex items-center gap-2">
-          <span className="text-lg">{item.icon}</span>
+          <span className="w-7 h-7 rounded-lg bg-primary-50 text-primary-700 flex items-center justify-center">
+            <Package size={15} />
+          </span>
           <span className="font-semibold text-coffee-dark">{item.name}</span>
         </div>
       </td>
@@ -354,10 +356,10 @@ function InventoryRow({ item, pct, isLow, isCritical, onRestock }) {
       </td>
       <td className="px-4 py-3 text-center">
         {isCritical
-          ? <span className="text-xs bg-red-100 text-red-700 border border-red-300 px-2 py-1 rounded-full font-bold">⚠ Cạn kiệt</span>
+          ? <span className="text-xs bg-red-100 text-red-700 border border-red-300 px-2 py-1 rounded-full font-bold">Cạn kiệt</span>
           : isLow
           ? <span className="text-xs bg-yellow-100 text-yellow-700 border border-yellow-300 px-2 py-1 rounded-full font-bold">Sắp hết</span>
-          : <span className="text-xs bg-green-50 text-green-700 border border-green-200 px-2 py-1 rounded-full font-semibold">✓ Ổn</span>
+          : <span className="text-xs bg-green-50 text-green-700 border border-green-200 px-2 py-1 rounded-full font-semibold">Ổn</span>
         }
       </td>
       <td className="px-4 py-3">
@@ -867,49 +869,34 @@ export default function DashboardPage() {
   const progressPct = (today.target && today.target > 0) ? Math.min((today.revenue / today.target) * 100, 100).toFixed(0) : '0';
 
   return (
-    <div className="h-full overflow-y-auto bg-cream-warm">
-      <div className="p-6 max-w-7xl mx-auto">
+    <div className="page-shell">
+      <div className="page-container">
         {/* Page Header */}
-        <div className="mb-5 flex items-center justify-between flex-wrap gap-3">
+        <div className="page-header">
           <div>
-            <h1 className="font-display font-bold text-2xl text-coffee-dark">Báo cáo & Thống kê</h1>
-            <p className="text-coffee-light text-sm mt-1">
+            <h1 className="page-title">Báo cáo & thống kê</h1>
+            <p className="page-subtitle">
               {new Date().toLocaleDateString('vi-VN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
             </p>
           </div>
           {/* Tab switcher */}
-          <div className="flex bg-cream-light rounded-lg p-1 gap-1 overflow-x-auto scrollbar-hide max-w-full flex-nowrap">
+          <div className="tab-strip overflow-x-auto scrollbar-hide max-w-full">
             <button
               onClick={() => setActiveTab('overview')}
-              className={`min-h-[40px] px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
-                activeTab === 'overview'
-                  ? 'text-white shadow-coffee'
-                  : 'text-coffee-medium hover:text-coffee-dark'
-              }`}
-              style={activeTab === 'overview' ? { background: 'linear-gradient(135deg, #2563EB, #0EA5E9)' } : {}}
+              className={`tab-button whitespace-nowrap ${activeTab === 'overview' ? 'tab-button-active' : 'tab-button-inactive'}`}
             >
               Tổng quan
             </button>
             <button
               onClick={() => setActiveTab('history')}
-              className={`min-h-[40px] px-4 py-2 rounded-lg text-sm font-semibold transition-all flex items-center gap-1.5 ${
-                activeTab === 'history'
-                  ? 'text-white shadow-coffee'
-                  : 'text-coffee-medium hover:text-coffee-dark'
-              }`}
-              style={activeTab === 'history' ? { background: 'linear-gradient(135deg, #2563EB, #0EA5E9)' } : {}}
+              className={`tab-button whitespace-nowrap flex items-center gap-1.5 ${activeTab === 'history' ? 'tab-button-active' : 'tab-button-inactive'}`}
             >
               <FileText size={14} />
               Hóa đơn
             </button>
              <button
               onClick={() => setActiveTab('inventory')}
-              className={`min-h-[40px] px-4 py-2 rounded-lg text-sm font-semibold transition-all flex items-center gap-1.5 ${
-                activeTab === 'inventory'
-                  ? 'text-white shadow-coffee'
-                  : 'text-coffee-medium hover:text-coffee-dark'
-              }`}
-              style={activeTab === 'inventory' ? { background: 'linear-gradient(135deg, #2563EB, #0EA5E9)' } : {}}
+              className={`tab-button whitespace-nowrap flex items-center gap-1.5 ${activeTab === 'inventory' ? 'tab-button-active' : 'tab-button-inactive'}`}
             >
               <Package size={14} />
               Kho
@@ -921,36 +908,21 @@ export default function DashboardPage() {
             </button>
             <button
               onClick={() => setActiveTab('customers')}
-              className={`min-h-[40px] px-4 py-2 rounded-lg text-sm font-semibold transition-all flex items-center gap-1.5 ${
-                activeTab === 'customers'
-                  ? 'text-white shadow-coffee'
-                  : 'text-coffee-medium hover:text-coffee-dark'
-              }`}
-              style={activeTab === 'customers' ? { background: 'linear-gradient(135deg, #2563EB, #0EA5E9)' } : {}}
+              className={`tab-button whitespace-nowrap flex items-center gap-1.5 ${activeTab === 'customers' ? 'tab-button-active' : 'tab-button-inactive'}`}
             >
               <Users size={14} />
               Khách hàng
             </button>
             <button
               onClick={() => setActiveTab('tables')}
-              className={`min-h-[40px] px-4 py-2 rounded-lg text-sm font-semibold transition-all flex items-center gap-1.5 ${
-                activeTab === 'tables'
-                  ? 'text-white shadow-coffee'
-                  : 'text-coffee-medium hover:text-coffee-dark'
-              }`}
-              style={activeTab === 'tables' ? { background: 'linear-gradient(135deg, #2563EB, #0EA5E9)' } : {}}
+              className={`tab-button whitespace-nowrap flex items-center gap-1.5 ${activeTab === 'tables' ? 'tab-button-active' : 'tab-button-inactive'}`}
             >
               <MapPin size={14} />
-              Thiết lập Bàn
+              Thiết lập bàn
             </button>
             <button
               onClick={() => setActiveTab('detailed_reports')}
-              className={`min-h-[40px] px-4 py-2 rounded-lg text-sm font-semibold transition-all flex items-center gap-1.5 ${
-                activeTab === 'detailed_reports'
-                  ? 'text-white shadow-coffee'
-                  : 'text-coffee-medium hover:text-coffee-dark'
-              }`}
-              style={activeTab === 'detailed_reports' ? { background: 'linear-gradient(135deg, #2563EB, #0EA5E9)' } : {}}
+              className={`tab-button whitespace-nowrap flex items-center gap-1.5 ${activeTab === 'detailed_reports' ? 'tab-button-active' : 'tab-button-inactive'}`}
             >
               <TrendingUp size={14} />
               Báo cáo chi tiết
@@ -1145,7 +1117,7 @@ export default function DashboardPage() {
               <div className="flex items-center justify-between flex-wrap gap-4 border-b border-gray-100 pb-4 mb-4">
                 <div className="flex items-center gap-2">
                   <Package size={22} className="text-blue-600" />
-                  <h2 className="font-display font-bold text-coffee-dark text-xl">Hệ thống Quản lý Kho chuyên nghiệp</h2>
+                  <h2 className="font-display font-bold text-coffee-dark text-xl">Quản lý kho</h2>
                 </div>
                 <div className="flex items-center gap-2">
                   <button onClick={resetInventory}
@@ -1265,7 +1237,7 @@ export default function DashboardPage() {
                       <div className="flex flex-wrap gap-2">
                         {lowStockItems.map(item => (
                           <span key={item.id} className="text-xs bg-red-100 text-red-700 border border-red-200 px-2.5 py-1 rounded-lg font-bold">
-                            {item.icon} {item.name}: còn {item.qty.toLocaleString('vi-VN')} {item.unit} (định mức: {item.minQty} {item.unit})
+                            {item.name}: còn {item.qty.toLocaleString('vi-VN')} {item.unit} (định mức: {item.minQty} {item.unit})
                           </span>
                         ))}
                       </div>
@@ -1273,10 +1245,10 @@ export default function DashboardPage() {
                   )}
 
                   {/* Table */}
-                  <div className="overflow-x-auto rounded-lg border border-gray-150">
+                  <div className="overflow-x-auto rounded-lg border border-gray-200">
                     <table className="w-full text-sm text-left">
                       <thead>
-                        <tr className="bg-gray-50 border-b border-gray-150">
+                        <tr className="bg-gray-50 border-b border-gray-200">
                           <th className="px-4 py-3 font-semibold text-gray-700">Nguyên liệu</th>
                           <th className="px-4 py-3 font-semibold text-gray-700 text-right">Tồn kho hiện tại</th>
                           <th className="px-4 py-3 font-semibold text-gray-700 text-right hidden md:table-cell">Hạn mức tối thiểu</th>
@@ -1294,7 +1266,9 @@ export default function DashboardPage() {
                               <tr key={item.id} className={`hover:bg-gray-50/50 transition-colors ${isCritical ? 'bg-red-50/40' : isLow ? 'bg-yellow-50/40' : ''}`}>
                                 <td className="px-4 py-3.5">
                                   <div className="flex items-center gap-2.5">
-                                    <span className="text-2xl w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center">{item.icon || '☕'}</span>
+                                    <span className="w-8 h-8 rounded-lg bg-primary-50 text-primary-700 flex items-center justify-center">
+                                      <Package size={16} />
+                                    </span>
                                     <span className="font-semibold text-gray-800">{item.name}</span>
                                   </div>
                                 </td>
@@ -1306,9 +1280,9 @@ export default function DashboardPage() {
                                 </td>
                                 <td className="px-4 py-3.5 text-center">
                                   {isCritical ? (
-                                    <span className="text-xs bg-red-100 text-red-800 px-2.5 py-1 rounded-full font-bold border border-red-200">⚠ Cạn kiệt</span>
+                                    <span className="text-xs bg-red-100 text-red-800 px-2.5 py-1 rounded-full font-bold border border-red-200">Cạn kiệt</span>
                                   ) : isLow ? (
-                                    <span className="text-xs bg-yellow-100 text-yellow-800 px-2.5 py-1 rounded-full font-bold border border-yellow-250">Sắp hết</span>
+                                    <span className="text-xs bg-yellow-100 text-yellow-800 px-2.5 py-1 rounded-full font-bold border border-yellow-300">Sắp hết</span>
                                   ) : (
                                     <span className="text-xs bg-green-50 text-green-700 px-2.5 py-1 rounded-full font-bold border border-green-200">Ổn định</span>
                                   )}
@@ -1379,10 +1353,10 @@ export default function DashboardPage() {
                     <p className="text-xs text-gray-500 italic">Món chưa có định lượng sẽ không tự động trừ kho nguyên liệu khi bán.</p>
                   </div>
 
-                  <div className="overflow-x-auto rounded-lg border border-gray-150">
+                  <div className="overflow-x-auto rounded-lg border border-gray-200">
                     <table className="w-full text-sm text-left">
                       <thead>
-                        <tr className="bg-gray-50 border-b border-gray-150">
+                        <tr className="bg-gray-50 border-b border-gray-200">
                           <th className="px-4 py-3 font-semibold text-gray-700">Món ăn / Đồ uống</th>
                           <th className="px-4 py-3 font-semibold text-gray-700">Nhóm danh mục</th>
                           <th className="px-4 py-3 font-semibold text-gray-700 text-right">Đơn giá bán</th>
@@ -1470,10 +1444,10 @@ export default function DashboardPage() {
                   </div>
 
                   {/* Ledger Table */}
-                  <div className="overflow-x-auto rounded-lg border border-gray-150">
+                  <div className="overflow-x-auto rounded-lg border border-gray-200">
                     <table className="w-full text-sm text-left">
                       <thead>
-                        <tr className="bg-gray-50 border-b border-gray-150">
+                        <tr className="bg-gray-50 border-b border-gray-200">
                           <th className="px-4 py-3 font-semibold text-gray-700">Thời gian</th>
                           <th className="px-4 py-3 font-semibold text-gray-700">Nguyên liệu</th>
                           <th className="px-4 py-3 font-semibold text-gray-700">Loại giao dịch</th>
@@ -1556,10 +1530,10 @@ export default function DashboardPage() {
                     </button>
                   </div>
 
-                  <div className="overflow-x-auto rounded-lg border border-gray-150">
+                  <div className="overflow-x-auto rounded-lg border border-gray-200">
                     <table className="w-full text-sm text-left">
                       <thead>
-                        <tr className="bg-gray-50 border-b border-gray-150">
+                        <tr className="bg-gray-50 border-b border-gray-200">
                           <th className="px-4 py-3 font-semibold text-gray-700">Tên nhà cung cấp</th>
                           <th className="px-4 py-3 font-semibold text-gray-700">Số điện thoại</th>
                           <th className="px-4 py-3 font-semibold text-gray-700">Email</th>
@@ -1613,7 +1587,7 @@ export default function DashboardPage() {
             {/* MODAL 1: THÊM NGUYÊN LIỆU MỚI */}
             {showAddIng && (
               <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 backdrop-blur-sm p-4">
-                <div className="bg-white rounded-lg p-6 w-full max-w-md shadow-2xl animate-fade-in">
+                <div className="bg-white rounded-lg p-6 w-full max-w-md shadow-coffee-lg animate-fade-in">
                   <div className="flex items-center justify-between border-b border-gray-100 pb-3 mb-4">
                     <h3 className="font-bold text-coffee-dark text-lg">Thêm nguyên liệu mới</h3>
                     <button onClick={() => setShowAddIng(false)} className="p-1 text-gray-400 hover:bg-gray-100 rounded-full">
@@ -1645,21 +1619,21 @@ export default function DashboardPage() {
                         />
                       </div>
                       <div>
-                        <label className="block text-xs font-bold text-gray-700 mb-1">Icon (Emoji) *</label>
+                        <label className="block text-xs font-bold text-gray-700 mb-1">Nhóm nguyên liệu *</label>
                         <select
                           value={ingForm.icon}
                           onChange={e => setIngForm(prev => ({ ...prev, icon: e.target.value }))}
                           className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
                         >
-                          <option value="☕">☕ Cà phê</option>
-                          <option value="🥛">🥛 Sữa tươi</option>
-                          <option value="🥫">🥫 Hộp sữa đặc</option>
-                          <option value="🍃">🍃 Lá trà/Trà đen</option>
-                          <option value="🍵">🍵 Bột Matcha</option>
-                          <option value="🍚">🍚 Đường/Bột</option>
-                          <option value="🍋">🍋 Chanh quả</option>
-                          <option value="🧊">🧊 Đá viên</option>
-                          <option value="📦">📦 Hộp giấy/Ly giấy</option>
+                          <option value="☕">Cà phê</option>
+                          <option value="🥛">Sữa tươi</option>
+                          <option value="🥫">Hộp sữa đặc</option>
+                          <option value="🍃">Lá trà/Trà đen</option>
+                          <option value="🍵">Bột Matcha</option>
+                          <option value="🍚">Đường/Bột</option>
+                          <option value="🍋">Chanh quả</option>
+                          <option value="🧊">Đá viên</option>
+                          <option value="📦">Hộp giấy/Ly giấy</option>
                         </select>
                       </div>
                     </div>
@@ -1710,7 +1684,7 @@ export default function DashboardPage() {
             {/* MODAL 2: CHỈNH SỬA NGUYÊN LIỆU */}
             {showEditIng && (
               <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 backdrop-blur-sm p-4">
-                <div className="bg-white rounded-lg p-6 w-full max-w-md shadow-2xl animate-fade-in">
+                <div className="bg-white rounded-lg p-6 w-full max-w-md shadow-coffee-lg animate-fade-in">
                   <div className="flex items-center justify-between border-b border-gray-100 pb-3 mb-4">
                     <h3 className="font-bold text-coffee-dark text-lg">Chỉnh sửa nguyên liệu</h3>
                     <button onClick={() => setShowEditIng(false)} className="p-1 text-gray-400 hover:bg-gray-100 rounded-full">
@@ -1740,21 +1714,21 @@ export default function DashboardPage() {
                         />
                       </div>
                       <div>
-                        <label className="block text-xs font-bold text-gray-700 mb-1">Icon (Emoji)</label>
+                        <label className="block text-xs font-bold text-gray-700 mb-1">Nhóm nguyên liệu</label>
                         <select
                           value={ingForm.icon}
                           onChange={e => setIngForm(prev => ({ ...prev, icon: e.target.value }))}
                           className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
                         >
-                          <option value="☕">☕ Cà phê</option>
-                          <option value="🥛">🥛 Sữa tươi</option>
-                          <option value="🥫">🥫 Hộp sữa đặc</option>
-                          <option value="🍃">🍃 Lá trà/Trà đen</option>
-                          <option value="🍵">🍵 Bột Matcha</option>
-                          <option value="🍚">🍚 Đường/Bột</option>
-                          <option value="🍋">🍋 Chanh quả</option>
-                          <option value="🧊">🧊 Đá viên</option>
-                          <option value="📦">📦 Hộp giấy/Ly giấy</option>
+                          <option value="☕">Cà phê</option>
+                          <option value="🥛">Sữa tươi</option>
+                          <option value="🥫">Hộp sữa đặc</option>
+                          <option value="🍃">Lá trà/Trà đen</option>
+                          <option value="🍵">Bột Matcha</option>
+                          <option value="🍚">Đường/Bột</option>
+                          <option value="🍋">Chanh quả</option>
+                          <option value="🧊">Đá viên</option>
+                          <option value="📦">Hộp giấy/Ly giấy</option>
                         </select>
                       </div>
                     </div>
@@ -1791,7 +1765,7 @@ export default function DashboardPage() {
             {/* MODAL 3: NHẬP HÀNG KHO */}
             {showImport && (
               <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 backdrop-blur-sm p-4">
-                <div className="bg-white rounded-lg p-6 w-full max-w-md shadow-2xl animate-fade-in">
+                <div className="bg-white rounded-lg p-6 w-full max-w-md shadow-coffee-lg animate-fade-in">
                   <div className="flex items-center justify-between border-b border-gray-100 pb-3 mb-4">
                     <h3 className="font-bold text-coffee-dark text-lg flex items-center gap-1.5 text-emerald-600">
                       <Download size={18} />
@@ -1812,7 +1786,7 @@ export default function DashboardPage() {
                       >
                         {inventory.map(item => (
                           <option key={item.id} value={item.id}>
-                            {item.icon} {item.name} (Tồn hiện tại: {item.qty} {item.unit})
+                            {item.name} (Tồn hiện tại: {item.qty} {item.unit})
                           </option>
                         ))}
                       </select>
@@ -1890,7 +1864,7 @@ export default function DashboardPage() {
             {/* MODAL 4: KIỂM KHO / CÂN ĐỐI */}
             {showAdjust && (
               <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 backdrop-blur-sm p-4">
-                <div className="bg-white rounded-lg p-6 w-full max-w-md shadow-2xl animate-fade-in">
+                <div className="bg-white rounded-lg p-6 w-full max-w-md shadow-coffee-lg animate-fade-in">
                   <div className="flex items-center justify-between border-b border-gray-100 pb-3 mb-4">
                     <h3 className="font-bold text-coffee-dark text-lg flex items-center gap-1.5 text-amber-600">
                       <Sliders size={18} />
@@ -1914,7 +1888,7 @@ export default function DashboardPage() {
                       >
                         {inventory.map(item => (
                           <option key={item.id} value={item.id}>
-                            {item.icon} {item.name} (Tồn hệ thống: {item.qty} {item.unit})
+                            {item.name} (Tồn hệ thống: {item.qty} {item.unit})
                           </option>
                         ))}
                       </select>
@@ -1971,7 +1945,7 @@ export default function DashboardPage() {
             {/* MODAL 5: THÊM NHÀ CUNG CẤP */}
             {showAddSupplier && (
               <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 backdrop-blur-sm p-4">
-                <div className="bg-white rounded-lg p-6 w-full max-w-md shadow-2xl animate-fade-in">
+                <div className="bg-white rounded-lg p-6 w-full max-w-md shadow-coffee-lg animate-fade-in">
                   <div className="flex items-center justify-between border-b border-gray-100 pb-3 mb-4">
                     <h3 className="font-bold text-coffee-dark text-lg">Thêm nhà cung cấp</h3>
                     <button onClick={() => setShowAddSupplier(false)} className="p-1 text-gray-400 hover:bg-gray-100 rounded-full">
@@ -2043,7 +2017,7 @@ export default function DashboardPage() {
             {/* MODAL 6: SỬA NHÀ CUNG CẤP */}
             {showEditSupplier && (
               <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 backdrop-blur-sm p-4">
-                <div className="bg-white rounded-lg p-6 w-full max-w-md shadow-2xl animate-fade-in">
+                <div className="bg-white rounded-lg p-6 w-full max-w-md shadow-coffee-lg animate-fade-in">
                   <div className="flex items-center justify-between border-b border-gray-100 pb-3 mb-4">
                     <h3 className="font-bold text-coffee-dark text-lg">Cập nhật nhà cung cấp</h3>
                     <button onClick={() => setShowEditSupplier(false)} className="p-1 text-gray-400 hover:bg-gray-100 rounded-full">
@@ -2111,7 +2085,7 @@ export default function DashboardPage() {
             {/* MODAL 7: CẤU HÌNH ĐỊNH LƯỢNG MÓN (RECIPE EDITOR) */}
             {showRecipeModal && recipeProduct && (
               <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 backdrop-blur-sm p-4">
-                <div className="bg-white rounded-lg p-6 w-full max-w-2xl shadow-2xl animate-fade-in max-h-[85vh] flex flex-col">
+                <div className="bg-white rounded-lg p-6 w-full max-w-2xl shadow-coffee-lg animate-fade-in max-h-[85vh] flex flex-col">
                   <div className="flex items-center justify-between border-b border-gray-100 pb-3 mb-4">
                     <div>
                       <h3 className="font-bold text-coffee-dark text-lg">Cấu hình định lượng món ăn</h3>
@@ -2138,7 +2112,7 @@ export default function DashboardPage() {
                               <option value="">-- Chọn nguyên liệu --</option>
                               {inventory.map(item => (
                                 <option key={item.id} value={item.id}>
-                                  {item.icon} {item.name} ({item.unit})
+                                  {item.name} ({item.unit})
                                 </option>
                               ))}
                             </select>
@@ -2242,10 +2216,10 @@ export default function DashboardPage() {
                   </button>
                 </div>
 
-                <div className="overflow-x-auto rounded-lg border border-gray-150 bg-white">
+                <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white">
                   <table className="w-full text-sm text-left">
                     <thead>
-                      <tr className="bg-gray-50 border-b border-gray-150">
+                      <tr className="bg-gray-50 border-b border-gray-200">
                         <th className="px-4 py-3 font-semibold text-gray-700">Tên khách hàng</th>
                         <th className="px-4 py-3 font-semibold text-gray-700">Số điện thoại</th>
                         <th className="px-4 py-3 font-semibold text-gray-700 text-right">Điểm tích lũy</th>
@@ -2266,13 +2240,13 @@ export default function DashboardPage() {
                                 <span className="font-semibold text-gray-800">{c.name || '---'}</span>
                               </div>
                             </td>
-                            <td className="px-4 py-3.5 text-gray-650 font-mono">{c.phone || '---'}</td>
+                            <td className="px-4 py-3.5 text-gray-600 font-mono">{c.phone || '---'}</td>
                             <td className="px-4 py-3.5 text-right font-bold text-gray-900">{(c.points || 0)} điểm</td>
                             <td className="px-4 py-3.5 text-center">
                               {c.tier === 'DIAMOND' ? (
-                                <span className="bg-purple-100 text-purple-700 border border-purple-200 text-xs px-2.5 py-1 rounded-full font-bold">💎 Kim cương</span>
+                                <span className="bg-purple-100 text-purple-700 border border-purple-200 text-xs px-2.5 py-1 rounded-full font-bold">Kim cương</span>
                               ) : c.tier === 'GOLD' ? (
-                                <span className="bg-amber-100 text-amber-700 border border-amber-250 text-xs px-2.5 py-1 rounded-full font-bold">👑 Vàng</span>
+                                <span className="bg-amber-100 text-amber-700 border border-amber-300 text-xs px-2.5 py-1 rounded-full font-bold">Vàng</span>
                               ) : (
                                 <span className="bg-gray-100 text-gray-600 border border-gray-200 text-xs px-2.5 py-1 rounded-full font-semibold">Bạc</span>
                               )}
@@ -2338,10 +2312,10 @@ export default function DashboardPage() {
                   </button>
                 </div>
 
-                <div className="overflow-x-auto rounded-lg border border-gray-150 bg-white">
+                <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white">
                   <table className="w-full text-sm text-left">
                     <thead>
-                      <tr className="bg-gray-50 border-b border-gray-150">
+                      <tr className="bg-gray-50 border-b border-gray-200">
                         <th className="px-4 py-3 font-semibold text-gray-700">Tên bàn</th>
                         <th className="px-4 py-3 font-semibold text-gray-700">Khu vực phân bổ</th>
                         <th className="px-4 py-3 font-semibold text-gray-700 text-center">Sức chứa khách</th>
@@ -2366,7 +2340,7 @@ export default function DashboardPage() {
                               {t.status === 'occupied' ? (
                                 <span className="bg-pink-150 text-pink-700 text-[11px] px-2 py-0.5 rounded font-bold border border-pink-200">Có khách</span>
                               ) : t.status === 'dirty' ? (
-                                <span className="bg-yellow-100 text-yellow-700 text-[11px] px-2 py-0.5 rounded font-bold border border-yellow-250">Chưa dọn</span>
+                                <span className="bg-yellow-100 text-yellow-700 text-[11px] px-2 py-0.5 rounded font-bold border border-yellow-300">Chưa dọn</span>
                               ) : (
                                 <span className="bg-green-50 text-green-700 text-[11px] px-2 py-0.5 rounded font-bold border border-green-200">Bàn trống</span>
                               )}
@@ -2409,7 +2383,7 @@ export default function DashboardPage() {
             {/* MODAL: THÊM KHÁCH HÀNG CRM */}
             {showAddCust && (
               <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 backdrop-blur-sm p-4 animate-fade-in">
-                <div className="bg-white rounded-lg p-6 w-full max-w-md shadow-2xl">
+                <div className="bg-white rounded-lg p-6 w-full max-w-md shadow-coffee-lg">
                   <div className="flex items-center justify-between border-b border-gray-100 pb-3 mb-4">
                     <h3 className="font-bold text-coffee-dark text-lg">Tạo hồ sơ khách hàng mới</h3>
                     <button onClick={() => setShowAddCust(false)} className="p-1 text-gray-400 hover:bg-gray-100 rounded-full">
@@ -2486,7 +2460,7 @@ export default function DashboardPage() {
             {/* MODAL: SỬA KHÁCH HÀNG CRM */}
             {showEditCust && (
               <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 backdrop-blur-sm p-4 animate-fade-in">
-                <div className="bg-white rounded-lg p-6 w-full max-w-md shadow-2xl">
+                <div className="bg-white rounded-lg p-6 w-full max-w-md shadow-coffee-lg">
                   <div className="flex items-center justify-between border-b border-gray-100 pb-3 mb-4">
                     <h3 className="font-bold text-coffee-dark text-lg">Chỉnh sửa hồ sơ khách hàng</h3>
                     <button onClick={() => setShowEditCust(false)} className="p-1 text-gray-400 hover:bg-gray-100 rounded-full">
@@ -2563,7 +2537,7 @@ export default function DashboardPage() {
             {/* MODAL: THÊM MỚI BÀN ĂN */}
             {showAddTable && (
               <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 backdrop-blur-sm p-4 animate-fade-in">
-                <div className="bg-white rounded-lg p-6 w-full max-w-md shadow-2xl">
+                <div className="bg-white rounded-lg p-6 w-full max-w-md shadow-coffee-lg">
                   <div className="flex items-center justify-between border-b border-gray-100 pb-3 mb-4">
                     <h3 className="font-bold text-coffee-dark text-lg">Thêm bàn ăn vào sơ đồ</h3>
                     <button onClick={() => setShowAddTable(false)} className="p-1 text-gray-400 hover:bg-gray-100 rounded-full">
@@ -2630,7 +2604,7 @@ export default function DashboardPage() {
             {/* MODAL: SỬA BÀN ĂN */}
             {showEditTable && (
               <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 backdrop-blur-sm p-4 animate-fade-in">
-                <div className="bg-white rounded-lg p-6 w-full max-w-md shadow-2xl">
+                <div className="bg-white rounded-lg p-6 w-full max-w-md shadow-coffee-lg">
                   <div className="flex items-center justify-between border-b border-gray-100 pb-3 mb-4">
                     <h3 className="font-bold text-coffee-dark text-lg">Chỉnh sửa thông tin bàn</h3>
                     <button onClick={() => setShowEditTable(false)} className="p-1 text-gray-400 hover:bg-gray-100 rounded-full">

@@ -39,7 +39,7 @@ export default function SplitBillModal({ cart, onClose, onConfirmSplit }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in"
       style={{ background: 'rgba(26,15,10,0.75)', backdropFilter: 'blur(8px)' }}>
-      <div className="relative bg-white rounded-lg shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
+      <div className="relative bg-white rounded-lg shadow-coffee-lg w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
         
         <div className="px-6 py-4 border-b border-cream-medium/50 flex items-center justify-between bg-cream-light/30">
           <div className="flex items-center gap-3">
