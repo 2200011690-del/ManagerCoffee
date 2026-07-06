@@ -2415,12 +2415,6 @@ const INITIAL_INVENTORY = [
   { name: 'Bột Matcha', unit: 'kg', qty: 2.5, minQty: 1, icon: '🍵' },
 ];
 
-const INITIAL_SUPPLIERS = [
-  { name: 'Cty Sữa Cát Tường', phone: '0912888999', email: 'cattuong@milk.vn', address: 'KCN Sóng Thần, Bình Dương' },
-  { name: 'Nhà phân phối Cà phê Hải Hà', phone: '0903111222', email: 'haihacoffee@gmail.com', address: '45 Lê Văn Sỹ, Q.3, TP.HCM' },
-  { name: 'Chợ Đầu Mối Bình Điền (Đường & Trà)', phone: '0987654321', email: 'binhdienmarket@hcm.gov.vn', address: 'Quận 8, TP.HCM' },
-];
-
 const RECIPE_SEEDS = {
   'Cà phê Đen': { 'Cà phê Arabica': 0.02 },
   'Cà phê Sữa': { 'Cà phê Arabica': 0.018, 'Sữa đặc': 0.03 },
@@ -2633,12 +2627,11 @@ app.post('/api/inventory/reset', async (req, res) => {
     await prisma.stockTransaction.deleteMany({ where: { storeId } });
     await prisma.recipeItem.deleteMany({ where: { product: { storeId } } });
     await prisma.inventory.deleteMany({ where: { storeId } });
-    await prisma.supplier.deleteMany({ where: { storeId } });
-    
+
     const suppliersMap = {};
-    for (const s of INITIAL_SUPPLIERS) {
-      const supplier = await prisma.supplier.create({ data: { ...s, storeId } });
-      suppliersMap[s.name] = supplier.id;
+    const existingSuppliers = await prisma.supplier.findMany({ where: { storeId } });
+    for (const supplier of existingSuppliers) {
+      suppliersMap[supplier.name] = supplier.id;
     }
 
     const inventoryMap = {};
@@ -2647,11 +2640,11 @@ app.post('/api/inventory/reset', async (req, res) => {
       
       let supplierId = null;
       if (inv.name.includes('Sữa')) {
-        supplierId = suppliersMap['Cty Sữa Cát Tường'];
+        supplierId = suppliersMap['Cty Sữa Cát Tường'] || null;
       } else if (inv.name.includes('Cà phê')) {
-        supplierId = suppliersMap['Nhà phân phối Cà phê Hải Hà'];
+        supplierId = suppliersMap['Nhà phân phối Cà phê Hải Hà'] || null;
       } else {
-        supplierId = suppliersMap['Chợ Đầu Mối Bình Điền (Đường & Trà)'];
+        supplierId = suppliersMap['Chợ Đầu Mối Bình Điền (Đường & Trà)'] || null;
       }
 
       await prisma.stockTransaction.create({
