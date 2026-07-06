@@ -43,7 +43,7 @@ export default function SplitPaymentModal({ total, onClose, onConfirm }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in"
       style={{ background: 'rgba(26,15,10,0.65)', backdropFilter: 'blur(6px)' }}>
-      <div className="bg-white rounded-3xl shadow-coffee-lg w-full max-w-md p-6 animate-slide-up">
+      <div className="bg-white rounded-lg shadow-coffee-lg w-full max-w-md p-6 animate-slide-up">
         <div className="flex items-center justify-between mb-5">
           <div>
             <h3 className="font-display font-bold text-lg text-coffee-dark">Thanh toán kết hợp</h3>
@@ -55,7 +55,7 @@ export default function SplitPaymentModal({ total, onClose, onConfirm }) {
         </div>
 
         {/* Total */}
-        <div className="bg-cream-light/60 rounded-2xl p-4 mb-4 text-center border border-cream-medium/30">
+        <div className="bg-cream-light/60 rounded-lg p-4 mb-4 text-center border border-cream-medium/30">
           <p className="text-xs text-coffee-light uppercase tracking-wider mb-1">Tổng cần thanh toán</p>
           <p className="text-2xl font-bold text-coffee-accent font-mono">{total.toLocaleString('vi-VN')}đ</p>
         </div>
@@ -66,7 +66,7 @@ export default function SplitPaymentModal({ total, onClose, onConfirm }) {
             const methodConfig = PAYMENT_METHODS.find(m => m.id === payment.method);
             const Icon = methodConfig?.icon || Banknote;
             return (
-              <div key={idx} className={`rounded-2xl border-2 p-3 ${methodConfig?.color || 'border-cream-dark'}`}>
+              <div key={idx} className={`rounded-lg border-2 p-3 ${methodConfig?.color || 'border-cream-dark'}`}>
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
                     <Icon size={16} />
@@ -81,7 +81,7 @@ export default function SplitPaymentModal({ total, onClose, onConfirm }) {
                   value={payment.amount || ''}
                   onChange={e => updatePayment(idx, 'amount', e.target.value)}
                   placeholder="Nhập số tiền..."
-                  className="w-full px-3 py-2 rounded-xl border border-current/20 bg-white text-sm font-mono font-bold focus:outline-none focus:ring-2 focus:ring-coffee-accent/30"
+                  className="w-full px-3 py-2 rounded-lg border border-current/20 bg-white text-sm font-mono font-bold focus:outline-none focus:ring-2 focus:ring-coffee-accent/30"
                 />
                 {(payment.method !== 'cash') && (
                   <input
@@ -112,7 +112,7 @@ export default function SplitPaymentModal({ total, onClose, onConfirm }) {
         </div>
 
         {/* Remaining */}
-        <div className={`rounded-2xl p-3 mb-4 flex items-center justify-between text-sm font-bold ${
+        <div className={`rounded-lg p-3 mb-4 flex items-center justify-between text-sm font-bold ${
           isValid ? 'bg-green-50 border border-green-200 text-green-800' :
           remaining > 0 ? 'bg-amber-50 border border-amber-200 text-amber-800' :
           'bg-red-50 border border-red-200 text-red-800'

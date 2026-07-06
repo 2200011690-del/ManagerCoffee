@@ -136,7 +136,7 @@ export default function QuickAttendanceModal({ onClose }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-fade-in">
-      <div className="relative w-full max-w-sm mx-4 bg-gray-900/90 border border-gray-850 rounded-2xl shadow-2xl overflow-hidden p-6 transition-all duration-300 transform scale-100">
+      <div className="relative w-full max-w-sm mx-4 bg-gray-900/90 border border-gray-850 rounded-lg shadow-2xl overflow-hidden p-6 transition-all duration-300 transform scale-100">
         
         {/* Shutter flash overlay */}
         {flash && (
@@ -219,7 +219,7 @@ export default function QuickAttendanceModal({ onClose }) {
                   key={num}
                   disabled={isLoading}
                   onClick={() => handleKeyPress(num)}
-                  className="h-14 rounded-xl text-white font-semibold text-lg bg-gray-800/60 hover:bg-gray-700 active:bg-gray-850 hover:scale-102 transition-all flex items-center justify-center border border-gray-750/30"
+                  className="h-14 rounded-lg text-white font-semibold text-lg bg-gray-800/60 hover:bg-gray-700 active:bg-gray-850 hover:scale-102 transition-all flex items-center justify-center border border-gray-750/30"
                 >
                   {num}
                 </button>
@@ -228,7 +228,7 @@ export default function QuickAttendanceModal({ onClose }) {
               <button
                 disabled={isLoading}
                 onClick={handleClear}
-                className="h-14 rounded-xl text-gray-400 font-medium text-sm bg-gray-800/25 hover:bg-gray-850 hover:text-white transition-all flex items-center justify-center border border-gray-800/10"
+                className="h-14 rounded-lg text-gray-400 font-medium text-sm bg-gray-800/25 hover:bg-gray-850 hover:text-white transition-all flex items-center justify-center border border-gray-800/10"
               >
                 Xóa
               </button>
@@ -236,7 +236,7 @@ export default function QuickAttendanceModal({ onClose }) {
               <button
                 disabled={isLoading}
                 onClick={() => handleKeyPress(0)}
-                className="h-14 rounded-xl text-white font-semibold text-lg bg-gray-800/60 hover:bg-gray-700 active:bg-gray-850 hover:scale-102 transition-all flex items-center justify-center border border-gray-750/30"
+                className="h-14 rounded-lg text-white font-semibold text-lg bg-gray-800/60 hover:bg-gray-700 active:bg-gray-850 hover:scale-102 transition-all flex items-center justify-center border border-gray-750/30"
               >
                 0
               </button>
@@ -244,7 +244,7 @@ export default function QuickAttendanceModal({ onClose }) {
               <button
                 disabled={isLoading}
                 onClick={handleDelete}
-                className="h-14 rounded-xl text-gray-400 hover:text-white hover:bg-gray-850 transition-all flex items-center justify-center"
+                className="h-14 rounded-lg text-gray-400 hover:text-white hover:bg-gray-850 transition-all flex items-center justify-center"
               >
                 <Delete size={20} />
               </button>
@@ -267,7 +267,7 @@ export default function QuickAttendanceModal({ onClose }) {
             <h4 className="text-white text-lg font-bold mb-1">Điểm danh thành công!</h4>
             <p className="text-gray-400 text-xs mb-4">Xin chào, <span className="text-white font-semibold">{result.employeeName}</span></p>
 
-            <div className="w-full bg-gray-950/80 border border-gray-850 rounded-xl p-4 mb-4 text-left space-y-2">
+            <div className="w-full bg-gray-950/80 border border-gray-850 rounded-lg p-4 mb-4 text-left space-y-2">
               <div className="flex justify-between text-xs">
                 <span className="text-gray-500">Trạng thái:</span>
                 <span className={`font-bold ${result.action === 'clockIn' ? 'text-green-400' : 'text-amber-400'}`}>

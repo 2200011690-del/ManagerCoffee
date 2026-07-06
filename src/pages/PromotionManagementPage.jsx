@@ -291,7 +291,7 @@ export default function PromotionManagementPage() {
         </div>
 
         {/* Sub-tab switcher bar */}
-        <div className="flex bg-cream-medium/20 rounded-xl p-1 gap-1 w-fit border border-cream-medium/30">
+        <div className="flex bg-cream-medium/20 rounded-lg p-1 gap-1 w-fit border border-cream-medium/30">
           <button
             onClick={() => setActiveSubTab('auto')}
             className={`min-h-[36px] px-4 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ${
@@ -317,7 +317,7 @@ export default function PromotionManagementPage() {
         </div>
 
         {error && (
-          <div className="bg-red-50 text-red-600 p-4 rounded-xl border border-red-200">
+          <div className="bg-red-50 text-red-600 p-4 rounded-lg border border-red-200">
             {error}
           </div>
         )}
@@ -328,7 +328,7 @@ export default function PromotionManagementPage() {
             {loading ? (
               <p className="text-center py-10 text-coffee-medium">Đang tải danh sách khuyến mãi...</p>
             ) : promotions.length === 0 ? (
-              <div className="bg-white rounded-2xl shadow-card p-12 text-center text-coffee-medium">
+              <div className="bg-white rounded-lg shadow-card p-12 text-center text-coffee-medium">
                 <Gift size={40} className="mx-auto mb-3 text-coffee-light/40" />
                 <p className="font-semibold">Chưa cấu hình chương trình khuyến mãi nào</p>
                 <p className="text-xs text-gray-400 mt-0.5 font-medium">Bấm "Tạo khuyến mãi mới" ở trên để thiết lập chương trình đầu tiên</p>
@@ -339,7 +339,7 @@ export default function PromotionManagementPage() {
                   const cond = parseJson(promo.conditions);
                   const rew = parseJson(promo.rewards);
                   return (
-                    <div key={promo.id} className={`bg-white p-6 rounded-2xl shadow-card border transition-all duration-200 hover:shadow-coffee-sm flex flex-col justify-between ${promo.isActive ? 'border-cream-medium/30' : 'border-gray-200 bg-gray-50/50'}`}>
+                    <div key={promo.id} className={`bg-white p-6 rounded-lg shadow-card border transition-all duration-200 hover:shadow-coffee-sm flex flex-col justify-between ${promo.isActive ? 'border-cream-medium/30' : 'border-gray-200 bg-gray-50/50'}`}>
                       <div>
                         <div className="flex items-center justify-between mb-3">
                           <span className={`text-xs font-bold px-2.5 py-1 rounded-full uppercase ${
@@ -449,7 +449,7 @@ export default function PromotionManagementPage() {
               </div>
             </div>
 
-            <div className="overflow-x-auto rounded-xl border border-gray-150 bg-white">
+            <div className="overflow-x-auto rounded-lg border border-gray-150 bg-white">
               <table className="w-full text-sm text-left">
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-150">
@@ -522,7 +522,7 @@ export default function PromotionManagementPage() {
                               </button>
                               <button
                                 onClick={() => handleDeleteVouch(v.id)}
-                                className="p-1 hover:bg-gray-100 rounded text-red-650"
+                                className="p-1 hover:bg-gray-100 rounded text-red-600"
                                 title="Xóa"
                               >
                                 <Trash2 size={15} />
@@ -547,7 +547,7 @@ export default function PromotionManagementPage() {
       {/* Promotion Form Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-fade-in overflow-y-auto">
-          <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden my-8">
+          <div className="bg-white rounded-lg w-full max-w-lg shadow-2xl overflow-hidden my-8">
             <div className="p-5 border-b border-gray-100 flex justify-between items-center bg-cream-light/30">
               <h2 className="font-display font-bold text-coffee-dark text-lg flex items-center gap-2">
                 <Gift className="text-coffee-accent" size={20} />
@@ -564,21 +564,21 @@ export default function PromotionManagementPage() {
                 <button
                   type="button"
                   onClick={() => setPromoType('HAPPY_HOUR')}
-                  className={`py-2 px-3 rounded-xl border text-xs font-bold transition-all ${promoType === 'HAPPY_HOUR' ? 'border-amber-500 bg-amber-50 text-amber-700' : 'border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+                  className={`py-2 px-3 rounded-lg border text-xs font-bold transition-all ${promoType === 'HAPPY_HOUR' ? 'border-amber-500 bg-amber-50 text-amber-700' : 'border-gray-200 text-gray-600 hover:bg-gray-50'}`}
                 >
                   Giờ vàng (Happy Hour)
                 </button>
                 <button
                   type="button"
                   onClick={() => setPromoType('COMBO')}
-                  className={`py-2 px-3 rounded-xl border text-xs font-bold transition-all ${promoType === 'COMBO' ? 'border-purple-500 bg-purple-50 text-purple-700' : 'border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+                  className={`py-2 px-3 rounded-lg border text-xs font-bold transition-all ${promoType === 'COMBO' ? 'border-purple-500 bg-purple-50 text-purple-700' : 'border-gray-200 text-gray-600 hover:bg-gray-50'}`}
                 >
                   Đóng gói Combo
                 </button>
                 <button
                   type="button"
                   onClick={() => setPromoType('BUY_X_GET_Y')}
-                  className={`py-2 px-3 rounded-xl border text-xs font-bold transition-all ${promoType === 'BUY_X_GET_Y' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+                  className={`py-2 px-3 rounded-lg border text-xs font-bold transition-all ${promoType === 'BUY_X_GET_Y' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 text-gray-600 hover:bg-gray-50'}`}
                 >
                   Mua X tặng Y
                 </button>
@@ -752,10 +752,10 @@ export default function PromotionManagementPage() {
               </div>
 
               <div className="pt-4 border-t border-gray-100 flex justify-end gap-3">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 border border-gray-200 rounded-xl text-sm font-semibold text-gray-500 hover:bg-gray-50">
+                <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 border border-gray-200 rounded-lg text-sm font-semibold text-gray-500 hover:bg-gray-50">
                   Hủy bỏ
                 </button>
-                <button type="submit" className="px-5 py-2 btn-primary rounded-xl text-sm font-semibold flex items-center gap-1.5">
+                <button type="submit" className="px-5 py-2 btn-primary rounded-lg text-sm font-semibold flex items-center gap-1.5">
                   <Check size={16} /> Lưu chương trình
                 </button>
               </div>
@@ -767,7 +767,7 @@ export default function PromotionManagementPage() {
       {/* MODAL: THÊM MỚI VOUCHER */}
       {showAddVouch && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 backdrop-blur-sm p-4 animate-fade-in">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md shadow-2xl">
             <div className="flex items-center justify-between border-b border-gray-100 pb-3 mb-4">
               <h3 className="font-bold text-coffee-dark text-lg">Tạo mã giảm giá mới</h3>
               <button onClick={() => setShowAddVouch(false)} className="p-1 text-gray-400 hover:bg-gray-100 rounded-full">
@@ -870,7 +870,7 @@ export default function PromotionManagementPage() {
       {/* MODAL: SỬA VOUCHER */}
       {showEditVouch && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 backdrop-blur-sm p-4 animate-fade-in">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md shadow-2xl">
             <div className="flex items-center justify-between border-b border-gray-100 pb-3 mb-4">
               <h3 className="font-bold text-coffee-dark text-lg">Cập nhật mã giảm giá</h3>
               <button onClick={() => setShowEditVouch(false)} className="p-1 text-gray-400 hover:bg-gray-100 rounded-full">

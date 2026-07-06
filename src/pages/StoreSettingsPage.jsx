@@ -38,7 +38,7 @@ const INTEGRATION_FIELDS = {
     config: [
       ['apiUrl', 'API URL', 'https://partner-api.grab.com'],
       ['merchantId', 'Merchant ID', 'merchant_xxx'],
-      ['storeCode', 'Store Code', 'store_xxx']
+      ['storeCode', 'Mã cửa hàng', 'store_xxx']
     ],
     secrets: [
       ['apiKey', 'API Key'],
@@ -51,7 +51,7 @@ const INTEGRATION_FIELDS = {
     config: [
       ['apiUrl', 'API URL', 'https://partner-api.shopeefood.vn'],
       ['merchantId', 'Merchant ID', 'merchant_xxx'],
-      ['storeCode', 'Store Code', 'store_xxx']
+      ['storeCode', 'Mã cửa hàng', 'store_xxx']
     ],
     secrets: [
       ['apiKey', 'API Key'],
@@ -60,7 +60,7 @@ const INTEGRATION_FIELDS = {
     ]
   },
   web_order: {
-    title: 'Web Order',
+    title: 'Website đặt món',
     config: [
       ['publicOrderUrl', 'URL đặt hàng', 'https://order.domain-cua-quan.vn'],
       ['channelName', 'Tên kênh', 'Website']
@@ -162,7 +162,7 @@ export default function StoreSettingsPage() {
     try {
       await api.put('/store/settings', settings);
       localStorage.setItem('lan_printer_ip', printerIp);
-      showNotification('Lưu cấu hình thành công! 🎉', 'success');
+      showNotification('Lưu cấu hình thành công', 'success');
     } catch {
       showNotification('Lỗi khi lưu cấu hình', 'error');
     } finally {
@@ -262,7 +262,7 @@ export default function StoreSettingsPage() {
           ]
         }
       });
-      showNotification('Đã gửi lệnh in thử thành công! 🎉', 'success');
+      showNotification('Đã gửi lệnh in thử thành công', 'success');
     } catch (err) {
       showNotification(err.response?.data?.error || 'Lỗi kết nối máy in LAN', 'error');
     } finally {
@@ -282,7 +282,7 @@ export default function StoreSettingsPage() {
   }
 
   return (
-    <div className="h-full overflow-y-auto bg-[#FDFBF7] p-6 lg:p-8">
+    <div className="h-full overflow-y-auto bg-surface-bg p-6 lg:p-8">
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>
@@ -296,7 +296,7 @@ export default function StoreSettingsPage() {
         <button
           onClick={handleSave}
           disabled={saving}
-          className="min-h-[44px] px-5 py-2.5 bg-gradient-to-r from-coffee-accent to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white rounded-xl font-semibold shadow-md shadow-coffee-light/20 flex items-center gap-2 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:pointer-events-none"
+          className="min-h-[44px] px-5 py-2.5 bg-primary-600 hover:bg-primary-700 text-white rounded-lg font-semibold shadow-sm flex items-center gap-2 active:scale-98 transition-all disabled:opacity-50 disabled:pointer-events-none"
         >
           {saving ? (
             <RefreshCw className="w-4 h-4 animate-spin" />
@@ -307,14 +307,14 @@ export default function StoreSettingsPage() {
         </button>
       </div>
 
-      <div className="max-w-4xl bg-white rounded-3xl border border-coffee-light/10 shadow-coffee-sm overflow-hidden flex flex-col md:flex-row min-h-[500px]">
+      <div className="max-w-6xl bg-white rounded-lg border border-surface-border shadow-card overflow-hidden flex flex-col md:flex-row min-h-[500px]">
         {/* Sidebar Tabs */}
-        <div className="w-full md:w-60 bg-cream-light/40 border-r border-coffee-light/10 p-4 space-y-1">
+        <div className="w-full md:w-60 bg-surface-muted/70 border-r border-surface-border p-4 space-y-1">
           <button
             onClick={() => setActiveTab('general')}
-            className={`w-full min-h-[44px] flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold transition-all ${
+            className={`w-full min-h-[44px] flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-semibold transition-all ${
               activeTab === 'general'
-                ? 'bg-coffee-accent text-white shadow-md shadow-coffee-accent/20'
+                ? 'bg-coffee-accent text-white shadow-sm'
                 : 'text-coffee-medium hover:bg-cream-light/80 hover:text-coffee-dark'
             }`}
           >
@@ -324,9 +324,9 @@ export default function StoreSettingsPage() {
 
           <button
             onClick={() => setActiveTab('receipt')}
-            className={`w-full min-h-[44px] flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold transition-all ${
+            className={`w-full min-h-[44px] flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-semibold transition-all ${
               activeTab === 'receipt'
-                ? 'bg-coffee-accent text-white shadow-md shadow-coffee-accent/20'
+                ? 'bg-coffee-accent text-white shadow-sm'
                 : 'text-coffee-medium hover:bg-cream-light/80 hover:text-coffee-dark'
             }`}
           >
@@ -336,9 +336,9 @@ export default function StoreSettingsPage() {
 
           <button
             onClick={() => setActiveTab('loyalty')}
-            className={`w-full min-h-[44px] flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold transition-all ${
+            className={`w-full min-h-[44px] flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-semibold transition-all ${
               activeTab === 'loyalty'
-                ? 'bg-coffee-accent text-white shadow-md shadow-coffee-accent/20'
+                ? 'bg-coffee-accent text-white shadow-sm'
                 : 'text-coffee-medium hover:bg-cream-light/80 hover:text-coffee-dark'
             }`}
           >
@@ -349,9 +349,9 @@ export default function StoreSettingsPage() {
           <button
             type="button"
             onClick={() => setActiveTab('bank')}
-            className={`w-full min-h-[44px] flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold transition-all ${
+            className={`w-full min-h-[44px] flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-semibold transition-all ${
               activeTab === 'bank'
-                ? 'bg-coffee-accent text-white shadow-md shadow-coffee-accent/20'
+                ? 'bg-coffee-accent text-white shadow-sm'
                 : 'text-coffee-medium hover:bg-cream-light/80 hover:text-coffee-dark'
             }`}
           >
@@ -362,9 +362,9 @@ export default function StoreSettingsPage() {
           <button
             type="button"
             onClick={() => setActiveTab('printer')}
-            className={`w-full min-h-[44px] flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold transition-all ${
+            className={`w-full min-h-[44px] flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-semibold transition-all ${
               activeTab === 'printer'
-                ? 'bg-coffee-accent text-white shadow-md shadow-coffee-accent/20'
+                ? 'bg-coffee-accent text-white shadow-sm'
                 : 'text-coffee-medium hover:bg-cream-light/80 hover:text-coffee-dark'
             }`}
           >
@@ -375,9 +375,9 @@ export default function StoreSettingsPage() {
           <button
             type="button"
             onClick={() => setActiveTab('integrations')}
-            className={`w-full min-h-[44px] flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold transition-all ${
+            className={`w-full min-h-[44px] flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-semibold transition-all ${
               activeTab === 'integrations'
-                ? 'bg-coffee-accent text-white shadow-md shadow-coffee-accent/20'
+                ? 'bg-coffee-accent text-white shadow-sm'
                 : 'text-coffee-medium hover:bg-cream-light/80 hover:text-coffee-dark'
             }`}
           >
@@ -397,7 +397,7 @@ export default function StoreSettingsPage() {
 
               {/* Logo Preview and Link */}
               <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-                <div className="w-20 h-20 rounded-2xl bg-cream-light border border-coffee-light/20 flex items-center justify-center overflow-hidden flex-shrink-0">
+                <div className="w-20 h-20 rounded-lg bg-cream-light border border-coffee-light/20 flex items-center justify-center overflow-hidden flex-shrink-0">
                   {settings.logo ? (
                     <img src={settings.logo} alt="Logo" className="w-full h-full object-contain" />
                   ) : (
@@ -412,7 +412,7 @@ export default function StoreSettingsPage() {
                     value={settings.logo}
                     onChange={handleChange}
                     placeholder="https://example.com/logo.png"
-                    className="w-full min-h-[40px] px-3.5 py-2 text-sm rounded-xl border border-coffee-light/20 focus:outline-none focus:border-coffee-accent bg-[#FCFBF8]"
+                    className="w-full min-h-[40px] px-3.5 py-2 text-sm rounded-lg border border-coffee-light/20 focus:outline-none focus:border-coffee-accent bg-white"
                   />
                 </div>
               </div>
@@ -426,17 +426,17 @@ export default function StoreSettingsPage() {
                     value={settings.name}
                     onChange={handleChange}
                     required
-                    className="w-full min-h-[40px] px-3.5 py-2 text-sm rounded-xl border border-coffee-light/20 focus:outline-none focus:border-coffee-accent bg-[#FCFBF8]"
+                    className="w-full min-h-[40px] px-3.5 py-2 text-sm rounded-lg border border-coffee-light/20 focus:outline-none focus:border-coffee-accent bg-white"
                   />
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-coffee-medium">Mã cửa hàng (Store Code)</label>
+                  <label className="text-xs font-semibold text-coffee-medium">Mã cửa hàng</label>
                   <input
                     type="text"
                     value={settings.code}
                     disabled
-                    className="w-full min-h-[40px] px-3.5 py-2 text-sm rounded-xl border border-coffee-light/20 bg-cream-light/30 text-coffee-medium/60 cursor-not-allowed"
+                    className="w-full min-h-[40px] px-3.5 py-2 text-sm rounded-lg border border-coffee-light/20 bg-cream-light/30 text-coffee-medium/60 cursor-not-allowed"
                   />
                 </div>
               </div>
@@ -449,7 +449,7 @@ export default function StoreSettingsPage() {
                     name="phone"
                     value={settings.phone}
                     onChange={handleChange}
-                    className="w-full min-h-[40px] px-3.5 py-2 text-sm rounded-xl border border-coffee-light/20 focus:outline-none focus:border-coffee-accent bg-[#FCFBF8]"
+                    className="w-full min-h-[40px] px-3.5 py-2 text-sm rounded-lg border border-coffee-light/20 focus:outline-none focus:border-coffee-accent bg-white"
                   />
                 </div>
 
@@ -460,7 +460,7 @@ export default function StoreSettingsPage() {
                     name="currency"
                     value={settings.currency}
                     onChange={handleChange}
-                    className="w-full min-h-[40px] px-3.5 py-2 text-sm rounded-xl border border-coffee-light/20 focus:outline-none focus:border-coffee-accent bg-[#FCFBF8]"
+                    className="w-full min-h-[40px] px-3.5 py-2 text-sm rounded-lg border border-coffee-light/20 focus:outline-none focus:border-coffee-accent bg-white"
                   />
                 </div>
               </div>
@@ -472,7 +472,7 @@ export default function StoreSettingsPage() {
                   value={settings.address}
                   onChange={handleChange}
                   rows={2}
-                  className="w-full px-3.5 py-2 text-sm rounded-xl border border-coffee-light/20 focus:outline-none focus:border-coffee-accent bg-[#FCFBF8] resize-none"
+                  className="w-full px-3.5 py-2 text-sm rounded-lg border border-coffee-light/20 focus:outline-none focus:border-coffee-accent bg-white resize-none"
                 />
               </div>
             </div>
@@ -487,7 +487,7 @@ export default function StoreSettingsPage() {
 
               <div className="space-y-1.5">
                 <label className="text-xs font-semibold text-coffee-medium flex items-center gap-1">
-                  <span>Tiêu đề hóa đơn (Header)</span>
+                  <span>Tiêu đề hóa đơn</span>
                   <span className="text-[10px] text-coffee-medium/50">(Hiển thị ở dòng đầu, ví dụ: Chào mừng quý khách)</span>
                 </label>
                 <textarea
@@ -496,13 +496,13 @@ export default function StoreSettingsPage() {
                   onChange={handleChange}
                   rows={3}
                   placeholder="Hân hạnh phục vụ quý khách!&#10;Wifi: espresso_guest / Pass: 88888888"
-                  className="w-full px-3.5 py-2 text-sm font-mono rounded-xl border border-coffee-light/20 focus:outline-none focus:border-coffee-accent bg-[#FCFBF8] resize-none"
+                  className="w-full px-3.5 py-2 text-sm font-mono rounded-lg border border-coffee-light/20 focus:outline-none focus:border-coffee-accent bg-white resize-none"
                 />
               </div>
 
               <div className="space-y-1.5">
                 <label className="text-xs font-semibold text-coffee-medium flex items-center gap-1">
-                  <span>Chân hóa đơn (Footer)</span>
+                  <span>Chân hóa đơn</span>
                   <span className="text-[10px] text-coffee-medium/50">(Hiển thị ở dòng cuối, ví dụ: Hẹn gặp lại)</span>
                 </label>
                 <textarea
@@ -511,11 +511,11 @@ export default function StoreSettingsPage() {
                   onChange={handleChange}
                   rows={3}
                   placeholder="Cảm ơn và hẹn gặp lại quý khách!&#10;Thiết kế bởi Manager Coffee"
-                  className="w-full px-3.5 py-2 text-sm font-mono rounded-xl border border-coffee-light/20 focus:outline-none focus:border-coffee-accent bg-[#FCFBF8] resize-none"
+                  className="w-full px-3.5 py-2 text-sm font-mono rounded-lg border border-coffee-light/20 focus:outline-none focus:border-coffee-accent bg-white resize-none"
                 />
               </div>
 
-              <div className="bg-cream-light/40 border border-coffee-light/10 rounded-2xl p-4 flex gap-3">
+              <div className="bg-cream-light/40 border border-coffee-light/10 rounded-lg p-4 flex gap-3">
                 <AlertTriangle className="w-5 h-5 text-coffee-accent flex-shrink-0 mt-0.5" />
                 <div className="space-y-1">
                   <h4 className="text-xs font-bold text-coffee-dark">Mẹo tùy chỉnh hóa đơn:</h4>
@@ -549,7 +549,7 @@ export default function StoreSettingsPage() {
                       step="0.01"
                       min="0"
                       max="1"
-                      className="w-full min-h-[40px] pl-3.5 pr-10 py-2 text-sm rounded-xl border border-coffee-light/20 focus:outline-none focus:border-coffee-accent bg-[#FCFBF8]"
+                      className="w-full min-h-[40px] pl-3.5 pr-10 py-2 text-sm rounded-lg border border-coffee-light/20 focus:outline-none focus:border-coffee-accent bg-white"
                     />
                     <span className="absolute right-3 top-2.5 text-xs text-coffee-medium font-bold">
                       {Math.round(settings.vatRate * 100)}%
@@ -563,7 +563,7 @@ export default function StoreSettingsPage() {
                 <div className="space-y-2">
                   <label className="text-xs font-semibold text-coffee-medium flex items-center gap-1.5">
                     <Gift size={14} className="text-coffee-accent" />
-                    <span>Tỷ lệ tích lũy điểm (Loyalty Rate)</span>
+                    <span>Tỷ lệ tích lũy điểm</span>
                   </label>
                   <div className="relative">
                     <input
@@ -574,7 +574,7 @@ export default function StoreSettingsPage() {
                       step="0.01"
                       min="0"
                       max="1"
-                      className="w-full min-h-[40px] pl-3.5 pr-10 py-2 text-sm rounded-xl border border-coffee-light/20 focus:outline-none focus:border-coffee-accent bg-[#FCFBF8]"
+                      className="w-full min-h-[40px] pl-3.5 pr-10 py-2 text-sm rounded-lg border border-coffee-light/20 focus:outline-none focus:border-coffee-accent bg-white"
                     />
                     <span className="absolute right-3 top-2.5 text-xs text-coffee-medium font-bold">
                       {Math.round(settings.pointsRate * 100)}%
@@ -604,7 +604,7 @@ export default function StoreSettingsPage() {
                     value={settings.bankId}
                     onChange={handleChange}
                     placeholder="Ví dụ: MB"
-                    className="w-full min-h-[40px] px-3.5 py-2 text-sm rounded-xl border border-coffee-light/20 focus:outline-none focus:border-coffee-accent bg-[#FCFBF8]"
+                    className="w-full min-h-[40px] px-3.5 py-2 text-sm rounded-lg border border-coffee-light/20 focus:outline-none focus:border-coffee-accent bg-white"
                   />
                 </div>
 
@@ -616,7 +616,7 @@ export default function StoreSettingsPage() {
                     value={settings.bankAccountNo}
                     onChange={handleChange}
                     placeholder="Nhập số tài khoản"
-                    className="w-full min-h-[40px] px-3.5 py-2 text-sm rounded-xl border border-coffee-light/20 focus:outline-none focus:border-coffee-accent bg-[#FCFBF8]"
+                    className="w-full min-h-[40px] px-3.5 py-2 text-sm rounded-lg border border-coffee-light/20 focus:outline-none focus:border-coffee-accent bg-white"
                   />
                 </div>
               </div>
@@ -629,7 +629,7 @@ export default function StoreSettingsPage() {
                   value={settings.bankAccountName}
                   onChange={handleChange}
                   placeholder="Ví dụ: NGUYEN VAN A"
-                  className="w-full min-h-[40px] px-3.5 py-2 text-sm rounded-xl border border-coffee-light/20 focus:outline-none focus:border-coffee-accent bg-[#FCFBF8]"
+                  className="w-full min-h-[40px] px-3.5 py-2 text-sm rounded-lg border border-coffee-light/20 focus:outline-none focus:border-coffee-accent bg-white"
                 />
               </div>
             </div>
@@ -651,19 +651,19 @@ export default function StoreSettingsPage() {
                       value={printerIp}
                       onChange={(e) => setPrinterIp(e.target.value)}
                       placeholder="Nhập địa chỉ IP máy in"
-                      className="flex-1 min-h-[40px] px-3.5 py-2 text-sm rounded-xl border border-coffee-light/20 focus:outline-none focus:border-coffee-accent bg-[#FCFBF8]"
+                      className="flex-1 min-h-[40px] px-3.5 py-2 text-sm rounded-lg border border-coffee-light/20 focus:outline-none focus:border-coffee-accent bg-white"
                     />
                     <button
                       type="button"
                       onClick={handleTestPrint}
                       disabled={testingPrint}
-                      className="min-h-[40px] px-4 bg-coffee-accent hover:bg-amber-700 text-white rounded-xl text-xs font-bold transition-all disabled:opacity-50"
+                      className="min-h-[40px] px-4 bg-coffee-accent hover:bg-primary-700 text-white rounded-lg text-xs font-bold transition-all disabled:opacity-50"
                     >
                       {testingPrint ? 'Đang gửi...' : 'In thử hóa đơn'}
                     </button>
                   </div>
                   <p className="text-[10px] text-coffee-medium/60 leading-relaxed">
-                    * Lưu ý: Máy in phải kết nối chung mạng LAN với thiết bị này. Nếu bỏ trống, hệ thống sẽ tự động in bằng hộp thoại in của trình duyệt làm phương án dự phòng.
+                    Máy in phải kết nối chung mạng LAN với thiết bị này. Nếu bỏ trống, hệ thống sẽ tự động in bằng hộp thoại in của trình duyệt làm phương án dự phòng.
                   </p>
                 </div>
               </div>
@@ -677,8 +677,8 @@ export default function StoreSettingsPage() {
                 <p className="text-xs text-coffee-medium/70">Mỗi cửa hàng dùng tài khoản/API key riêng của chính cửa hàng đó.</p>
               </div>
 
-              <div className="divide-y divide-coffee-light/10 rounded-2xl border border-coffee-light/10 overflow-hidden">
-                <div className="flex items-center justify-between gap-4 p-4 bg-[#FCFBF8]">
+              <div className="divide-y divide-coffee-light/10 rounded-lg border border-coffee-light/10 overflow-hidden">
+                <div className="flex items-center justify-between gap-4 p-4 bg-white">
                   <div>
                     <p className="text-sm font-bold text-coffee-dark">QR ngân hàng</p>
                     <p className="text-xs text-coffee-medium/70 mt-0.5">
@@ -698,7 +698,7 @@ export default function StoreSettingsPage() {
                   {statusBadge(Boolean(integrationStatus?.payments?.webhook?.protected), 'Nên thêm secret')}
                 </div>
 
-                <div className="flex items-center justify-between gap-4 p-4 bg-[#FCFBF8]">
+                <div className="flex items-center justify-between gap-4 p-4 bg-white">
                   <div>
                     <p className="text-sm font-bold text-coffee-dark">Hóa đơn điện tử</p>
                     <p className="text-xs text-coffee-medium/70 mt-0.5">
@@ -718,7 +718,7 @@ export default function StoreSettingsPage() {
                   {statusBadge(Boolean(integrationStatus?.delivery?.grabFood?.configured && integrationStatus?.delivery?.shopeeFood?.configured))}
                 </div>
 
-                <div className="flex items-center justify-between gap-4 p-4 bg-[#FCFBF8]">
+                <div className="flex items-center justify-between gap-4 p-4 bg-white">
                   <div>
                     <p className="text-sm font-bold text-coffee-dark">Máy in bill LAN</p>
                     <p className="text-xs text-coffee-medium/70 mt-0.5">
@@ -737,7 +737,7 @@ export default function StoreSettingsPage() {
                   const pendingSecrets = integrationSecrets[provider] || {};
 
                   return (
-                    <div key={provider} className="rounded-2xl border border-coffee-light/10 bg-[#FCFBF8] p-4 space-y-4">
+                    <div key={provider} className="rounded-lg border border-coffee-light/10 bg-white p-4 space-y-4">
                       <div className="flex items-center justify-between gap-4">
                         <div>
                           <p className="text-sm font-bold text-coffee-dark">{meta.title}</p>
@@ -765,7 +765,7 @@ export default function StoreSettingsPage() {
                               value={config[field] || ''}
                               onChange={(e) => updateIntegrationConfig(provider, field, e.target.value)}
                               placeholder={placeholder || label}
-                              className="w-full min-h-[40px] px-3.5 py-2 text-sm rounded-xl border border-coffee-light/20 focus:outline-none focus:border-coffee-accent bg-white"
+                              className="w-full min-h-[40px] px-3.5 py-2 text-sm rounded-lg border border-coffee-light/20 focus:outline-none focus:border-coffee-accent bg-white"
                             />
                           </div>
                         ))}
@@ -787,7 +787,7 @@ export default function StoreSettingsPage() {
                               value={pendingSecrets[field] || ''}
                               onChange={(e) => updateIntegrationSecret(provider, field, e.target.value)}
                               placeholder={secretFlags[field] ? 'Để trống nếu không đổi' : label}
-                              className="w-full min-h-[40px] px-3.5 py-2 text-sm rounded-xl border border-coffee-light/20 focus:outline-none focus:border-coffee-accent bg-white"
+                              className="w-full min-h-[40px] px-3.5 py-2 text-sm rounded-lg border border-coffee-light/20 focus:outline-none focus:border-coffee-accent bg-white"
                               autoComplete="new-password"
                             />
                           </div>
@@ -799,7 +799,7 @@ export default function StoreSettingsPage() {
                           type="button"
                           onClick={() => handleSaveIntegration(provider)}
                           disabled={integrationSaving === provider}
-                          className="min-h-[40px] px-4 bg-coffee-accent hover:bg-amber-700 text-white rounded-xl text-xs font-bold transition-all disabled:opacity-50 flex items-center gap-2"
+                          className="min-h-[40px] px-4 bg-coffee-accent hover:bg-primary-700 text-white rounded-lg text-xs font-bold transition-all disabled:opacity-50 flex items-center gap-2"
                         >
                           {integrationSaving === provider && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
                           <span>Lưu {meta.title}</span>

@@ -342,7 +342,7 @@ export default function EmployeeManagementPage() {
         </div>
 
         {error && (
-          <div className="bg-red-50 text-red-600 p-4 rounded-xl border border-red-200">
+          <div className="bg-red-50 text-red-600 p-4 rounded-lg border border-red-200">
             {error}
           </div>
         )}
@@ -354,11 +354,11 @@ export default function EmployeeManagementPage() {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 animate-fade-in">
               {users.map(u => (
-                <div key={u.id} className="bg-white p-5 rounded-2xl shadow-card border border-cream-medium/30 flex flex-col hover:shadow-coffee-sm transition-all duration-200">
+                <div key={u.id} className="bg-white p-5 rounded-lg shadow-card border border-cream-medium/30 flex flex-col hover:shadow-coffee-sm transition-all duration-200">
                   <div className="flex items-start justify-between mb-2">
                     <div className="flex items-center gap-3">
                       <div className="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-lg flex-shrink-0"
-                        style={{ background: u.role === 'admin' ? 'linear-gradient(135deg, #A76D42, #C8956C)' : '#9ca3af' }}>
+                        style={{ background: u.role === 'admin' ? 'linear-gradient(135deg, #2563EB, #0EA5E9)' : '#9ca3af' }}>
                         {u.name.charAt(0).toUpperCase()}
                       </div>
                       <div>
@@ -373,7 +373,7 @@ export default function EmployeeManagementPage() {
                     </div>
                     <button
                       onClick={() => setProfileUser(u)}
-                      className="px-2.5 py-1 bg-cream-light hover:bg-cream-medium text-coffee-dark border border-cream-medium/30 rounded-xl text-[10px] font-bold transition-all"
+                      className="px-2.5 py-1 bg-cream-light hover:bg-cream-medium text-coffee-dark border border-cream-medium/30 rounded-lg text-[10px] font-bold transition-all"
                     >
                       Hồ sơ lý lịch
                     </button>
@@ -417,13 +417,13 @@ export default function EmployeeManagementPage() {
           loadingAttendance ? (
             <p className="text-center py-10 text-coffee-medium">Đang tải lịch sử chấm công...</p>
           ) : attendanceLogs.length === 0 ? (
-            <div className="bg-white rounded-2xl shadow-card p-12 text-center text-coffee-medium">
+            <div className="bg-white rounded-lg shadow-card p-12 text-center text-coffee-medium">
               <Clock size={40} className="mx-auto mb-3 text-coffee-light/40" />
               <p className="font-semibold">Chưa có lịch sử chấm công</p>
               <p className="text-xs text-gray-400 mt-0.5">Nhân viên sử dụng nút "Điểm danh nhanh" trên thanh bên để check-in / check-out</p>
             </div>
           ) : (
-            <div className="bg-white rounded-2xl shadow-card border border-cream-medium/30 overflow-hidden animate-fade-in">
+            <div className="bg-white rounded-lg shadow-card border border-cream-medium/30 overflow-hidden animate-fade-in">
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse">
                   <thead>
@@ -508,13 +508,13 @@ export default function EmployeeManagementPage() {
           loadingShifts ? (
             <p className="text-center py-10 text-coffee-medium">Đang tải lịch sử giao ca...</p>
           ) : shiftLogs.length === 0 ? (
-            <div className="bg-white rounded-2xl shadow-card p-12 text-center text-coffee-medium">
+            <div className="bg-white rounded-lg shadow-card p-12 text-center text-coffee-medium">
               <Calendar size={40} className="mx-auto mb-3 text-coffee-light/40" />
               <p className="font-semibold">Chưa có lịch sử giao ca</p>
               <p className="text-xs text-gray-400 mt-0.5">Lịch sử mở/đóng ca két tiền mặt của thu ngân POS sẽ được hiển thị ở đây</p>
             </div>
           ) : (
-            <div className="bg-white rounded-2xl shadow-card border border-cream-medium/30 overflow-hidden animate-fade-in">
+            <div className="bg-white rounded-lg shadow-card border border-cream-medium/30 overflow-hidden animate-fade-in">
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse">
                   <thead>
@@ -593,14 +593,14 @@ export default function EmployeeManagementPage() {
           loadingSalary ? (
             <p className="text-center py-10 text-coffee-medium">Đang tính toán bảng lương...</p>
           ) : salaryReport.length === 0 ? (
-            <div className="bg-white rounded-2xl shadow-card p-12 text-center text-coffee-medium">
+            <div className="bg-white rounded-lg shadow-card p-12 text-center text-coffee-medium">
               <Users size={40} className="mx-auto mb-3 text-coffee-light/40" />
               <p className="font-semibold">Không tìm thấy dữ liệu nhân viên</p>
             </div>
           ) : (
             <div className="space-y-4 animate-fade-in">
               {/* Date range picker bar */}
-              <div className="bg-white p-4 rounded-2xl shadow-card border border-cream-medium/30 flex flex-wrap items-center justify-between gap-4">
+              <div className="bg-white p-4 rounded-lg shadow-card border border-cream-medium/30 flex flex-wrap items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
                   <Calendar size={18} className="text-coffee-light" />
                   <span className="text-sm font-bold text-coffee-dark">Kỳ tính lương:</span>
@@ -609,14 +609,14 @@ export default function EmployeeManagementPage() {
                       type="date"
                       value={salaryStartDate}
                       onChange={e => setSalaryStartDate(e.target.value)}
-                      className="input-field py-1 px-3 text-sm min-h-[36px] bg-white border border-gray-250 rounded-xl"
+                      className="input-field py-1 px-3 text-sm min-h-[36px] bg-white border border-gray-250 rounded-lg"
                     />
                     <span className="text-coffee-light text-xs">đến</span>
                     <input
                       type="date"
                       value={salaryEndDate}
                       onChange={e => setSalaryEndDate(e.target.value)}
-                      className="input-field py-1 px-3 text-sm min-h-[36px] bg-white border border-gray-250 rounded-xl"
+                      className="input-field py-1 px-3 text-sm min-h-[36px] bg-white border border-gray-250 rounded-lg"
                     />
                   </div>
                 </div>
@@ -631,7 +631,7 @@ export default function EmployeeManagementPage() {
                       setSalaryStartDate(monday.toISOString().split('T')[0]);
                       setSalaryEndDate(new Date().toISOString().split('T')[0]);
                     }}
-                    className="px-3 py-1.5 bg-cream-light hover:bg-cream-medium text-coffee-dark text-xs font-semibold rounded-xl border border-cream-medium/20 transition-all"
+                    className="px-3 py-1.5 bg-cream-light hover:bg-cream-medium text-coffee-dark text-xs font-semibold rounded-lg border border-cream-medium/20 transition-all"
                   >
                     Tuần này
                   </button>
@@ -642,14 +642,14 @@ export default function EmployeeManagementPage() {
                       setSalaryStartDate(start.toISOString().split('T')[0]);
                       setSalaryEndDate(new Date().toISOString().split('T')[0]);
                     }}
-                    className="px-3 py-1.5 bg-cream-light hover:bg-cream-medium text-coffee-dark text-xs font-semibold rounded-xl border border-cream-medium/20 transition-all"
+                    className="px-3 py-1.5 bg-cream-light hover:bg-cream-medium text-coffee-dark text-xs font-semibold rounded-lg border border-cream-medium/20 transition-all"
                   >
                     Tháng này
                   </button>
                 </div>
               </div>
 
-              <div className="bg-white rounded-2xl shadow-card border border-cream-medium/30 overflow-hidden">
+              <div className="bg-white rounded-lg shadow-card border border-cream-medium/30 overflow-hidden">
                 <div className="overflow-x-auto">
                   <table className="w-full text-left border-collapse">
                     <thead>
@@ -727,7 +727,7 @@ export default function EmployeeManagementPage() {
       {/* Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white rounded-2xl w-full max-w-xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
+          <div className="bg-white rounded-lg w-full max-w-xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
             <div className="p-5 border-b border-gray-100 flex justify-between items-center bg-cream-light/30 flex-shrink-0">
               <h2 className="font-display font-bold text-coffee-dark text-lg">
                 {editingUser ? 'Sửa thông tin nhân sự' : 'Thêm nhân sự mới'}
@@ -764,11 +764,11 @@ export default function EmployeeManagementPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-gray-500 mb-1.5 uppercase font-sans">Ngày sinh</label>
-                  <input type="date" value={formData.dateOfBirth} onChange={e => setFormData({...formData, dateOfBirth: e.target.value})} className="input-field w-full min-h-[44px] text-sm bg-white border border-gray-250 rounded-xl" />
+                  <input type="date" value={formData.dateOfBirth} onChange={e => setFormData({...formData, dateOfBirth: e.target.value})} className="input-field w-full min-h-[44px] text-sm bg-white border border-gray-250 rounded-lg" />
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-gray-500 mb-1.5 uppercase font-sans">Ngày vào làm</label>
-                  <input type="date" value={formData.startDate} onChange={e => setFormData({...formData, startDate: e.target.value})} className="input-field w-full min-h-[44px] text-sm bg-white border border-gray-250 rounded-xl" />
+                  <input type="date" value={formData.startDate} onChange={e => setFormData({...formData, startDate: e.target.value})} className="input-field w-full min-h-[44px] text-sm bg-white border border-gray-250 rounded-lg" />
                 </div>
               </div>
 
@@ -786,10 +786,10 @@ export default function EmployeeManagementPage() {
               <div>
                 <label className="block text-xs font-bold text-gray-500 mb-1.5 uppercase font-sans">Phân quyền chức vụ</label>
                 <div className="grid grid-cols-2 gap-3">
-                  <button type="button" onClick={() => setFormData({...formData, role: 'staff'})} className={`py-3 rounded-xl border-2 text-sm font-semibold flex items-center justify-center gap-2 ${formData.role === 'staff' ? 'border-coffee-accent bg-coffee-accent/10 text-coffee-accent' : 'border-gray-200 text-gray-500'}`}>
+                  <button type="button" onClick={() => setFormData({...formData, role: 'staff'})} className={`py-3 rounded-lg border-2 text-sm font-semibold flex items-center justify-center gap-2 ${formData.role === 'staff' ? 'border-coffee-accent bg-coffee-accent/10 text-coffee-accent' : 'border-gray-200 text-gray-500'}`}>
                     <User size={16} /> Nhân viên
                   </button>
-                  <button type="button" onClick={() => setFormData({...formData, role: 'admin'})} className={`py-3 rounded-xl border-2 text-sm font-semibold flex items-center justify-center gap-2 ${formData.role === 'admin' ? 'border-coffee-accent bg-coffee-accent/10 text-coffee-accent' : 'border-gray-200 text-gray-500'}`}>
+                  <button type="button" onClick={() => setFormData({...formData, role: 'admin'})} className={`py-3 rounded-lg border-2 text-sm font-semibold flex items-center justify-center gap-2 ${formData.role === 'admin' ? 'border-coffee-accent bg-coffee-accent/10 text-coffee-accent' : 'border-gray-200 text-gray-500'}`}>
                     <Shield size={16} /> Quản lý
                   </button>
                 </div>
@@ -860,7 +860,7 @@ export default function EmployeeManagementPage() {
       {/* Attendance Modal */}
       {isAttendanceModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
+          <div className="bg-white rounded-lg w-full max-w-md shadow-2xl overflow-hidden">
             <div className="p-5 border-b border-gray-100 flex justify-between items-center bg-cream-light/30">
               <h2 className="font-display font-bold text-coffee-dark text-lg">
                 {editingAttendance ? 'Sửa giờ công' : 'Thêm ngày công thủ công'}
@@ -876,7 +876,7 @@ export default function EmployeeManagementPage() {
                   required
                   value={attendanceFormData.userId}
                   onChange={e => setAttendanceFormData({...attendanceFormData, userId: e.target.value})}
-                  className="input-field w-full min-h-[44px] bg-white border border-gray-250 rounded-xl px-3 text-sm focus:border-coffee-accent focus:ring-coffee-accent/20"
+                  className="input-field w-full min-h-[44px] bg-white border border-gray-250 rounded-lg px-3 text-sm focus:border-coffee-accent focus:ring-coffee-accent/20"
                 >
                   <option value="" disabled>Chọn nhân viên...</option>
                   {users.map(u => (
@@ -927,7 +927,7 @@ export default function EmployeeManagementPage() {
       {/* Profile Details Modal */}
       {profileUser && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
+          <div className="bg-white rounded-lg w-full max-w-md shadow-2xl overflow-hidden">
             <div className="p-5 border-b border-gray-100 flex justify-between items-center bg-cream-light/30">
               <h2 className="font-display font-bold text-coffee-dark text-lg">
                 Hồ sơ lý lịch nhân sự
@@ -975,7 +975,7 @@ export default function EmployeeManagementPage() {
               </div>
             </div>
             <div className="p-4 border-t border-gray-100 bg-cream-light/20 flex justify-end">
-              <button onClick={() => setProfileUser(null)} className="px-4 py-2 bg-coffee-accent text-white font-bold rounded-xl text-xs hover:bg-coffee-accent-dark transition-all">
+              <button onClick={() => setProfileUser(null)} className="px-4 py-2 bg-coffee-accent text-white font-bold rounded-lg text-xs hover:bg-coffee-accent-dark transition-all">
                 Đóng
               </button>
             </div>
@@ -986,7 +986,7 @@ export default function EmployeeManagementPage() {
       {/* Attendance Detail Modal for salary */}
       {selectedSalaryDetail && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
+          <div className="bg-white rounded-lg w-full max-w-lg shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
             <div className="p-5 border-b border-gray-100 flex justify-between items-center bg-cream-light/30 flex-shrink-0">
               <div>
                 <h2 className="font-display font-bold text-coffee-dark text-lg">
@@ -1005,7 +1005,7 @@ export default function EmployeeManagementPage() {
               ) : (
                 <div className="space-y-2">
                   {selectedSalaryDetail.attendances.map(a => (
-                    <div key={a.id} className="flex items-center justify-between p-3 rounded-xl bg-cream-light/40 border border-cream-medium/20 text-xs">
+                    <div key={a.id} className="flex items-center justify-between p-3 rounded-lg bg-cream-light/40 border border-cream-medium/20 text-xs">
                       <div>
                         <span className="font-bold text-coffee-dark block">{formatDateOnly(a.date)}</span>
                         <span className="text-[10px] text-gray-500 font-mono">

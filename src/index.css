@@ -51,16 +51,16 @@
 
   /* ── Cards ── */
   .glass-card {
-    @apply bg-white border border-surface-border rounded-xl shadow-card;
+    @apply bg-white border border-surface-border rounded-lg shadow-card;
   }
 
   .glass-card-dark {
-    @apply bg-sidebar-hover border border-sidebar-border rounded-xl;
+    @apply bg-sidebar-hover border border-sidebar-border rounded-lg;
   }
 
   /* ── Product Card (KiotViet style – compact, no image) ── */
   .menu-card {
-    @apply bg-white rounded-xl border border-surface-border
+    @apply bg-white rounded-lg border border-surface-border
            shadow-card cursor-pointer transition-all duration-150
            hover:shadow-card-hover hover:border-primary-300
            active:scale-95;
@@ -103,7 +103,7 @@
 
   /* ── Stat Card ── */
   .stat-card {
-    @apply bg-white rounded-xl p-5 shadow-card border border-surface-border
+    @apply bg-white rounded-lg p-5 shadow-card border border-surface-border
            transition-all duration-150 hover:shadow-card-hover;
   }
 
@@ -148,7 +148,7 @@
     backdrop-filter: none !important;
     position: absolute !important;
   }
-  .relative.bg-white.rounded-2xl {
+  .relative.bg-white.rounded-lg {
     box-shadow: none !important;
     border: none !important;
     background: transparent !important;

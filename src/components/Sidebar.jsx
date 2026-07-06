@@ -7,14 +7,14 @@ import { useInventory } from '../context/InventoryContext';
 import QuickAttendanceModal from './pos/QuickAttendanceModal';
 
 const ALL_NAV_ITEMS = [
-  { id: 'pos',       label: 'Bán hàng',     icon: ShoppingBag, subtitle: 'POS',          roles: ['admin', 'staff'] },
-  { id: 'tables',    label: 'Sơ đồ bàn',    icon: LayoutGrid,  subtitle: 'Table Map',    roles: ['admin', 'staff'] },
-  { id: 'kitchen',   label: 'Nhà bếp',      icon: ChefHat,     subtitle: 'Kitchen',      roles: ['admin', 'staff'] },
-  { id: 'dashboard', label: 'Báo cáo',      icon: BarChart3,   subtitle: 'Analytics',    roles: ['admin'] },
-  { id: 'menu',      label: 'Quản lý Menu', icon: ChefHat,     subtitle: 'Menu & CRUD',  roles: ['admin'] },
-  { id: 'promotions', label: 'Khuyến mãi',   icon: Gift,        subtitle: 'Promotions',   roles: ['admin'] },
-  { id: 'employees', label: 'Nhân sự',      icon: Users,       subtitle: 'Employee',     roles: ['admin'] },
-  { id: 'settings',  label: 'Cài đặt',      icon: Settings,    subtitle: 'Settings',     roles: ['admin'] },
+  { id: 'pos',       label: 'Bán hàng',   icon: ShoppingBag, subtitle: 'Quầy POS',      roles: ['admin', 'staff'] },
+  { id: 'tables',    label: 'Sơ đồ bàn',  icon: LayoutGrid,  subtitle: 'Khu vực bàn',   roles: ['admin', 'staff'] },
+  { id: 'kitchen',   label: 'Nhà bếp',    icon: ChefHat,     subtitle: 'Bếp/Pha chế',   roles: ['admin', 'staff'] },
+  { id: 'dashboard', label: 'Báo cáo',    icon: BarChart3,   subtitle: 'Doanh thu',     roles: ['admin'] },
+  { id: 'menu',      label: 'Thực đơn',   icon: ChefHat,     subtitle: 'Món & giá',     roles: ['admin'] },
+  { id: 'promotions', label: 'Khuyến mãi', icon: Gift,        subtitle: 'Ưu đãi',        roles: ['admin'] },
+  { id: 'employees', label: 'Nhân sự',    icon: Users,       subtitle: 'Ca làm',        roles: ['admin'] },
+  { id: 'settings',  label: 'Cấu hình',   icon: Settings,    subtitle: 'Cửa hàng',      roles: ['admin'] },
 ];
 
 export default function Sidebar() {
@@ -45,6 +45,11 @@ export default function Sidebar() {
 
   const timeStr = now.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
   const dateStr = now.toLocaleDateString('vi-VN', { weekday: 'short', day: '2-digit', month: '2-digit' });
+  const roleLabel = currentUser?.role === 'admin'
+    ? 'Quản trị viên'
+    : currentUser?.role === 'staff'
+      ? 'Nhân viên'
+      : currentUser?.role ?? '';
 
   const navItems = ALL_NAV_ITEMS.filter((item) =>
     currentUser && item.roles.includes(currentUser.role) && canAccess(item.id)
@@ -72,13 +77,13 @@ export default function Sidebar() {
           </div>
           <div>
             <p className="text-white font-bold text-sm leading-tight">Manager Coffee</p>
-            <p className="text-sidebar-text text-xs">POS System</p>
+            <p className="text-sidebar-text text-xs">Quản lý bán hàng</p>
           </div>
         </div>
         {isAdmin && (
           <div className="mt-3 inline-flex items-center gap-1 px-2 py-0.5 bg-primary-600/20 border border-primary-500/30 rounded-md">
             <Shield size={10} className="text-primary-400" />
-            <span className="text-primary-400 text-[10px] font-bold tracking-wide">ADMIN</span>
+            <span className="text-primary-400 text-[10px] font-bold tracking-wide">QUẢN TRỊ</span>
           </div>
         )}
       </div>
@@ -101,7 +106,7 @@ export default function Sidebar() {
 
       {/* Nav */}
       <nav className="flex-1 px-3 py-3 space-y-0.5 overflow-y-auto">
-        <p className="text-sidebar-text/40 text-[10px] font-bold tracking-widest px-3 mb-2 uppercase">Menu</p>
+        <p className="text-sidebar-text/40 text-[10px] font-bold tracking-widest px-3 mb-2 uppercase">Điều hướng</p>
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = currentView === item.id;
@@ -139,7 +144,7 @@ export default function Sidebar() {
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-white text-xs font-semibold truncate">{currentUser?.name ?? 'Chưa đăng nhập'}</p>
-              <p className="text-sidebar-text text-[10px] truncate capitalize">{currentUser?.role ?? ''}</p>
+              <p className="text-sidebar-text text-[10px] truncate">{roleLabel}</p>
             </div>
           </div>
         </div>

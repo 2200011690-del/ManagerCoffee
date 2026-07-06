@@ -160,33 +160,33 @@ export default function LockScreen() {
 
   return (
     <div className="fixed inset-0 z-[100] flex" style={{ background: '#0F172A' }}>
-      {/* Left decorative panel */}
-      <div className="hidden lg:flex flex-col justify-between w-96 bg-primary-600 p-12">
+      {/* Brand panel */}
+      <div className="hidden lg:flex flex-col justify-between w-96 bg-primary-700 p-12">
         <div>
           <div className="flex items-center gap-3 mb-8">
-            <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center">
+            <div className="w-12 h-12 rounded-lg bg-white/20 flex items-center justify-center">
               <Coffee size={24} className="text-white" />
             </div>
             <div>
               <p className="text-white font-bold text-xl leading-tight">Manager Coffee</p>
-              <p className="text-white/60 text-sm">SaaS POS System</p>
+              <p className="text-white/60 text-sm">Quản lý vận hành F&B</p>
             </div>
           </div>
           <h2 className="text-white font-bold text-3xl leading-tight mb-4">
-            Giải pháp bán hàng<br />đa chi nhánh thông minh
+            Bán hàng, bàn, bếp<br />và kho trong một hệ thống
           </h2>
           <p className="text-white/70 text-sm leading-relaxed mb-6">
-            Hệ thống POS đa phân quyền phục vụ quản lý đơn hàng, bàn ăn và kho nguyên liệu realtime dành riêng cho mô hình F&B.
+            Mỗi cửa hàng có dữ liệu riêng, phân quyền riêng và cấu hình riêng cho bán hàng, in hóa đơn, thanh toán và báo cáo.
           </p>
           {showDemoCredentials && (
-            <div className="bg-white/10 rounded-xl p-4 border border-white/10">
+            <div className="bg-white/10 rounded-lg p-4 border border-white/10">
               <p className="text-white font-semibold text-sm mb-1 flex items-center gap-1.5">
-                <Store size={15} /> Dùng thử Hệ thống:
+                <Store size={15} /> Thông tin dùng thử:
               </p>
               <p className="text-white/80 text-xs leading-relaxed">
-                Nhập mã quán mặc định: <span className="font-bold text-yellow-300">espresso-lab</span><br/>
-                Admin demo: <span className="font-bold text-yellow-300">{demoAdminEmail}</span> / <span className="font-bold text-yellow-300">{demoAdminPassword}</span><br/>
-                Mã PIN Nhân viên: <span className="font-bold text-yellow-300">2222</span>
+                Mã cửa hàng: <span className="font-bold text-yellow-300">espresso-lab</span><br/>
+                Tài khoản quản trị: <span className="font-bold text-yellow-300">{demoAdminEmail}</span> / <span className="font-bold text-yellow-300">{demoAdminPassword}</span><br/>
+                PIN nhân viên: <span className="font-bold text-yellow-300">2222</span>
               </p>
             </div>
           )}
@@ -202,7 +202,7 @@ export default function LockScreen() {
         <div className="w-full max-w-xs py-8">
           {/* Mobile logo */}
           <div className="flex lg:hidden items-center gap-3 justify-center mb-8">
-            <div className="w-11 h-11 rounded-xl bg-primary-600 flex items-center justify-center">
+            <div className="w-11 h-11 rounded-lg bg-primary-600 flex items-center justify-center">
               <Coffee size={22} className="text-white" />
             </div>
             <p className="text-white font-bold text-xl">Manager Coffee</p>
@@ -218,8 +218,8 @@ export default function LockScreen() {
                 </div>
 
                 {showDemoCredentials && (
-                  <div className="bg-white/10 rounded-xl p-3 border border-white/10 text-xs text-white/80 leading-relaxed">
-                    Platform demo: <span className="font-bold text-yellow-300">{demoPlatformEmail}</span> / <span className="font-bold text-yellow-300">{demoPlatformPassword}</span>
+                  <div className="bg-white/10 rounded-lg p-3 border border-white/10 text-xs text-white/80 leading-relaxed">
+                    Tài khoản nền tảng: <span className="font-bold text-yellow-300">{demoPlatformEmail}</span> / <span className="font-bold text-yellow-300">{demoPlatformPassword}</span>
                   </div>
                 )}
 
@@ -233,7 +233,7 @@ export default function LockScreen() {
                       value={platformEmail}
                       onChange={(e) => setPlatformEmail(e.target.value)}
                       placeholder={showDemoCredentials ? demoPlatformEmail : 'owner@yourdomain.vn'}
-                      className="w-full min-h-[44px] bg-slate-800 text-white border border-slate-700 rounded-xl px-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
+                      className="w-full min-h-[44px] bg-slate-800 text-white border border-slate-700 rounded-lg px-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
                     />
                   </div>
 
@@ -246,7 +246,7 @@ export default function LockScreen() {
                       value={platformPassword}
                       onChange={(e) => setPlatformPassword(e.target.value)}
                       placeholder={showDemoCredentials ? demoPlatformPassword : 'Nhập mật khẩu nền tảng'}
-                      className="w-full min-h-[44px] bg-slate-800 text-white border border-slate-700 rounded-xl px-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
+                      className="w-full min-h-[44px] bg-slate-800 text-white border border-slate-700 rounded-lg px-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
                     />
                   </div>
 
@@ -257,7 +257,7 @@ export default function LockScreen() {
                   <button
                     type="submit"
                     disabled={isLoading}
-                    className="w-full min-h-[44px] bg-primary-600 hover:bg-primary-700 text-white rounded-xl font-bold text-sm transition-all shadow-lg active:scale-95 disabled:opacity-50"
+                    className="w-full min-h-[44px] bg-primary-600 hover:bg-primary-700 text-white rounded-lg font-bold text-sm transition-all shadow-lg active:scale-95 disabled:opacity-50"
                   >
                     {isLoading ? 'Đang đăng nhập...' : 'Đăng nhập nền tảng'}
                   </button>
@@ -279,7 +279,7 @@ export default function LockScreen() {
             <div className="space-y-6">
               <div className="text-center">
                 <h3 className="text-white font-bold text-2xl mb-1">Đăng nhập hệ thống</h3>
-                <p className="text-slate-400 text-sm">Nhập Mã cửa hàng để bắt đầu</p>
+                <p className="text-slate-400 text-sm">Nhập mã cửa hàng để bắt đầu</p>
               </div>
 
               <form onSubmit={handleStoreSubmit} className="space-y-4">
@@ -291,7 +291,7 @@ export default function LockScreen() {
                     value={tempStoreCode}
                     onChange={(e) => setTempStoreCode(e.target.value)}
                     placeholder="Ví dụ: espresso-lab"
-                    className="w-full min-h-[44px] bg-slate-800 text-white border border-slate-700 rounded-xl px-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
+                    className="w-full min-h-[44px] bg-slate-800 text-white border border-slate-700 rounded-lg px-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
                   />
                   {storeError && (
                     <p className="text-red-400 text-xs mt-1.5 font-medium">{storeError}</p>
@@ -300,7 +300,7 @@ export default function LockScreen() {
 
                 <button
                   type="submit"
-                  className="w-full min-h-[44px] bg-primary-600 hover:bg-primary-700 text-white rounded-xl font-bold text-sm transition-all shadow-lg active:scale-95"
+                  className="w-full min-h-[44px] bg-primary-600 hover:bg-primary-700 text-white rounded-lg font-bold text-sm transition-all shadow-lg active:scale-95"
                 >
                   Tiếp tục
                 </button>
@@ -313,7 +313,7 @@ export default function LockScreen() {
                   onClick={() => setShowRegister(true)}
                   className="text-primary-400 hover:text-primary-300 font-semibold text-sm flex items-center gap-1.5 justify-center mx-auto"
                 >
-                  <UserPlus size={16} /> Tạo cửa hàng mới (Free)
+                  <UserPlus size={16} /> Tạo cửa hàng mới
                 </button>
                 <button
                   type="button"
@@ -333,21 +333,21 @@ export default function LockScreen() {
             /* --- Vùng Đăng nhập --- */
             <div>
               {isAdminMode ? (
-                /* --- Đăng nhập Admin bằng Email/Password --- */
+                /* --- Đăng nhập quản trị bằng Email/Password --- */
                 <div className="space-y-6">
                   <div className="text-center">
-                    <h3 className="text-white font-bold text-2xl mb-1">Đăng nhập Admin</h3>
+                    <h3 className="text-white font-bold text-2xl mb-1">Đăng nhập quản trị</h3>
                     <div className="flex items-center gap-1.5 justify-center text-sm text-slate-400">
                       <span>Cửa hàng: <strong className="text-white">{storeCode}</strong></span>
                       <button onClick={() => setIsSelectingStore(true)} className="text-primary-400 hover:underline text-xs">
-                        (Đổi quán)
+                        Đổi cửa hàng
                       </button>
                     </div>
                   </div>
 
                   <form onSubmit={handleAdminLoginSubmit} className="space-y-4">
                     <div>
-                      <label htmlFor="adminEmailInput" className="block text-slate-300 text-xs font-semibold uppercase tracking-wider mb-2">Email Quản trị</label>
+                      <label htmlFor="adminEmailInput" className="block text-slate-300 text-xs font-semibold uppercase tracking-wider mb-2">Email quản trị</label>
                       <input
                         id="adminEmailInput"
                         type="email"
@@ -355,7 +355,7 @@ export default function LockScreen() {
                         value={adminEmail}
                         onChange={(e) => setAdminEmail(e.target.value)}
                         placeholder={showDemoCredentials ? demoAdminEmail : 'admin@yourstore.vn'}
-                        className="w-full min-h-[44px] bg-slate-800 text-white border border-slate-700 rounded-xl px-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
+                        className="w-full min-h-[44px] bg-slate-800 text-white border border-slate-700 rounded-lg px-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
                       />
                     </div>
 
@@ -368,7 +368,7 @@ export default function LockScreen() {
                         value={adminPassword}
                         onChange={(e) => setAdminPassword(e.target.value)}
                         placeholder={showDemoCredentials ? demoAdminPassword : 'Nhập mật khẩu quản trị'}
-                        className="w-full min-h-[44px] bg-slate-800 text-white border border-slate-700 rounded-xl px-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
+                        className="w-full min-h-[44px] bg-slate-800 text-white border border-slate-700 rounded-lg px-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
                       />
                     </div>
 
@@ -379,7 +379,7 @@ export default function LockScreen() {
                     <button
                       type="submit"
                       disabled={isLoading}
-                      className="w-full min-h-[44px] bg-primary-600 hover:bg-primary-700 text-white rounded-xl font-bold text-sm transition-all shadow-lg active:scale-95 disabled:opacity-50"
+                      className="w-full min-h-[44px] bg-primary-600 hover:bg-primary-700 text-white rounded-lg font-bold text-sm transition-all shadow-lg active:scale-95 disabled:opacity-50"
                     >
                       {isLoading ? 'Đang đăng nhập...' : 'Đăng nhập'}
                     </button>
@@ -392,7 +392,7 @@ export default function LockScreen() {
                     }}
                     className="w-full text-center text-primary-400 hover:text-primary-300 font-semibold text-sm hover:underline block pt-2"
                   >
-                    Quay lại Đăng nhập Nhân viên (PIN)
+                    Quay lại đăng nhập nhân viên bằng PIN
                   </button>
                 </div>
               ) : (
@@ -406,7 +406,7 @@ export default function LockScreen() {
                         onClick={() => setIsSelectingStore(true)}
                         className="text-primary-400 hover:underline text-xs"
                       >
-                        (Đổi quán)
+                        Đổi cửa hàng
                       </button>
                     </div>
                   </div>
@@ -432,7 +432,7 @@ export default function LockScreen() {
 
                   {/* Pad or Loader */}
                   {isLoading ? (
-                    <div className="flex flex-col items-center justify-center py-10 space-y-4 bg-slate-900/50 rounded-2xl p-6 border border-slate-800">
+                    <div className="flex flex-col items-center justify-center py-10 space-y-4 bg-slate-900/50 rounded-lg p-6 border border-slate-800">
                       <div className="relative">
                         <div className="w-14 h-14 rounded-full border-4 border-slate-800 border-t-primary-500 animate-spin" />
                         <Coffee className="w-6 h-6 text-primary-400 absolute inset-0 m-auto animate-pulse" />
@@ -447,7 +447,7 @@ export default function LockScreen() {
                             <button
                               key={key}
                               onClick={() => handleKey(key)}
-                              className={`min-h-[60px] rounded-xl font-bold text-xl transition-all duration-150 select-none active:scale-95 ${
+                              className={`min-h-[60px] rounded-lg font-bold text-xl transition-all duration-150 select-none active:scale-95 ${
                                 key === '✓'
                                   ? 'bg-primary-600 text-white hover:bg-primary-700 shadow-lg'
                                   : key === '⌫'
@@ -472,7 +472,7 @@ export default function LockScreen() {
                     }}
                     className="w-full mt-6 text-center text-primary-400 hover:text-primary-300 font-semibold text-sm hover:underline block"
                   >
-                    Đăng nhập Admin (Email/Mật khẩu)
+                    Đăng nhập quản trị bằng email
                   </button>
                 </div>
               )}
@@ -484,7 +484,7 @@ export default function LockScreen() {
       {/* --- Modal đăng ký cửa hàng --- */}
       {showRegister && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-slide-up">
+          <div className="bg-slate-900 border border-slate-800 rounded-lg shadow-2xl w-full max-w-sm overflow-hidden animate-slide-up">
             <div className="px-6 py-4 border-b border-slate-800 flex items-center gap-3">
               <button
                 onClick={() => { setShowRegister(false); setRegError(''); }}
@@ -509,7 +509,7 @@ export default function LockScreen() {
               </div>
 
               <div>
-                <label className="block text-slate-300 text-xs font-semibold mb-1">Mã viết tắt (Store Code)</label>
+                <label className="block text-slate-300 text-xs font-semibold mb-1">Mã cửa hàng</label>
                 <input
                   type="text"
                   required
@@ -521,7 +521,7 @@ export default function LockScreen() {
               </div>
 
               <div>
-                <label className="block text-slate-300 text-xs font-semibold mb-1">Tên quản trị viên (Admin Name)</label>
+                <label className="block text-slate-300 text-xs font-semibold mb-1">Tên quản trị viên</label>
                 <input
                   type="text"
                   required
@@ -533,7 +533,7 @@ export default function LockScreen() {
               </div>
 
               <div>
-                <label className="block text-slate-300 text-xs font-semibold mb-1">Email quản trị viên *</label>
+                <label className="block text-slate-300 text-xs font-semibold mb-1">Email quản trị viên</label>
                 <input
                   type="email"
                   required
@@ -545,7 +545,7 @@ export default function LockScreen() {
               </div>
 
               <div>
-                <label className="block text-slate-300 text-xs font-semibold mb-1">Mật khẩu Admin *</label>
+                <label className="block text-slate-300 text-xs font-semibold mb-1">Mật khẩu quản trị</label>
                 <input
                   type="password"
                   required
@@ -558,7 +558,7 @@ export default function LockScreen() {
 
               {regError && (
                 <div className="text-red-400 text-xs font-medium bg-red-950/40 p-2.5 rounded-lg border border-red-900/50">
-                  ⚠️ {regError}
+                  {regError}
                 </div>
               )}
 
@@ -573,7 +573,7 @@ export default function LockScreen() {
                 disabled={regLoading}
                 className="w-full min-h-[44px] bg-primary-600 hover:bg-primary-700 text-white rounded-lg font-bold text-sm transition-all shadow-lg disabled:opacity-50"
               >
-                {regLoading ? 'Đang tạo cửa hàng...' : 'Hoàn tất Đăng ký'}
+                {regLoading ? 'Đang tạo cửa hàng...' : 'Hoàn tất đăng ký'}
               </button>
             </form>
           </div>

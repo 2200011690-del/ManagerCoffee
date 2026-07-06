@@ -88,11 +88,11 @@ export default function ReturnOrderModal({ onClose, onSuccess }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in"
       style={{ background: 'rgba(26,15,10,0.65)', backdropFilter: 'blur(6px)' }}>
-      <div className="bg-white rounded-3xl shadow-coffee-lg w-full max-w-lg animate-slide-up max-h-[90vh] overflow-hidden flex flex-col">
+      <div className="bg-white rounded-lg shadow-coffee-lg w-full max-w-lg animate-slide-up max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
         <div className="px-6 py-4 border-b border-cream-medium/50 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="w-10 h-10 rounded-xl bg-red-50 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-lg bg-red-50 flex items-center justify-center">
               <RotateCcw size={20} className="text-red-500" />
             </div>
             <div>
@@ -139,7 +139,7 @@ export default function ReturnOrderModal({ onClose, onSuccess }) {
               </div>
 
               {error && (
-                <div className="flex items-center gap-2 text-xs text-red-600 bg-red-50 border border-red-200 rounded-xl p-3">
+                <div className="flex items-center gap-2 text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg p-3">
                   <AlertTriangle size={14} className="flex-shrink-0" />
                   {error}
                 </div>
@@ -148,7 +148,7 @@ export default function ReturnOrderModal({ onClose, onSuccess }) {
               {/* Order details */}
               {order && (
                 <>
-                  <div className="bg-cream-light/60 rounded-2xl p-4 border border-cream-medium/30">
+                  <div className="bg-cream-light/60 rounded-lg p-4 border border-cream-medium/30">
                     <div className="flex justify-between items-center mb-2">
                       <span className="font-mono font-bold text-coffee-accent">{order.orderNumber}</span>
                       <span className="text-xs text-coffee-light">{order.date} · {order.time}</span>
@@ -172,7 +172,7 @@ export default function ReturnOrderModal({ onClose, onSuccess }) {
                         return (
                           <div key={item.id}
                             onClick={() => !isFullyReturned && toggleItem(item)}
-                            className={`flex items-center gap-3 p-3 rounded-xl border-2 transition-all cursor-pointer ${
+                            className={`flex items-center gap-3 p-3 rounded-lg border-2 transition-all cursor-pointer ${
                               isFullyReturned ? 'opacity-40 cursor-not-allowed border-gray-200' :
                               isSelected ? 'border-red-300 bg-red-50' : 'border-cream-dark hover:border-red-200'
                             }`}
@@ -227,13 +227,13 @@ export default function ReturnOrderModal({ onClose, onSuccess }) {
                         <label className="block text-xs font-bold text-coffee-medium uppercase tracking-wider mb-1.5">Phương thức hoàn tiền</label>
                         <div className="grid grid-cols-2 gap-2">
                           <button onClick={() => setRefundMethod('cash')}
-                            className={`min-h-[40px] flex items-center justify-center gap-2 rounded-xl text-sm font-semibold border-2 transition-all ${
+                            className={`min-h-[40px] flex items-center justify-center gap-2 rounded-lg text-sm font-semibold border-2 transition-all ${
                               refundMethod === 'cash' ? 'border-coffee-accent bg-coffee-accent/10 text-coffee-accent' : 'border-cream-dark text-coffee-light'
                             }`}>
                             <Banknote size={16} /> Tiền mặt
                           </button>
                           <button onClick={() => setRefundMethod('card')}
-                            className={`min-h-[40px] flex items-center justify-center gap-2 rounded-xl text-sm font-semibold border-2 transition-all ${
+                            className={`min-h-[40px] flex items-center justify-center gap-2 rounded-lg text-sm font-semibold border-2 transition-all ${
                               refundMethod === 'card' ? 'border-coffee-accent bg-coffee-accent/10 text-coffee-accent' : 'border-cream-dark text-coffee-light'
                             }`}>
                             <CreditCard size={16} /> Thẻ / QR
@@ -241,7 +241,7 @@ export default function ReturnOrderModal({ onClose, onSuccess }) {
                         </div>
                       </div>
 
-                      <div className="bg-red-50 border border-red-200 rounded-2xl p-4">
+                      <div className="bg-red-50 border border-red-200 rounded-lg p-4">
                         <div className="flex justify-between text-sm font-bold text-red-800">
                           <span>Tổng hoàn tiền:</span>
                           <span className="text-lg">{refundAmount.toLocaleString('vi-VN')}đ</span>
@@ -260,7 +260,7 @@ export default function ReturnOrderModal({ onClose, onSuccess }) {
           <div className="px-6 py-4 border-t border-cream-medium/50 flex gap-3">
             <button onClick={onClose} className="flex-1 min-h-[44px] btn-secondary">Hủy</button>
             <button onClick={handleReturn} disabled={processing}
-              className="flex-[2] min-h-[44px] bg-red-500 hover:bg-red-600 text-white font-bold rounded-xl transition-all flex items-center justify-center gap-2">
+              className="flex-[2] min-h-[44px] bg-red-500 hover:bg-red-600 text-white font-bold rounded-lg transition-all flex items-center justify-center gap-2">
               <RotateCcw size={18} />
               {processing ? 'Đang xử lý...' : 'Xác nhận trả hàng'}
             </button>

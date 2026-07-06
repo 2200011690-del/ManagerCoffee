@@ -32,7 +32,7 @@ const ProductGrid = React.memo(function ProductGrid({ items, onAddToCart, onSele
           <div
             key={item.id}
             onClick={() => onSelectItem(item)}
-            className="bg-white rounded-xl border border-surface-border shadow-card cursor-pointer transition-all duration-150 hover:shadow-card-hover hover:border-primary-300 active:scale-95 overflow-hidden"
+            className="bg-white rounded-lg border border-surface-border shadow-card cursor-pointer transition-all duration-150 hover:shadow-card-hover hover:border-primary-300 active:scale-95 overflow-hidden"
           >
             {/* Color top strip based on category */}
             <div className={`h-1 w-full ${cat.dot}`} />
@@ -47,7 +47,7 @@ const ProductGrid = React.memo(function ProductGrid({ items, onAddToCart, onSele
                 {item.popular && (
                   <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-orange-600">
                     <Flame size={10} />
-                    Hot
+                    Bán chạy
                   </span>
                 )}
               </div>

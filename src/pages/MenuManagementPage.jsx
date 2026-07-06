@@ -120,7 +120,7 @@ function ItemForm({ initial, onSave, onClose }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in"
       style={{ background: 'rgba(26,15,10,0.65)', backdropFilter: 'blur(6px)' }}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg flex flex-col max-h-[90vh] animate-slide-up">
+      <div className="bg-white rounded-lg shadow-2xl w-full max-w-lg flex flex-col max-h-[90vh] animate-slide-up">
         <div className="px-5 py-4 border-b border-cream-medium/40 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2">
             <ChefHat size={18} className="text-coffee-accent" />
@@ -151,7 +151,7 @@ function ItemForm({ initial, onSave, onClose }) {
           {field('Mô tả', 'description', 'text', 'Mô tả ngắn về món...')}
           {field('Link ảnh (URL)', 'image', 'url', 'https://...')}
           {form.image && (
-            <div className="rounded-xl overflow-hidden h-28 bg-cream-light">
+            <div className="rounded-lg overflow-hidden h-28 bg-cream-light">
               <img src={form.image} alt="preview" className="w-full h-full object-cover"
                 onError={e => { e.target.style.display = 'none'; }} />
             </div>
@@ -167,7 +167,7 @@ function ItemForm({ initial, onSave, onClose }) {
             {recipeItems.length > 0 ? (
               <div className="space-y-2 mb-3">
                 {recipeItems.map(item => (
-                  <div key={item.inventoryId} className="flex items-center gap-2 bg-cream-light/40 p-2 rounded-xl border border-cream-medium/20">
+                  <div key={item.inventoryId} className="flex items-center gap-2 bg-cream-light/40 p-2 rounded-lg border border-cream-medium/20">
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-semibold text-coffee-dark truncate">{item.name}</p>
                       <p className="text-[10px] text-coffee-light">Đơn vị: {item.unit}</p>
@@ -203,7 +203,7 @@ function ItemForm({ initial, onSave, onClose }) {
                 <select
                   onChange={handleAddIngredient}
                   value=""
-                  className="w-full bg-cream-light/60 hover:bg-cream-medium/40 text-coffee-medium text-xs font-semibold px-3 py-2 rounded-xl border border-cream-medium/30 transition-all cursor-pointer focus:outline-none"
+                  className="w-full bg-cream-light/60 hover:bg-cream-medium/40 text-coffee-medium text-xs font-semibold px-3 py-2 rounded-lg border border-cream-medium/30 transition-all cursor-pointer focus:outline-none"
                 >
                   <option value="" disabled>+ Chọn nguyên liệu để định lượng...</option>
                   {availableIngredients.map(inv => (
@@ -263,7 +263,7 @@ export default function MenuManagementPage() {
       if (createdProduct && createdProduct.id && recipeIngredients && recipeIngredients.length > 0) {
         await saveRecipe(createdProduct.id, recipeIngredients);
       }
-      showNotification('Thêm món mới thành công! 🎉', 'success');
+      showNotification('Thêm món mới thành công', 'success');
       setShowAdd(false);
     } catch {
       showNotification('Lỗi khi thêm món mới!', 'error');
@@ -282,7 +282,7 @@ export default function MenuManagementPage() {
       if (recipeIngredients) {
         await saveRecipe(editTarget.id, recipeIngredients);
       }
-      showNotification('Cập nhật món thành công! 🎉', 'success');
+      showNotification('Cập nhật món thành công', 'success');
       setEditTarget(null);
     } catch {
       showNotification('Lỗi khi cập nhật món!', 'error');
@@ -343,10 +343,10 @@ export default function MenuManagementPage() {
               <button
                 key={cat}
                 onClick={() => setFilterCat(cat)}
-                className={`min-h-[44px] flex-shrink-0 px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
+                className={`min-h-[44px] flex-shrink-0 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
                   filterCat === cat ? 'text-white shadow-coffee' : 'bg-cream-light text-coffee-medium hover:bg-cream-medium'
                 }`}
-                style={filterCat === cat ? { background: 'linear-gradient(135deg, #A76D42, #C8956C)' } : {}}
+                style={filterCat === cat ? { background: 'linear-gradient(135deg, #2563EB, #0EA5E9)' } : {}}
               >
                 {cat}
               </button>
@@ -355,7 +355,7 @@ export default function MenuManagementPage() {
         </div>
 
         {/* Table */}
-        <div className="bg-white rounded-2xl border border-cream-medium/30 shadow-card overflow-hidden">
+        <div className="bg-white rounded-lg border border-cream-medium/30 shadow-card overflow-hidden">
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-cream-light border-b border-cream-medium/40">
@@ -372,7 +372,7 @@ export default function MenuManagementPage() {
                 <tr key={item.id}
                   className={`border-b border-cream-medium/30 transition-colors ${item.hidden ? 'opacity-50 bg-gray-50' : 'hover:bg-cream-light/40'}`}>
                   <td className="px-4 py-3">
-                    <div className="w-12 h-12 rounded-xl overflow-hidden bg-cream-light flex-shrink-0">
+                    <div className="w-12 h-12 rounded-lg overflow-hidden bg-cream-light flex-shrink-0">
                       <img src={item.image} alt={item.name} className="w-full h-full object-cover"
                         onError={e => { e.target.src = 'https://images.unsplash.com/photo-1511920170033-f8396924c348?w=100&q=60'; }} />
                     </div>
@@ -380,7 +380,7 @@ export default function MenuManagementPage() {
                   <td className="px-4 py-3">
                     <p className="font-semibold text-coffee-dark">{item.name}</p>
                     <p className="text-xs text-coffee-light truncate max-w-[180px]">{item.description}</p>
-                    {item.popular && <span className="text-xs bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded-full font-semibold mt-0.5 inline-block">🔥 Hot</span>}
+                    {item.popular && <span className="text-xs bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded-full font-semibold mt-0.5 inline-block">Bán chạy</span>}
                   </td>
                   <td className="px-4 py-3 hidden sm:table-cell">
                     <span className="text-xs bg-cream-light text-coffee-medium px-2 py-1 rounded-lg font-medium">{item.category}</span>
@@ -452,8 +452,8 @@ export default function MenuManagementPage() {
       {deleteConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in"
           style={{ background: 'rgba(26,15,10,0.65)', backdropFilter: 'blur(6px)' }}>
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 animate-slide-up text-center">
-            <div className="w-14 h-14 rounded-2xl bg-red-50 flex items-center justify-center mx-auto mb-4">
+          <div className="bg-white rounded-lg shadow-2xl w-full max-w-sm p-6 animate-slide-up text-center">
+            <div className="w-14 h-14 rounded-lg bg-red-50 flex items-center justify-center mx-auto mb-4">
               <AlertTriangle size={26} className="text-red-500" />
             </div>
             <h3 className="font-display font-bold text-xl text-coffee-dark mb-1">Xóa món này?</h3>

@@ -39,11 +39,11 @@ export default function SplitBillModal({ cart, onClose, onConfirmSplit }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in"
       style={{ background: 'rgba(26,15,10,0.75)', backdropFilter: 'blur(8px)' }}>
-      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
+      <div className="relative bg-white rounded-lg shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
         
         <div className="px-6 py-4 border-b border-cream-medium/50 flex items-center justify-between bg-cream-light/30">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-coffee-accent/10 flex items-center justify-center text-coffee-accent">
+            <div className="w-10 h-10 rounded-lg bg-coffee-accent/10 flex items-center justify-center text-coffee-accent">
               <SplitSquareVertical size={20} />
             </div>
             <div>
@@ -60,7 +60,7 @@ export default function SplitBillModal({ cart, onClose, onConfirmSplit }) {
           {cart.map(item => {
             const selectedQty = splitCounts[item.cartItemId] || 0;
             return (
-              <div key={item.cartItemId} className="flex items-center justify-between p-3 rounded-xl border border-cream-medium/40 bg-white">
+              <div key={item.cartItemId} className="flex items-center justify-between p-3 rounded-lg border border-cream-medium/40 bg-white">
                 <div className="flex-1 min-w-0 pr-4">
                   <p className="font-semibold text-coffee-dark truncate">{item.name}</p>
                   <p className="text-coffee-light text-xs mt-0.5">{item.price.toLocaleString('vi-VN')}đ / món (Tổng: {item.qty})</p>
@@ -70,7 +70,7 @@ export default function SplitBillModal({ cart, onClose, onConfirmSplit }) {
                   <button onClick={() => handleSelectAll(item.cartItemId, item.qty)} className="text-xs text-coffee-accent font-semibold px-2 py-1 bg-coffee-accent/10 rounded-lg hover:bg-coffee-accent/20">
                     Chọn hết
                   </button>
-                  <div className="flex items-center gap-3 bg-cream-light rounded-xl p-1 border border-cream-medium/30">
+                  <div className="flex items-center gap-3 bg-cream-light rounded-lg p-1 border border-cream-medium/30">
                     <button 
                       onClick={() => handleDecrement(item.cartItemId)}
                       disabled={selectedQty === 0}

@@ -30,8 +30,8 @@ function MiniBarChart({ data }) {
                 style={{
                   height: `${height}%`,
                   background: isToday
-                    ? 'linear-gradient(135deg, #A76D42, #C8956C)'
-                    : 'linear-gradient(135deg, #D4C4AE, #EDE3D4)',
+                    ? 'linear-gradient(135deg, #2563EB, #0EA5E9)'
+                    : 'linear-gradient(135deg, #CBD5E1, #E2E8F0)',
                 }}
               />
             </div>
@@ -48,7 +48,7 @@ function StatCard({ icon: Icon, label, value, sub, color, trend }) {
   return (
     <div className="stat-card">
       <div className="flex items-start justify-between mb-4">
-        <div className={`w-11 h-11 rounded-xl flex items-center justify-center ${color}`}>
+        <div className={`w-11 h-11 rounded-lg flex items-center justify-center ${color}`}>
           <Icon size={20} className="text-white" />
         </div>
         {trend && (
@@ -74,7 +74,7 @@ function TopItemRow({ item, rank }) {
   return (
     <div className="flex items-center gap-4 py-3 border-b border-cream-medium/40 last:border-0">
       <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${rank <= 3 ? 'text-white' : 'bg-cream-light text-coffee-light'}`}
-        style={rank <= 3 ? { background: 'linear-gradient(135deg, #A76D42, #C8956C)' } : {}}>
+        style={rank <= 3 ? { background: 'linear-gradient(135deg, #2563EB, #0EA5E9)' } : {}}>
         {rank}
       </div>
       <div className="flex-1 min-w-0">
@@ -158,8 +158,8 @@ function OrderHistoryTab() {
 
       {/* Empty state */}
       {orderHistory.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-cream-medium/30 p-12 text-center">
-          <div className="w-14 h-14 rounded-2xl bg-cream-light flex items-center justify-center mx-auto mb-4">
+        <div className="bg-white rounded-lg border border-cream-medium/30 p-12 text-center">
+          <div className="w-14 h-14 rounded-lg bg-cream-light flex items-center justify-center mx-auto mb-4">
             <FileText size={24} className="text-coffee-light" />
           </div>
           <p className="font-semibold text-coffee-medium">Chưa có hóa đơn nào</p>
@@ -167,7 +167,7 @@ function OrderHistoryTab() {
         </div>
       ) : (
         <>
-          <div className="bg-white rounded-2xl border border-cream-medium/30 overflow-hidden shadow-card">
+          <div className="bg-white rounded-lg border border-cream-medium/30 overflow-hidden shadow-card">
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-cream-light border-b border-cream-medium/40">
@@ -242,7 +242,7 @@ function OrderHistoryTab() {
       {detailOrder && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in"
           style={{ background: 'rgba(26,15,10,0.6)', backdropFilter: 'blur(5px)' }}>
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md animate-slide-up">
+          <div className="bg-white rounded-lg shadow-2xl w-full max-w-md animate-slide-up">
             <div className="px-5 py-4 border-b border-cream-medium/40 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <CheckCircle size={18} className="text-green-500" />
@@ -255,15 +255,15 @@ function OrderHistoryTab() {
             </div>
             <div className="p-5 space-y-3">
               <div className="grid grid-cols-2 gap-3 text-sm">
-                <div className="bg-cream-light rounded-xl p-3">
+                <div className="bg-cream-light rounded-lg p-3">
                   <p className="text-coffee-light text-xs">Bàn</p>
                   <p className="font-bold text-coffee-dark">{detailOrder.tableName}</p>
                 </div>
-                <div className="bg-cream-light rounded-xl p-3">
+                <div className="bg-cream-light rounded-lg p-3">
                   <p className="text-coffee-light text-xs">Thời gian</p>
                   <p className="font-bold text-coffee-dark">{detailOrder.time} · {detailOrder.date}</p>
                 </div>
-                <div className="bg-cream-light rounded-xl p-3 col-span-2 flex justify-between items-center">
+                <div className="bg-cream-light rounded-lg p-3 col-span-2 flex justify-between items-center">
                   <div>
                     <p className="text-coffee-light text-xs">Người bán</p>
                     <p className="font-bold text-coffee-dark">{detailOrder.employee?.name || 'Không rõ'}</p>
@@ -276,7 +276,7 @@ function OrderHistoryTab() {
                   )}
                 </div>
               </div>
-              <div className="bg-cream-light rounded-xl p-3">
+              <div className="bg-cream-light rounded-lg p-3">
                 <p className="text-coffee-light text-xs mb-2">Danh sách món</p>
                 {detailOrder.items.map((item, i) => (
                   <div key={i} className="flex justify-between py-1 border-b border-cream-medium/40 last:border-0 text-sm">
@@ -344,7 +344,7 @@ function InventoryRow({ item, pct, isLow, isCritical, onRestock }) {
           <div className="h-full rounded-full transition-all duration-500"
             style={{
               width: `${Math.min(pct, 100)}%`,
-              background: isCritical ? '#ef4444' : isLow ? '#eab308' : 'linear-gradient(90deg,#A76D42,#C8956C)',
+              background: isCritical ? '#ef4444' : isLow ? '#eab308' : 'linear-gradient(90deg,#2563EB,#0EA5E9)',
             }}
           />
         </div>
@@ -373,7 +373,7 @@ function InventoryRow({ item, pct, isLow, isCritical, onRestock }) {
           <button onClick={handleRestock}
             disabled={!restockAmount}
             className="min-h-[36px] px-3 rounded-lg text-xs font-bold text-white transition-all disabled:opacity-40"
-            style={{ background: 'linear-gradient(135deg, #A76D42, #C8956C)' }}>
+            style={{ background: 'linear-gradient(135deg, #2563EB, #0EA5E9)' }}>
             Nhập
           </button>
         </div>
@@ -878,7 +878,7 @@ export default function DashboardPage() {
             </p>
           </div>
           {/* Tab switcher */}
-          <div className="flex bg-cream-light rounded-xl p-1 gap-1 overflow-x-auto scrollbar-hide max-w-full flex-nowrap">
+          <div className="flex bg-cream-light rounded-lg p-1 gap-1 overflow-x-auto scrollbar-hide max-w-full flex-nowrap">
             <button
               onClick={() => setActiveTab('overview')}
               className={`min-h-[40px] px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
@@ -886,7 +886,7 @@ export default function DashboardPage() {
                   ? 'text-white shadow-coffee'
                   : 'text-coffee-medium hover:text-coffee-dark'
               }`}
-              style={activeTab === 'overview' ? { background: 'linear-gradient(135deg, #A76D42, #C8956C)' } : {}}
+              style={activeTab === 'overview' ? { background: 'linear-gradient(135deg, #2563EB, #0EA5E9)' } : {}}
             >
               Tổng quan
             </button>
@@ -897,7 +897,7 @@ export default function DashboardPage() {
                   ? 'text-white shadow-coffee'
                   : 'text-coffee-medium hover:text-coffee-dark'
               }`}
-              style={activeTab === 'history' ? { background: 'linear-gradient(135deg, #A76D42, #C8956C)' } : {}}
+              style={activeTab === 'history' ? { background: 'linear-gradient(135deg, #2563EB, #0EA5E9)' } : {}}
             >
               <FileText size={14} />
               Hóa đơn
@@ -909,7 +909,7 @@ export default function DashboardPage() {
                   ? 'text-white shadow-coffee'
                   : 'text-coffee-medium hover:text-coffee-dark'
               }`}
-              style={activeTab === 'inventory' ? { background: 'linear-gradient(135deg, #A76D42, #C8956C)' } : {}}
+              style={activeTab === 'inventory' ? { background: 'linear-gradient(135deg, #2563EB, #0EA5E9)' } : {}}
             >
               <Package size={14} />
               Kho
@@ -926,7 +926,7 @@ export default function DashboardPage() {
                   ? 'text-white shadow-coffee'
                   : 'text-coffee-medium hover:text-coffee-dark'
               }`}
-              style={activeTab === 'customers' ? { background: 'linear-gradient(135deg, #A76D42, #C8956C)' } : {}}
+              style={activeTab === 'customers' ? { background: 'linear-gradient(135deg, #2563EB, #0EA5E9)' } : {}}
             >
               <Users size={14} />
               Khách hàng
@@ -938,7 +938,7 @@ export default function DashboardPage() {
                   ? 'text-white shadow-coffee'
                   : 'text-coffee-medium hover:text-coffee-dark'
               }`}
-              style={activeTab === 'tables' ? { background: 'linear-gradient(135deg, #A76D42, #C8956C)' } : {}}
+              style={activeTab === 'tables' ? { background: 'linear-gradient(135deg, #2563EB, #0EA5E9)' } : {}}
             >
               <MapPin size={14} />
               Thiết lập Bàn
@@ -950,7 +950,7 @@ export default function DashboardPage() {
                   ? 'text-white shadow-coffee'
                   : 'text-coffee-medium hover:text-coffee-dark'
               }`}
-              style={activeTab === 'detailed_reports' ? { background: 'linear-gradient(135deg, #A76D42, #C8956C)' } : {}}
+              style={activeTab === 'detailed_reports' ? { background: 'linear-gradient(135deg, #2563EB, #0EA5E9)' } : {}}
             >
               <TrendingUp size={14} />
               Báo cáo chi tiết
@@ -960,7 +960,7 @@ export default function DashboardPage() {
 
         {/* Low-stock global banner */}
         {lowStockItems.length > 0 && activeTab !== 'inventory' && (
-          <div className="mb-4 flex items-center gap-3 px-4 py-3 rounded-xl bg-red-50 border border-red-200 cursor-pointer hover:bg-red-100 transition-colors"
+          <div className="mb-4 flex items-center gap-3 px-4 py-3 rounded-lg bg-red-50 border border-red-200 cursor-pointer hover:bg-red-100 transition-colors"
             onClick={() => setActiveTab('inventory')}>
             <AlertTriangle size={18} className="text-red-500 flex-shrink-0" />
             <p className="text-red-700 text-sm font-semibold flex-1">
@@ -976,7 +976,7 @@ export default function DashboardPage() {
           <>
             {/* Row 1: Key Stats */}
             <div className="grid grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
-              <StatCard icon={DollarSign} label="Doanh thu hôm nay" value={`${(today.revenue / 1_000_000).toFixed(1)}M`} sub={`Mục tiêu: ${(today.target / 1_000_000).toFixed(0)}M`} color="bg-gradient-to-br from-coffee-accent to-coffee-gold" trend={8.3} />
+              <StatCard icon={DollarSign} label="Doanh thu hôm nay" value={`${(today.revenue / 1_000_000).toFixed(1)}M`} sub={`Mục tiêu: ${(today.target / 1_000_000).toFixed(0)}M`} color="bg-primary-600" trend={8.3} />
               <StatCard icon={ShoppingBag} label="Số đơn hàng" value={today.orders} sub={`Trung bình: ${today.avgOrderValue.toLocaleString('vi-VN')}đ/đơn`} color="bg-gradient-to-br from-blue-500 to-blue-400" trend={5.2} />
               <StatCard icon={Users} label="Khách hôm nay" value={today.customers} sub="Lượt khách ghé thăm" color="bg-gradient-to-br from-purple-500 to-purple-400" trend={12.5} />
               <StatCard icon={Target} label="Tuần này" value={`${(thisWeek.revenue / 1_000_000).toFixed(1)}M`} sub={`${thisWeek.orders} đơn hàng`} color="bg-gradient-to-br from-emerald-500 to-emerald-400" trend={thisWeek.growth} />
@@ -984,7 +984,7 @@ export default function DashboardPage() {
 
             {/* Row 2: Chart + Progress */}
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 mb-6">
-              <div className="xl:col-span-2 bg-white rounded-2xl p-6 shadow-card border border-cream-medium/30">
+              <div className="xl:col-span-2 bg-white rounded-lg p-6 shadow-card border border-cream-medium/30">
                 <div className="flex items-center justify-between mb-6">
                   <div>
                     <h2 className="font-display font-bold text-coffee-dark text-lg">Doanh thu tuần này</h2>
@@ -1001,13 +1001,13 @@ export default function DashboardPage() {
                 <MiniBarChart data={weeklyRevenue} />
               </div>
 
-              <div className="bg-white rounded-2xl p-6 shadow-card border border-cream-medium/30 flex flex-col">
+              <div className="bg-white rounded-lg p-6 shadow-card border border-cream-medium/30 flex flex-col">
                 <h2 className="font-display font-bold text-coffee-dark text-lg mb-1">Tiến độ hôm nay</h2>
                 <p className="text-coffee-light text-sm mb-5">Doanh thu / Mục tiêu ngày</p>
                 <div className="flex-1 flex flex-col items-center justify-center">
                   <div className="relative w-36 h-36 mb-4">
                     <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
-                      <circle cx="50" cy="50" r="40" fill="none" stroke="#EDE3D4" strokeWidth="10" />
+                      <circle cx="50" cy="50" r="40" fill="none" stroke="#E2E8F0" strokeWidth="10" />
                       <circle cx="50" cy="50" r="40" fill="none" stroke="url(#progressGrad)" strokeWidth="10"
                         strokeLinecap="round"
                         strokeDasharray={`${2 * Math.PI * 40}`}
@@ -1016,8 +1016,8 @@ export default function DashboardPage() {
                       />
                       <defs>
                         <linearGradient id="progressGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-                          <stop offset="0%" stopColor="#A76D42" />
-                          <stop offset="100%" stopColor="#C8956C" />
+                          <stop offset="0%" stopColor="#2563EB" />
+                          <stop offset="100%" stopColor="#0EA5E9" />
                         </linearGradient>
                       </defs>
                     </svg>
@@ -1046,7 +1046,7 @@ export default function DashboardPage() {
 
             {/* Row 3: Top Items + Recent Orders */}
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 mb-6">
-              <div className="bg-white rounded-2xl p-6 shadow-card border border-cream-medium/30">
+              <div className="bg-white rounded-lg p-6 shadow-card border border-cream-medium/30">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2">
                     <Award size={18} className="text-coffee-accent" />
@@ -1057,7 +1057,7 @@ export default function DashboardPage() {
                 {topItems.map((item, idx) => <TopItemRow key={item.id} item={item} rank={idx + 1} />)}
               </div>
 
-              <div className="bg-white rounded-2xl p-6 shadow-card border border-cream-medium/30">
+              <div className="bg-white rounded-lg p-6 shadow-card border border-cream-medium/30">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2">
                     <Clock size={18} className="text-coffee-accent" />
@@ -1072,7 +1072,7 @@ export default function DashboardPage() {
                 {recentOrders.map(order => (
                   <div key={order.id} className="flex items-center justify-between py-3 border-b border-cream-medium/40 last:border-0">
                     <div className="flex items-center gap-3">
-                      <div className="min-w-[48px] px-1.5 h-9 rounded-xl bg-cream-light flex items-center justify-center text-coffee-medium text-[11px] font-bold">
+                      <div className="min-w-[48px] px-1.5 h-9 rounded-lg bg-cream-light flex items-center justify-center text-coffee-medium text-[11px] font-bold">
                         {order.orderNumber || order.id}
                       </div>
                       <div>
@@ -1092,14 +1092,14 @@ export default function DashboardPage() {
             </div>
 
             {/* Row 4: Shift Log */}
-            <div className="bg-white rounded-2xl p-6 shadow-card border border-cream-medium/30">
+            <div className="bg-white rounded-lg p-6 shadow-card border border-cream-medium/30">
               <div className="flex items-center gap-2 mb-5">
                 <Clock size={18} className="text-coffee-accent" />
                 <h2 className="font-display font-bold text-coffee-dark text-lg">Nhật ký ca làm việc</h2>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {shifts.map(shift => (
-                  <div key={shift.id} className="rounded-2xl p-4 border border-cream-medium/60" style={{ background: '#FAF7F2' }}>
+                  <div key={shift.id} className="rounded-lg p-4 border border-cream-medium/60" style={{ background: '#F8FAFC' }}>
                     <div className="flex items-start justify-between mb-3">
                       <div>
                         <h3 className="font-bold text-coffee-dark">{shift.name}</h3>
@@ -1110,11 +1110,11 @@ export default function DashboardPage() {
                       </span>
                     </div>
                     <div className="grid grid-cols-2 gap-3">
-                      <div className="bg-white rounded-xl p-3 text-center shadow-card">
+                      <div className="bg-white rounded-lg p-3 text-center shadow-card">
                         <p className="text-xl font-bold text-coffee-dark">{shift.orders}</p>
                         <p className="text-xs text-coffee-light mt-0.5">Đơn hàng</p>
                       </div>
-                      <div className="bg-white rounded-xl p-3 text-center shadow-card">
+                      <div className="bg-white rounded-lg p-3 text-center shadow-card">
                         <p className="text-xl font-bold text-coffee-accent">{(shift.revenue / 1_000_000).toFixed(1)}M</p>
                         <p className="text-xs text-coffee-light mt-0.5">Doanh thu</p>
                       </div>
@@ -1128,7 +1128,7 @@ export default function DashboardPage() {
 
         {/* ===== HISTORY TAB ===== */}
         {activeTab === 'history' && (
-          <div className="bg-white rounded-2xl p-6 shadow-card border border-cream-medium/30">
+          <div className="bg-white rounded-lg p-6 shadow-card border border-cream-medium/30">
             <div className="flex items-center gap-2 mb-5">
               <FileText size={18} className="text-coffee-accent" />
               <h2 className="font-display font-bold text-coffee-dark text-lg">Lịch sử hóa đơn</h2>
@@ -1140,7 +1140,7 @@ export default function DashboardPage() {
         {/* ===== INVENTORY TAB ===== */}
         {activeTab === 'inventory' && (
           <div className="space-y-4">
-            <div className="bg-white rounded-2xl p-6 shadow-card border border-cream-medium/30">
+            <div className="bg-white rounded-lg p-6 shadow-card border border-cream-medium/30">
               {/* Main Tab Header */}
               <div className="flex items-center justify-between flex-wrap gap-4 border-b border-gray-100 pb-4 mb-4">
                 <div className="flex items-center gap-2">
@@ -1247,7 +1247,7 @@ export default function DashboardPage() {
                           setAdjustForm({ inventoryId: inventory[0].id, actualQty: '', note: '' });
                           setShowAdjust(true);
                         }}
-                        className="flex-1 sm:flex-initial min-h-[38px] bg-amber-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-amber-700 transition-colors flex items-center justify-center gap-1.5"
+                        className="flex-1 sm:flex-initial min-h-[38px] bg-amber-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-primary-700 transition-colors flex items-center justify-center gap-1.5"
                       >
                         <Sliders size={16} />
                         Kiểm kho
@@ -1257,7 +1257,7 @@ export default function DashboardPage() {
 
                   {/* Low Stock Alert */}
                   {lowStockItems.length > 0 && (
-                    <div className="p-4 rounded-xl bg-red-50 border border-red-200">
+                    <div className="p-4 rounded-lg bg-red-50 border border-red-200">
                       <div className="flex items-center gap-2 mb-2">
                         <AlertTriangle size={18} className="text-red-600" />
                         <p className="text-red-800 font-bold text-sm">{lowStockItems.length} nguyên liệu sắp hết hoặc cạn kiệt!</p>
@@ -1273,7 +1273,7 @@ export default function DashboardPage() {
                   )}
 
                   {/* Table */}
-                  <div className="overflow-x-auto rounded-xl border border-gray-150">
+                  <div className="overflow-x-auto rounded-lg border border-gray-150">
                     <table className="w-full text-sm text-left">
                       <thead>
                         <tr className="bg-gray-50 border-b border-gray-150">
@@ -1346,7 +1346,7 @@ export default function DashboardPage() {
                                     </button>
                                     <button
                                       onClick={() => handleDeleteIng(item.id)}
-                                      className="p-1.5 hover:bg-gray-150 rounded text-red-650 transition-colors"
+                                      className="p-1.5 hover:bg-gray-100 rounded text-red-600 transition-colors"
                                       title="Xóa"
                                     >
                                       <Trash2 size={15} />
@@ -1379,7 +1379,7 @@ export default function DashboardPage() {
                     <p className="text-xs text-gray-500 italic">Món chưa có định lượng sẽ không tự động trừ kho nguyên liệu khi bán.</p>
                   </div>
 
-                  <div className="overflow-x-auto rounded-xl border border-gray-150">
+                  <div className="overflow-x-auto rounded-lg border border-gray-150">
                     <table className="w-full text-sm text-left">
                       <thead>
                         <tr className="bg-gray-50 border-b border-gray-150">
@@ -1442,7 +1442,7 @@ export default function DashboardPage() {
                   <div className="flex items-center justify-between flex-wrap gap-3">
                     <div className="flex items-center gap-2">
                       <span className="text-xs text-gray-500 font-semibold uppercase">Bộ lọc giao dịch:</span>
-                      <div className="flex bg-gray-150 rounded-lg p-0.5 gap-1">
+                      <div className="flex bg-gray-100 rounded-lg p-0.5 gap-1">
                         {['ALL', 'IMPORT', 'SALE', 'ADJUST'].map(type => (
                           <button
                             key={type}
@@ -1470,7 +1470,7 @@ export default function DashboardPage() {
                   </div>
 
                   {/* Ledger Table */}
-                  <div className="overflow-x-auto rounded-xl border border-gray-150">
+                  <div className="overflow-x-auto rounded-lg border border-gray-150">
                     <table className="w-full text-sm text-left">
                       <thead>
                         <tr className="bg-gray-50 border-b border-gray-150">
@@ -1556,7 +1556,7 @@ export default function DashboardPage() {
                     </button>
                   </div>
 
-                  <div className="overflow-x-auto rounded-xl border border-gray-150">
+                  <div className="overflow-x-auto rounded-lg border border-gray-150">
                     <table className="w-full text-sm text-left">
                       <thead>
                         <tr className="bg-gray-50 border-b border-gray-150">
@@ -1613,7 +1613,7 @@ export default function DashboardPage() {
             {/* MODAL 1: THÊM NGUYÊN LIỆU MỚI */}
             {showAddIng && (
               <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 backdrop-blur-sm p-4">
-                <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl animate-fade-in">
+                <div className="bg-white rounded-lg p-6 w-full max-w-md shadow-2xl animate-fade-in">
                   <div className="flex items-center justify-between border-b border-gray-100 pb-3 mb-4">
                     <h3 className="font-bold text-coffee-dark text-lg">Thêm nguyên liệu mới</h3>
                     <button onClick={() => setShowAddIng(false)} className="p-1 text-gray-400 hover:bg-gray-100 rounded-full">
@@ -1710,7 +1710,7 @@ export default function DashboardPage() {
             {/* MODAL 2: CHỈNH SỬA NGUYÊN LIỆU */}
             {showEditIng && (
               <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 backdrop-blur-sm p-4">
-                <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl animate-fade-in">
+                <div className="bg-white rounded-lg p-6 w-full max-w-md shadow-2xl animate-fade-in">
                   <div className="flex items-center justify-between border-b border-gray-100 pb-3 mb-4">
                     <h3 className="font-bold text-coffee-dark text-lg">Chỉnh sửa nguyên liệu</h3>
                     <button onClick={() => setShowEditIng(false)} className="p-1 text-gray-400 hover:bg-gray-100 rounded-full">
@@ -1791,7 +1791,7 @@ export default function DashboardPage() {
             {/* MODAL 3: NHẬP HÀNG KHO */}
             {showImport && (
               <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 backdrop-blur-sm p-4">
-                <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl animate-fade-in">
+                <div className="bg-white rounded-lg p-6 w-full max-w-md shadow-2xl animate-fade-in">
                   <div className="flex items-center justify-between border-b border-gray-100 pb-3 mb-4">
                     <h3 className="font-bold text-coffee-dark text-lg flex items-center gap-1.5 text-emerald-600">
                       <Download size={18} />
@@ -1890,7 +1890,7 @@ export default function DashboardPage() {
             {/* MODAL 4: KIỂM KHO / CÂN ĐỐI */}
             {showAdjust && (
               <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 backdrop-blur-sm p-4">
-                <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl animate-fade-in">
+                <div className="bg-white rounded-lg p-6 w-full max-w-md shadow-2xl animate-fade-in">
                   <div className="flex items-center justify-between border-b border-gray-100 pb-3 mb-4">
                     <h3 className="font-bold text-coffee-dark text-lg flex items-center gap-1.5 text-amber-600">
                       <Sliders size={18} />
@@ -1935,7 +1935,7 @@ export default function DashboardPage() {
                     {adjustForm.inventoryId && (
                       <div className="p-3 bg-gray-50 rounded-lg text-xs text-gray-600 space-y-1">
                         <p>Tồn hệ thống: <span className="font-semibold text-gray-800">{inventory.find(i => i.id === adjustForm.inventoryId)?.qty || 0} {inventory.find(i => i.id === adjustForm.inventoryId)?.unit}</span></p>
-                        <p>Số lượng lệch: <span className={`font-bold ${(Number(adjustForm.actualQty) - (inventory.find(i => i.id === adjustForm.inventoryId)?.qty || 0)) >= 0 ? 'text-green-600' : 'text-red-650'}`}>{(Number(adjustForm.actualQty) - (inventory.find(i => i.id === adjustForm.inventoryId)?.qty || 0)).toFixed(2)} {inventory.find(i => i.id === adjustForm.inventoryId)?.unit}</span></p>
+                        <p>Số lượng lệch: <span className={`font-bold ${(Number(adjustForm.actualQty) - (inventory.find(i => i.id === adjustForm.inventoryId)?.qty || 0)) >= 0 ? 'text-green-600' : 'text-red-600'}`}>{(Number(adjustForm.actualQty) - (inventory.find(i => i.id === adjustForm.inventoryId)?.qty || 0)).toFixed(2)} {inventory.find(i => i.id === adjustForm.inventoryId)?.unit}</span></p>
                       </div>
                     )}
                     <div>
@@ -1958,7 +1958,7 @@ export default function DashboardPage() {
                       </button>
                       <button
                         type="submit"
-                        className="px-4 py-2 bg-amber-600 text-white rounded-lg text-sm hover:bg-amber-700 font-semibold"
+                        className="px-4 py-2 bg-amber-600 text-white rounded-lg text-sm hover:bg-primary-700 font-semibold"
                       >
                         Lưu cân đối kho
                       </button>
@@ -1971,7 +1971,7 @@ export default function DashboardPage() {
             {/* MODAL 5: THÊM NHÀ CUNG CẤP */}
             {showAddSupplier && (
               <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 backdrop-blur-sm p-4">
-                <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl animate-fade-in">
+                <div className="bg-white rounded-lg p-6 w-full max-w-md shadow-2xl animate-fade-in">
                   <div className="flex items-center justify-between border-b border-gray-100 pb-3 mb-4">
                     <h3 className="font-bold text-coffee-dark text-lg">Thêm nhà cung cấp</h3>
                     <button onClick={() => setShowAddSupplier(false)} className="p-1 text-gray-400 hover:bg-gray-100 rounded-full">
@@ -2043,7 +2043,7 @@ export default function DashboardPage() {
             {/* MODAL 6: SỬA NHÀ CUNG CẤP */}
             {showEditSupplier && (
               <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 backdrop-blur-sm p-4">
-                <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl animate-fade-in">
+                <div className="bg-white rounded-lg p-6 w-full max-w-md shadow-2xl animate-fade-in">
                   <div className="flex items-center justify-between border-b border-gray-100 pb-3 mb-4">
                     <h3 className="font-bold text-coffee-dark text-lg">Cập nhật nhà cung cấp</h3>
                     <button onClick={() => setShowEditSupplier(false)} className="p-1 text-gray-400 hover:bg-gray-100 rounded-full">
@@ -2111,7 +2111,7 @@ export default function DashboardPage() {
             {/* MODAL 7: CẤU HÌNH ĐỊNH LƯỢNG MÓN (RECIPE EDITOR) */}
             {showRecipeModal && recipeProduct && (
               <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 backdrop-blur-sm p-4">
-                <div className="bg-white rounded-2xl p-6 w-full max-w-2xl shadow-2xl animate-fade-in max-h-[85vh] flex flex-col">
+                <div className="bg-white rounded-lg p-6 w-full max-w-2xl shadow-2xl animate-fade-in max-h-[85vh] flex flex-col">
                   <div className="flex items-center justify-between border-b border-gray-100 pb-3 mb-4">
                     <div>
                       <h3 className="font-bold text-coffee-dark text-lg">Cấu hình định lượng món ăn</h3>
@@ -2127,7 +2127,7 @@ export default function DashboardPage() {
                     {recipeLines.map((line, idx) => {
                       const selectedIngredientObj = inventory.find(i => i.id === line.inventoryId);
                       return (
-                        <div key={idx} className="flex items-end gap-3 p-3 bg-gray-50 rounded-xl border border-gray-200">
+                        <div key={idx} className="flex items-end gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
                           <div className="flex-1">
                             <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Thành phần nguyên liệu</label>
                             <select
@@ -2166,7 +2166,7 @@ export default function DashboardPage() {
                           <button
                             type="button"
                             onClick={() => handleRemoveRecipeLine(idx)}
-                            className="p-2 bg-red-50 text-red-650 hover:bg-red-100 rounded-lg border border-red-200 transition-colors"
+                            className="p-2 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg border border-red-200 transition-colors"
                             title="Xóa dòng"
                           >
                             <Trash2 size={16} />
@@ -2176,7 +2176,7 @@ export default function DashboardPage() {
                     })}
 
                     {recipeLines.length === 0 && (
-                      <div className="text-center py-8 text-gray-400 bg-gray-50 rounded-xl border border-dashed border-gray-300">
+                      <div className="text-center py-8 text-gray-400 bg-gray-50 rounded-lg border border-dashed border-gray-300">
                         Chưa định nghĩa thành phần. Món ăn này hiện đang bán trực tiếp không trừ kho nguyên liệu.
                       </div>
                     )}
@@ -2242,7 +2242,7 @@ export default function DashboardPage() {
                   </button>
                 </div>
 
-                <div className="overflow-x-auto rounded-xl border border-gray-150 bg-white">
+                <div className="overflow-x-auto rounded-lg border border-gray-150 bg-white">
                   <table className="w-full text-sm text-left">
                     <thead>
                       <tr className="bg-gray-50 border-b border-gray-150">
@@ -2292,7 +2292,7 @@ export default function DashboardPage() {
                                 </button>
                                 <button
                                   onClick={() => handleDeleteCust(c.id)}
-                                  className="p-1 hover:bg-gray-100 rounded text-red-650"
+                                  className="p-1 hover:bg-gray-100 rounded text-red-600"
                                   title="Xóa khách hàng"
                                 >
                                   <Trash2 size={15} />
@@ -2338,7 +2338,7 @@ export default function DashboardPage() {
                   </button>
                 </div>
 
-                <div className="overflow-x-auto rounded-xl border border-gray-150 bg-white">
+                <div className="overflow-x-auto rounded-lg border border-gray-150 bg-white">
                   <table className="w-full text-sm text-left">
                     <thead>
                       <tr className="bg-gray-50 border-b border-gray-150">
@@ -2386,7 +2386,7 @@ export default function DashboardPage() {
                                 </button>
                                 <button
                                   onClick={() => handleDeleteTable(t.id)}
-                                  className="p-1 hover:bg-gray-100 rounded text-red-650"
+                                  className="p-1 hover:bg-gray-100 rounded text-red-600"
                                   title="Xóa bàn"
                                 >
                                   <Trash2 size={14} />
@@ -2409,7 +2409,7 @@ export default function DashboardPage() {
             {/* MODAL: THÊM KHÁCH HÀNG CRM */}
             {showAddCust && (
               <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 backdrop-blur-sm p-4 animate-fade-in">
-                <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
+                <div className="bg-white rounded-lg p-6 w-full max-w-md shadow-2xl">
                   <div className="flex items-center justify-between border-b border-gray-100 pb-3 mb-4">
                     <h3 className="font-bold text-coffee-dark text-lg">Tạo hồ sơ khách hàng mới</h3>
                     <button onClick={() => setShowAddCust(false)} className="p-1 text-gray-400 hover:bg-gray-100 rounded-full">
@@ -2486,7 +2486,7 @@ export default function DashboardPage() {
             {/* MODAL: SỬA KHÁCH HÀNG CRM */}
             {showEditCust && (
               <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 backdrop-blur-sm p-4 animate-fade-in">
-                <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
+                <div className="bg-white rounded-lg p-6 w-full max-w-md shadow-2xl">
                   <div className="flex items-center justify-between border-b border-gray-100 pb-3 mb-4">
                     <h3 className="font-bold text-coffee-dark text-lg">Chỉnh sửa hồ sơ khách hàng</h3>
                     <button onClick={() => setShowEditCust(false)} className="p-1 text-gray-400 hover:bg-gray-100 rounded-full">
@@ -2563,7 +2563,7 @@ export default function DashboardPage() {
             {/* MODAL: THÊM MỚI BÀN ĂN */}
             {showAddTable && (
               <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 backdrop-blur-sm p-4 animate-fade-in">
-                <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
+                <div className="bg-white rounded-lg p-6 w-full max-w-md shadow-2xl">
                   <div className="flex items-center justify-between border-b border-gray-100 pb-3 mb-4">
                     <h3 className="font-bold text-coffee-dark text-lg">Thêm bàn ăn vào sơ đồ</h3>
                     <button onClick={() => setShowAddTable(false)} className="p-1 text-gray-400 hover:bg-gray-100 rounded-full">
@@ -2630,7 +2630,7 @@ export default function DashboardPage() {
             {/* MODAL: SỬA BÀN ĂN */}
             {showEditTable && (
               <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 backdrop-blur-sm p-4 animate-fade-in">
-                <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
+                <div className="bg-white rounded-lg p-6 w-full max-w-md shadow-2xl">
                   <div className="flex items-center justify-between border-b border-gray-100 pb-3 mb-4">
                     <h3 className="font-bold text-coffee-dark text-lg">Chỉnh sửa thông tin bàn</h3>
                     <button onClick={() => setShowEditTable(false)} className="p-1 text-gray-400 hover:bg-gray-100 rounded-full">
@@ -2722,10 +2722,10 @@ export default function DashboardPage() {
             `}</style>
 
             {/* Filters and Actions Bar */}
-            <div className="no-print bg-white rounded-2xl p-4 shadow-card border border-cream-medium/30 flex flex-wrap items-center justify-between gap-4">
+            <div className="no-print bg-white rounded-lg p-4 shadow-card border border-cream-medium/30 flex flex-wrap items-center justify-between gap-4">
               <div className="flex flex-wrap items-center gap-3">
                 {/* Date filter presets */}
-                <div className="flex bg-cream-light rounded-xl p-1 gap-1">
+                <div className="flex bg-cream-light rounded-lg p-1 gap-1">
                   {['today', '7days', '30days', 'custom'].map((f) => (
                     <button
                       key={f}
@@ -2757,7 +2757,7 @@ export default function DashboardPage() {
                     />
                     <button
                       onClick={fetchDetailedReport}
-                      className="min-h-[36px] px-3 bg-coffee-accent hover:bg-amber-700 text-white rounded-lg text-xs font-bold transition-colors"
+                      className="min-h-[36px] px-3 bg-coffee-accent hover:bg-primary-700 text-white rounded-lg text-xs font-bold transition-colors"
                     >
                       Lọc
                     </button>
@@ -2769,14 +2769,14 @@ export default function DashboardPage() {
               <div className="flex items-center gap-2">
                 <button
                   onClick={handleExportDetailedCSV}
-                  className="min-h-[38px] px-4 text-xs bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-xl font-bold transition-all flex items-center gap-1.5"
+                  className="min-h-[38px] px-4 text-xs bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-lg font-bold transition-all flex items-center gap-1.5"
                 >
                   <Download size={14} />
                   Xuất Excel
                 </button>
                 <button
                   onClick={() => window.print()}
-                  className="min-h-[38px] px-4 text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-xl font-bold transition-all flex items-center gap-1.5"
+                  className="min-h-[38px] px-4 text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-lg font-bold transition-all flex items-center gap-1.5"
                 >
                   <FileText size={14} />
                   In / Xuất PDF
@@ -2800,7 +2800,7 @@ export default function DashboardPage() {
             </div>
 
             {/* Main report card */}
-            <div id="print-report-area" className="bg-white rounded-3xl p-6 shadow-card border border-cream-medium/30">
+            <div id="print-report-area" className="bg-white rounded-lg p-6 shadow-card border border-cream-medium/30">
               {/* Header info in print */}
               <div className="hidden print:block border-b border-gray-200 pb-4 mb-6">
                 <h1 className="text-2xl font-bold text-gray-800">HỆ THỐNG QUẢN LÝ MANAGER COFFEE</h1>
@@ -2856,7 +2856,7 @@ export default function DashboardPage() {
                         </div>
 
                         {/* Chart representation */}
-                        <div className="bg-cream-light/20 rounded-2xl p-5 border border-cream-medium/30 flex flex-col justify-center">
+                        <div className="bg-cream-light/20 rounded-lg p-5 border border-cream-medium/30 flex flex-col justify-center">
                           <h4 className="text-xs font-bold text-coffee-medium uppercase tracking-wider mb-4">So sánh doanh thu bán hàng</h4>
                           <div className="space-y-4">
                             {staffReports.map(emp => {
@@ -2870,7 +2870,7 @@ export default function DashboardPage() {
                                   </div>
                                   <div className="w-full h-3 bg-cream-light rounded-full overflow-hidden">
                                     <div
-                                      className="h-full rounded-full bg-gradient-to-r from-coffee-accent to-amber-500 transition-all duration-700"
+                                      className="h-full rounded-full bg-primary-600 transition-all duration-700"
                                       style={{ width: `${widthPct}%` }}
                                     />
                                   </div>
@@ -2889,7 +2889,7 @@ export default function DashboardPage() {
                       <h3 className="no-print font-bold text-base text-coffee-dark">Biểu đồ phân tích Peak Hours (Giờ cao điểm)</h3>
                       
                       {/* 24-Hour Custom Chart */}
-                      <div className="bg-cream-light/20 rounded-2xl p-5 border border-cream-medium/30">
+                      <div className="bg-cream-light/20 rounded-lg p-5 border border-cream-medium/30">
                         <div className="flex items-end justify-between h-48 gap-1 pt-6 px-2 overflow-x-auto">
                           {timeReports.hourlySales.map((h, i) => {
                             const maxRev = Math.max(...timeReports.hourlySales.map(hs => hs.revenue || 0)) || 1;
@@ -2908,7 +2908,7 @@ export default function DashboardPage() {
                                 <div
                                   className={`w-full rounded-t-md transition-all duration-500 cursor-pointer ${
                                     isPeak 
-                                      ? 'bg-gradient-to-t from-coffee-accent to-amber-500 shadow-md shadow-coffee-accent/20' 
+                                      ? 'bg-primary-600 shadow-sm'
                                       : 'bg-gradient-to-t from-cream-dark to-cream-medium/70 group-hover:from-coffee-light group-hover:to-coffee-medium'
                                   }`}
                                   style={{ height: `${heightPct * 0.8}%`, minHeight: '4px' }}
@@ -2920,7 +2920,7 @@ export default function DashboardPage() {
                         </div>
                         <div className="flex items-center justify-center gap-4 mt-4 text-[10px] text-coffee-medium font-semibold border-t border-cream-medium/20 pt-3">
                           <div className="flex items-center gap-1.5">
-                            <span className="w-3 h-3 rounded bg-gradient-to-t from-coffee-accent to-amber-500" />
+                            <span className="w-3 h-3 rounded bg-primary-600" />
                             <span>Giờ cao điểm doanh thu kỷ lục</span>
                           </div>
                           <div className="flex items-center gap-1.5">
@@ -2933,7 +2933,7 @@ export default function DashboardPage() {
                       {/* Day of week & Monthly grids */}
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         {/* Day of Week */}
-                        <div className="bg-white rounded-2xl p-5 border border-cream-medium/30">
+                        <div className="bg-white rounded-lg p-5 border border-cream-medium/30">
                           <h4 className="font-bold text-sm text-coffee-dark mb-3">Doanh thu theo Thứ</h4>
                           <div className="space-y-2">
                             {timeReports.dailySales.map(d => {
@@ -2953,7 +2953,7 @@ export default function DashboardPage() {
                         </div>
 
                         {/* Monthly */}
-                        <div className="bg-white rounded-2xl p-5 border border-cream-medium/30">
+                        <div className="bg-white rounded-lg p-5 border border-cream-medium/30">
                           <h4 className="font-bold text-sm text-coffee-dark mb-3">Doanh thu theo Tháng</h4>
                           <div className="max-h-60 overflow-y-auto pr-1 space-y-2">
                             {timeReports.monthlySales.map(m => (
@@ -2976,19 +2976,19 @@ export default function DashboardPage() {
                     <div className="space-y-6">
                       {/* Financial KPI Summary Cards */}
                       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                        <div className="bg-cream-light/30 border border-cream-medium/40 p-4 rounded-2xl">
+                        <div className="bg-cream-light/30 border border-cream-medium/40 p-4 rounded-lg">
                           <p className="text-xs font-bold text-coffee-medium uppercase tracking-wider mb-1">Tổng doanh thu</p>
                           <p className="text-xl font-mono font-bold text-coffee-dark">{profitLossReport.revenue.toLocaleString('vi-VN')}đ</p>
                         </div>
-                        <div className="bg-red-50/40 border border-red-100 p-4 rounded-2xl">
+                        <div className="bg-red-50/40 border border-red-100 p-4 rounded-lg">
                           <p className="text-xs font-bold text-red-600 uppercase tracking-wider mb-1">Giá vốn (COGS)</p>
                           <p className="text-xl font-mono font-bold text-red-700">-{profitLossReport.cogs.toLocaleString('vi-VN')}đ</p>
                         </div>
-                        <div className="bg-green-50/40 border border-green-100 p-4 rounded-2xl">
+                        <div className="bg-green-50/40 border border-green-100 p-4 rounded-lg">
                           <p className="text-xs font-bold text-green-700 uppercase tracking-wider mb-1">Lợi nhuận gộp</p>
                           <p className="text-xl font-mono font-bold text-green-800">{profitLossReport.grossProfit.toLocaleString('vi-VN')}đ</p>
                         </div>
-                        <div className="bg-blue-50/40 border border-blue-100 p-4 rounded-2xl">
+                        <div className="bg-blue-50/40 border border-blue-100 p-4 rounded-lg">
                           <p className="text-xs font-bold text-blue-600 uppercase tracking-wider mb-1">Tỷ suất lãi gộp</p>
                           <p className="text-xl font-mono font-bold text-blue-800">{profitLossReport.profitMargin.toFixed(1)}%</p>
                         </div>
@@ -3010,7 +3010,7 @@ export default function DashboardPage() {
                           </div>
                         </div>
 
-                        <div className="overflow-x-auto border border-cream-medium/30 rounded-2xl">
+                        <div className="overflow-x-auto border border-cream-medium/30 rounded-lg">
                           <table className="w-full text-left text-sm border-collapse">
                             <thead>
                               <tr className="border-b border-cream-medium/40 text-coffee-medium font-bold text-xs uppercase bg-cream-light/30">

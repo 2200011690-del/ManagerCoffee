@@ -78,7 +78,7 @@ const CartItem = React.memo(function CartItem({ item, onRemove, onUpdateQty, onA
           <Minus size={14} />
         </button>
         <span className="w-6 text-center text-sm font-bold text-coffee-dark">{item.qty}</span>
-        <button onClick={() => onUpdateQty(item.cartItemId, 1)} aria-label={`Tăng số lượng ${item.name}`} title="Tăng số lượng" className="min-w-[36px] min-h-[36px] rounded-lg flex items-center justify-center text-white transition-all" style={{ background: 'linear-gradient(135deg, #A76D42, #C8956C)' }}>
+        <button onClick={() => onUpdateQty(item.cartItemId, 1)} aria-label={`Tăng số lượng ${item.name}`} title="Tăng số lượng" className="min-w-[36px] min-h-[36px] rounded-lg flex items-center justify-center text-white transition-all" style={{ background: 'linear-gradient(135deg, #2563EB, #0EA5E9)' }}>
           <Plus size={14} />
         </button>
         <button onClick={() => onRemove(item.cartItemId)} aria-label={`Xóa ${item.name} khỏi giỏ`} title="Xóa món" className="min-w-[36px] min-h-[36px] rounded-lg bg-red-50 flex items-center justify-center text-red-500 hover:bg-red-100 transition-colors">
@@ -88,7 +88,7 @@ const CartItem = React.memo(function CartItem({ item, onRemove, onUpdateQty, onA
 
       {/* Discount Popup */}
       {showDiscountPopup && (
-        <div className="absolute right-0 top-0 z-30 bg-white rounded-2xl shadow-coffee-lg border border-cream-medium/60 p-4 w-56 animate-slide-up">
+        <div className="absolute right-0 top-0 z-30 bg-white rounded-lg shadow-coffee-lg border border-cream-medium/60 p-4 w-56 animate-slide-up">
           <p className="text-xs font-bold text-coffee-dark mb-2">Giảm giá: {item.name}</p>
           <div className="flex gap-1 mb-2">
             <button

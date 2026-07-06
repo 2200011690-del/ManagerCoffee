@@ -34,7 +34,7 @@ export default function PaymentQRModal({ amount, orderNumber, onSuccess, onFail 
     const handlePaymentSuccess = (data) => {
       if (data.orderNumber === orderNumber) {
         setPaid(true);
-        showNotification(`Đã nhận thanh toán chuyển khoản cho đơn ${orderNumber}! 🎉`, 'success');
+        showNotification(`Đã nhận thanh toán chuyển khoản cho đơn ${orderNumber}`, 'success');
         setTimeout(() => {
           onSuccess();
         }, 1500);
@@ -62,7 +62,7 @@ export default function PaymentQRModal({ amount, orderNumber, onSuccess, onFail 
   return (
     <div className="fixed inset-0 z-[120] flex items-center justify-center p-4"
       style={{ background: 'rgba(26,15,10,0.7)', backdropFilter: 'blur(8px)' }}>
-      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-slide-up border border-cream-medium/40">
+      <div className="bg-white rounded-lg shadow-2xl w-full max-w-md overflow-hidden animate-slide-up border border-cream-medium/40">
         
         {/* Header */}
         <div className="px-6 py-4 border-b border-cream-medium/40 flex items-center justify-between">
@@ -70,7 +70,7 @@ export default function PaymentQRModal({ amount, orderNumber, onSuccess, onFail 
             <CreditCard className="text-coffee-accent" size={20} />
             <h3 className="font-display font-bold text-coffee-dark">Chuyển khoản VietQR</h3>
           </div>
-          <button onClick={onFail} className="min-w-[36px] min-h-[36px] rounded-xl bg-cream-light flex items-center justify-center text-coffee-medium hover:bg-cream-medium transition-all">
+          <button onClick={onFail} className="min-w-[36px] min-h-[36px] rounded-lg bg-cream-light flex items-center justify-center text-coffee-medium hover:bg-cream-medium transition-all">
             <X size={16} />
           </button>
         </div>
@@ -84,7 +84,7 @@ export default function PaymentQRModal({ amount, orderNumber, onSuccess, onFail 
             </div>
           ) : error ? (
             <div className="py-8 text-center space-y-4">
-              <div className="w-12 h-12 rounded-2xl bg-red-50 text-red-600 flex items-center justify-center mx-auto">
+              <div className="w-12 h-12 rounded-lg bg-red-50 text-red-600 flex items-center justify-center mx-auto">
                 <ShieldAlert size={24} />
               </div>
               <p className="text-sm font-medium text-red-600 max-w-xs mx-auto leading-relaxed">
@@ -102,7 +102,7 @@ export default function PaymentQRModal({ amount, orderNumber, onSuccess, onFail 
             </div>
           ) : (
             <div className="w-full text-center space-y-4">
-              <div className="bg-cream-light/60 border border-cream-medium/40 rounded-2xl p-4 text-left space-y-1.5">
+              <div className="bg-cream-light/60 border border-cream-medium/40 rounded-lg p-4 text-left space-y-1.5">
                 <div className="flex justify-between text-xs text-coffee-medium">
                   <span>Ngân hàng:</span>
                   <span className="font-bold text-coffee-dark">{bankInfo.bankId}</span>
@@ -127,7 +127,7 @@ export default function PaymentQRModal({ amount, orderNumber, onSuccess, onFail 
               </div>
 
               {/* QR Code Container */}
-              <div className="relative w-48 h-48 mx-auto bg-white p-3 rounded-2xl border-2 border-cream-medium shadow-sm flex items-center justify-center">
+              <div className="relative w-48 h-48 mx-auto bg-white p-3 rounded-lg border-2 border-cream-medium shadow-sm flex items-center justify-center">
                 <img src={qrUrl} alt="VietQR Payment Code" className="w-full h-full object-contain" />
               </div>
 
@@ -144,7 +144,7 @@ export default function PaymentQRModal({ amount, orderNumber, onSuccess, onFail 
                 <button
                   onClick={handleBypass}
                   disabled={bypassing}
-                  className="w-full min-h-[40px] rounded-xl text-xs font-semibold bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 flex items-center justify-center gap-1 transition-all disabled:opacity-50"
+                  className="w-full min-h-[40px] rounded-lg text-xs font-semibold bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 flex items-center justify-center gap-1 transition-all disabled:opacity-50"
                 >
                   {bypassing ? (
                     <span className="animate-spin mr-1">⌛</span>

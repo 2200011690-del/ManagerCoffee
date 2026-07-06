@@ -12,17 +12,17 @@ export default function ItemModal({ item, onClose, onConfirm }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in bg-black/60 backdrop-blur-sm">
-      <div className="bg-[#FAF7F2] rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-slide-up border border-[#E5DDD0]">
+      <div className="bg-surface-bg rounded-lg shadow-2xl w-full max-w-md overflow-hidden animate-slide-up border border-[#E2E8F0]">
         {/* Image & Header Overlay */}
         <div className="relative h-56 overflow-hidden">
           {item.image ? (
             <img src={item.image} alt={item.name} className="w-full h-full object-cover transition-transform duration-700 hover:scale-105" />
           ) : (
-            <div className="w-full h-full bg-gradient-to-br from-[#2C1A10] to-[#5C4E43] flex items-center justify-center text-white font-display font-bold">
+            <div className="w-full h-full bg-gradient-to-br from-[#0F172A] to-[#475569] flex items-center justify-center text-white font-display font-bold">
               ☕ {item.name}
             </div>
           )}
-          <div className="absolute inset-0 bg-gradient-to-t from-[#2C1A10]/90 via-[#2C1A10]/40 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#0F172A]/90 via-[#0F172A]/40 to-transparent" />
           
           <button 
             onClick={onClose} 
@@ -32,7 +32,7 @@ export default function ItemModal({ item, onClose, onConfirm }) {
           </button>
           
           <div className="absolute bottom-4 left-5 right-5">
-            <span className="text-[10px] uppercase font-bold tracking-widest text-[#D4A373] px-2 py-0.5 rounded bg-[#2C1A10]/60 border border-[#A39081]/30 w-fit block mb-1.5">
+            <span className="text-[10px] uppercase font-bold tracking-widest text-[#38BDF8] px-2 py-0.5 rounded bg-[#0F172A]/60 border border-[#94A3B8]/30 w-fit block mb-1.5">
               {item.category}
             </span>
             <h3 className="text-white font-display font-bold text-2xl drop-shadow-sm">{item.name}</h3>
@@ -44,20 +44,20 @@ export default function ItemModal({ item, onClose, onConfirm }) {
           {/* Sugar Level */}
           <div>
             <div className="flex justify-between items-center mb-2.5">
-              <p className="text-[#5C4E43] text-xs font-bold uppercase tracking-wider">Mức đường</p>
-              <span className="text-[11px] font-semibold text-[#8C5E3C] bg-[#8C5E3C]/10 px-2 py-0.5 rounded-full">{sugar}</span>
+              <p className="text-[#475569] text-xs font-bold uppercase tracking-wider">Mức đường</p>
+              <span className="text-[11px] font-semibold text-[#2563EB] bg-[#2563EB]/10 px-2 py-0.5 rounded-full">{sugar}</span>
             </div>
             <div className="grid grid-cols-5 gap-2">
               {sugarOptions.map(s => (
                 <button
                   key={s}
                   onClick={() => setSugar(s)}
-                  className={`min-h-[42px] rounded-xl text-xs font-bold transition-all duration-200 transform active:scale-95 border ${
+                  className={`min-h-[42px] rounded-lg text-xs font-bold transition-all duration-200 transform active:scale-95 border ${
                     sugar === s
-                      ? 'text-white border-transparent hover:scale-[1.03] shadow-md shadow-[#A76D42]/20'
-                      : 'bg-[#FAF7F2] text-[#5C4E43] border-[#E5DDD0]/50 hover:bg-[#EFEAE2] hover:text-[#2C1A10]'
+                      ? 'text-white border-transparent hover:scale-[1.03] shadow-sm'
+                      : 'bg-surface-bg text-[#475569] border-[#E2E8F0]/50 hover:bg-[#F1F5F9] hover:text-[#0F172A]'
                   }`}
-                  style={sugar === s ? { background: 'linear-gradient(135deg, #A76D42, #C8956C)' } : {}}
+                  style={sugar === s ? { background: 'linear-gradient(135deg, #2563EB, #0EA5E9)' } : {}}
                 >
                   {s}
                 </button>
@@ -68,20 +68,20 @@ export default function ItemModal({ item, onClose, onConfirm }) {
           {/* Ice Level */}
           <div>
             <div className="flex justify-between items-center mb-2.5">
-              <p className="text-[#5C4E43] text-xs font-bold uppercase tracking-wider">Lượng đá</p>
-              <span className="text-[11px] font-semibold text-[#8C5E3C] bg-[#8C5E3C]/10 px-2 py-0.5 rounded-full">{ice}</span>
+              <p className="text-[#475569] text-xs font-bold uppercase tracking-wider">Lượng đá</p>
+              <span className="text-[11px] font-semibold text-[#2563EB] bg-[#2563EB]/10 px-2 py-0.5 rounded-full">{ice}</span>
             </div>
             <div className="grid grid-cols-4 gap-2">
               {iceOptions.map(i => (
                 <button
                   key={i}
                   onClick={() => setIce(i)}
-                  className={`min-h-[42px] rounded-xl text-xs font-bold transition-all duration-200 transform active:scale-95 border ${
+                  className={`min-h-[42px] rounded-lg text-xs font-bold transition-all duration-200 transform active:scale-95 border ${
                     ice === i
-                      ? 'text-white border-transparent hover:scale-[1.03] shadow-md shadow-[#A76D42]/20'
-                      : 'bg-[#FAF7F2] text-[#5C4E43] border-[#E5DDD0]/50 hover:bg-[#EFEAE2] hover:text-[#2C1A10]'
+                      ? 'text-white border-transparent hover:scale-[1.03] shadow-sm'
+                      : 'bg-surface-bg text-[#475569] border-[#E2E8F0]/50 hover:bg-[#F1F5F9] hover:text-[#0F172A]'
                   }`}
-                  style={ice === i ? { background: 'linear-gradient(135deg, #A76D42, #C8956C)' } : {}}
+                  style={ice === i ? { background: 'linear-gradient(135deg, #2563EB, #0EA5E9)' } : {}}
                 >
                   {i}
                 </button>
@@ -91,30 +91,30 @@ export default function ItemModal({ item, onClose, onConfirm }) {
 
           {/* Note */}
           <div>
-            <p className="text-[#5C4E43] text-xs font-bold uppercase tracking-wider mb-2.5">Ghi chú món ăn / Đồ uống</p>
+            <p className="text-[#475569] text-xs font-bold uppercase tracking-wider mb-2.5">Ghi chú món ăn / Đồ uống</p>
             <input
               type="text"
               value={note}
               onChange={e => setNote(e.target.value)}
               placeholder="Không dùng ống hút, ít đá, nhiều sữa..."
-              className="w-full bg-[#FAF7F2]/40 border border-[#E5DDD0] rounded-xl px-3 py-2 text-xs font-medium placeholder-[#A39081] focus:outline-none focus:ring-2 focus:ring-[#8C5E3C]/10 focus:border-[#8C5E3C] transition-all duration-150 min-h-[44px]"
+              className="w-full bg-surface-bg/40 border border-[#E2E8F0] rounded-lg px-3 py-2 text-xs font-medium placeholder-[#94A3B8] focus:outline-none focus:ring-2 focus:ring-[#2563EB]/10 focus:border-[#2563EB] transition-all duration-150 min-h-[44px]"
             />
           </div>
 
           {/* Qty + Add Button */}
-          <div className="flex items-center gap-4 pt-2 border-t border-[#E5DDD0]">
-            <div className="flex items-center gap-1.5 bg-[#FAF7F2] p-1.5 rounded-2xl border border-[#E5DDD0]">
+          <div className="flex items-center gap-4 pt-2 border-t border-[#E2E8F0]">
+            <div className="flex items-center gap-1.5 bg-surface-bg p-1.5 rounded-lg border border-[#E2E8F0]">
               <button 
                 onClick={() => setQty(Math.max(1, qty - 1))} 
-                className="w-10 h-10 rounded-xl bg-white shadow-sm border border-[#E5DDD0]/60 flex items-center justify-center text-[#5C4E43] hover:text-[#A76D42] hover:border-[#A76D42]/30 active:scale-90 transition-all"
+                className="w-10 h-10 rounded-lg bg-white shadow-sm border border-[#E2E8F0]/60 flex items-center justify-center text-[#475569] hover:text-[#2563EB] hover:border-[#2563EB]/30 active:scale-90 transition-all"
               >
                 <Minus size={16} />
               </button>
-              <span className="w-10 text-center font-bold text-[#2C1A10] text-base">{qty}</span>
+              <span className="w-10 text-center font-bold text-[#0F172A] text-base">{qty}</span>
               <button 
                 onClick={() => setQty(qty + 1)} 
-                className="w-10 h-10 rounded-xl flex items-center justify-center text-white active:scale-90 transition-all hover:scale-105" 
-                style={{ background: 'linear-gradient(135deg, #A76D42, #C8956C)' }}
+                className="w-10 h-10 rounded-lg flex items-center justify-center text-white active:scale-90 transition-all hover:scale-105"
+                style={{ background: 'linear-gradient(135deg, #2563EB, #0EA5E9)' }}
               >
                 <Plus size={16} />
               </button>
@@ -122,7 +122,7 @@ export default function ItemModal({ item, onClose, onConfirm }) {
             
             <button
               onClick={() => { onConfirm(item, sugar, ice, note, qty); onClose(); }}
-              className="flex-1 min-h-[48px] bg-gradient-to-r from-[#A76D42] to-[#D4A373] hover:from-[#965E36] hover:to-[#C59262] text-white font-bold text-sm rounded-2xl shadow-lg shadow-[#A76D42]/10 hover:shadow-xl hover:shadow-[#A76D42]/20 transition-all flex items-center justify-center gap-2 hover:-translate-y-0.5 active:translate-y-0"
+              className="flex-1 min-h-[48px] bg-gradient-to-r from-[#2563EB] to-[#38BDF8] hover:from-[#1D4ED8] hover:to-[#0284C7] text-white font-bold text-sm rounded-lg shadow-sm transition-all flex items-center justify-center gap-2 hover:-translate-y-0.5 active:translate-y-0"
             >
               <ShoppingCart size={16} />
               <span>Thêm · {(item.price * qty).toLocaleString('vi-VN')}đ</span>

@@ -73,13 +73,13 @@ function AppContent() {
             >
               <Menu size={20} />
             </button>
-            <span className="font-display font-bold text-sm tracking-wider">
-              {currentView === 'pos' ? 'BÁN HÀNG' :
-               currentView === 'tables' ? 'SƠ ĐỒ BÀN' :
-               currentView === 'dashboard' ? 'BÁO CÁO' :
-               currentView === 'menu' ? 'QUẢN LÝ MENU' :
-               currentView === 'promotions' ? 'KHUYẾN MÃI' :
-               currentView === 'employees' ? 'NHÂN SỰ' : 'CÀI ĐẶT'}
+            <span className="font-display font-bold text-sm">
+              {currentView === 'pos' ? 'Bán hàng' :
+               currentView === 'tables' ? 'Sơ đồ bàn' :
+               currentView === 'dashboard' ? 'Báo cáo' :
+               currentView === 'menu' ? 'Thực đơn' :
+               currentView === 'promotions' ? 'Khuyến mãi' :
+               currentView === 'employees' ? 'Nhân sự' : 'Cấu hình'}
             </span>
             <div className="w-8 h-8 rounded-full bg-primary-600 flex items-center justify-center text-xs font-bold text-white">
               {(currentUser?.name ?? '?')[0].toUpperCase()}
@@ -96,7 +96,7 @@ function AppContent() {
       {/* Global Toast Notification */}
       {notification && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-slide-up pointer-events-none">
-          <div className={`flex items-center gap-3 px-5 py-3 rounded-2xl shadow-coffee-lg text-white text-sm font-medium ${
+          <div className={`flex items-center gap-3 px-5 py-3 rounded-lg shadow-card text-white text-sm font-medium ${
             notification.type === 'success' ? 'bg-green-600' :
             notification.type === 'error' ? 'bg-red-600' : 'bg-coffee-dark'
           }`}>

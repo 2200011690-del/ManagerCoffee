@@ -5,6 +5,19 @@ import { useAuth } from '../context/AuthContext';
 
 const PLAN_OPTIONS = ['trial', 'starter', 'pro', 'enterprise'];
 const STATUS_OPTIONS = ['trial', 'active', 'past_due', 'suspended', 'cancelled'];
+const PLAN_LABELS = {
+  trial: 'Dùng thử',
+  starter: 'Starter',
+  pro: 'Pro',
+  enterprise: 'Enterprise'
+};
+const STATUS_LABELS = {
+  trial: 'Dùng thử',
+  active: 'Đang hoạt động',
+  past_due: 'Quá hạn',
+  suspended: 'Tạm khóa',
+  cancelled: 'Đã hủy'
+};
 
 export default function PlatformAdminPage() {
   const { currentUser, logout } = useAuth();
@@ -45,7 +58,7 @@ export default function PlatformAdminPage() {
       const overviewData = await api.get('/platform/overview');
       setOverview(overviewData);
     } catch (err) {
-      setError(err.response?.data?.error || 'Không thể cập nhật store');
+      setError(err.response?.data?.error || 'Không thể cập nhật cửa hàng');
     } finally {
       setSavingId(null);
     }
@@ -57,8 +70,8 @@ export default function PlatformAdminPage() {
   };
 
   const metricCards = [
-    { label: 'Tổng store', value: overview?.counts?.totalStores ?? 0, icon: Building2 },
-    { label: 'Store đang bật', value: overview?.counts?.activeStores ?? 0, icon: Store },
+    { label: 'Tổng cửa hàng', value: overview?.counts?.totalStores ?? 0, icon: Building2 },
+    { label: 'Đang hoạt động', value: overview?.counts?.activeStores ?? 0, icon: Store },
     { label: 'Người dùng', value: overview?.counts?.totalUsers ?? 0, icon: Users },
     { label: 'Hóa đơn', value: overview?.counts?.totalOrders ?? 0, icon: ShoppingBag },
     { label: 'API lỗi 5xx', value: overview?.api?.errorResponses ?? 0, icon: Activity },
@@ -73,7 +86,7 @@ export default function PlatformAdminPage() {
             <Shield size={18} />
           </div>
           <div>
-            <p className="font-bold text-sm">Manager Coffee Platform</p>
+            <p className="font-bold text-sm">Quản trị nền tảng</p>
             <p className="text-xs text-slate-500">{currentUser?.email}</p>
           </div>
         </div>
@@ -122,7 +135,7 @@ export default function PlatformAdminPage() {
         <section className="rounded-lg border border-slate-200 bg-white">
           <div className="px-4 py-3 border-b border-slate-200 flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
             <div>
-              <h1 className="font-bold text-base">Quản lý store</h1>
+              <h1 className="font-bold text-base">Quản lý cửa hàng</h1>
               <p className="text-xs text-slate-500 mt-0.5">Khóa/mở cửa hàng, đổi gói và trạng thái thuê bao.</p>
             </div>
             <form onSubmit={onSearchSubmit} className="flex gap-2">
@@ -131,7 +144,7 @@ export default function PlatformAdminPage() {
                 <input
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
-                  placeholder="Tìm store..."
+                  placeholder="Tìm cửa hàng..."
                   className="min-h-[38px] w-56 rounded-lg border border-slate-200 pl-9 pr-3 text-sm focus:outline-none focus:border-slate-400"
                 />
               </div>
@@ -145,7 +158,7 @@ export default function PlatformAdminPage() {
             <table className="w-full text-sm">
               <thead className="bg-slate-50 text-xs uppercase text-slate-500">
                 <tr>
-                  <th className="text-left px-4 py-3 font-bold">Store</th>
+                  <th className="text-left px-4 py-3 font-bold">Cửa hàng</th>
                   <th className="text-left px-4 py-3 font-bold">Gói</th>
                   <th className="text-left px-4 py-3 font-bold">Trạng thái</th>
                   <th className="text-left px-4 py-3 font-bold">Số liệu</th>
@@ -166,7 +179,7 @@ export default function PlatformAdminPage() {
                         onChange={(event) => updateStore(store.id, { plan: event.target.value })}
                         className="min-h-[34px] rounded-lg border border-slate-200 px-2 text-xs font-semibold bg-white"
                       >
-                        {PLAN_OPTIONS.map(plan => <option key={plan} value={plan}>{plan}</option>)}
+                        {PLAN_OPTIONS.map(plan => <option key={plan} value={plan}>{PLAN_LABELS[plan] || plan}</option>)}
                       </select>
                     </td>
                     <td className="px-4 py-3">
@@ -176,12 +189,12 @@ export default function PlatformAdminPage() {
                         onChange={(event) => updateStore(store.id, { subscriptionStatus: event.target.value })}
                         className="min-h-[34px] rounded-lg border border-slate-200 px-2 text-xs font-semibold bg-white"
                       >
-                        {STATUS_OPTIONS.map(status => <option key={status} value={status}>{status}</option>)}
+                        {STATUS_OPTIONS.map(status => <option key={status} value={status}>{STATUS_LABELS[status] || status}</option>)}
                       </select>
                     </td>
                     <td className="px-4 py-3 text-xs text-slate-600 min-w-[170px]">
-                      Users: {store._count?.users ?? 0} · Menu: {store._count?.products ?? 0}<br />
-                      Orders: {store._count?.orders ?? 0} · Tích hợp: {store._count?.integrations ?? 0}
+                      Người dùng: {store._count?.users ?? 0} · Món: {store._count?.products ?? 0}<br />
+                      Hóa đơn: {store._count?.orders ?? 0} · Tích hợp: {store._count?.integrations ?? 0}
                     </td>
                     <td className="px-4 py-3 text-right">
                       <button
@@ -203,7 +216,7 @@ export default function PlatformAdminPage() {
                 {!loading && stores.length === 0 && (
                   <tr>
                     <td className="px-4 py-8 text-center text-slate-500 text-sm" colSpan={5}>
-                      Không tìm thấy store nào.
+                      Không tìm thấy cửa hàng nào.
                     </td>
                   </tr>
                 )}

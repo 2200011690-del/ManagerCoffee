@@ -44,7 +44,7 @@ function TablePickerPanel({ onClose }) {
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 animate-fade-in"
       style={{ background: 'rgba(26,15,10,0.6)', backdropFilter: 'blur(5px)' }}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg animate-slide-up">
+      <div className="bg-white rounded-lg shadow-2xl w-full max-w-lg animate-slide-up">
         <div className="px-5 py-4 border-b border-cream-medium/50 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <LayoutGrid size={18} className="text-coffee-accent" />
@@ -58,7 +58,7 @@ function TablePickerPanel({ onClose }) {
           {/* Takeaway option */}
           <button
             onClick={() => { setTakeaway(); onClose(); }}
-            className={`w-full mb-3 flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-all text-left ${
+            className={`w-full mb-3 flex items-center gap-3 px-4 py-3 rounded-lg border-2 transition-all text-left ${
               activeTableId === null
                 ? 'border-coffee-accent bg-coffee-accent/10 text-coffee-accent'
                 : 'border-cream-dark text-coffee-medium hover:border-coffee-accent/40'
@@ -66,7 +66,7 @@ function TablePickerPanel({ onClose }) {
           >
             <ShoppingCart size={18} />
             <div>
-              <p className="font-semibold text-sm">Mang về / Takeaway</p>
+              <p className="font-semibold text-sm">Mang về</p>
               {tableHasCart(null) && <p className="text-xs opacity-70">Đang có món trong giỏ</p>}
             </div>
             {activeTableId === null && <span className="ml-auto text-xs font-bold bg-coffee-accent text-white px-2 py-0.5 rounded-full">Đang chọn</span>}
@@ -84,7 +84,7 @@ function TablePickerPanel({ onClose }) {
                       key={t.id}
                       onClick={() => handlePick(t.id)}
                       disabled={t.status === 'dirty'}
-                      className={`relative p-3 rounded-xl border-2 text-left transition-all ${statusColor(t.status)} ${
+                      className={`relative p-3 rounded-lg border-2 text-left transition-all ${statusColor(t.status)} ${
                         activeTableId === t.id ? 'ring-2 ring-coffee-accent ring-offset-1' : ''
                       } ${t.status === 'dirty' ? 'opacity-50 cursor-not-allowed' : 'hover:-translate-y-0.5 hover:shadow-md'}`}
                     >
@@ -94,7 +94,7 @@ function TablePickerPanel({ onClose }) {
                         <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-coffee-accent animate-pulse" />
                       )}
                       {activeTableId === t.id && (
-                        <span className="block text-xs font-bold mt-0.5" style={{ color: '#A76D42' }}>Đang chọn</span>
+                        <span className="block text-xs font-bold mt-0.5" style={{ color: '#2563EB' }}>Đang chọn</span>
                       )}
                     </button>
                   ))}
@@ -516,7 +516,7 @@ export default function POSPage() {
   const handleFinishCheckout = () => {
     setShowThermal(false);
     setPendingOrder(null);
-    showNotification('Thanh toán thành công! 🎉', 'success');
+    showNotification('Thanh toán thành công', 'success');
   };
 
   // Customer History & Recommendation (Phase 3)
@@ -631,9 +631,9 @@ export default function POSPage() {
           {/* Takeaway tab */}
           <button
             onClick={() => { setTakeaway(); }}
-            className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-t-xl text-sm font-semibold border-b-2 transition-all ${
+            className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-t-lg text-sm font-semibold border-b-2 transition-all ${
               activeTableId === null
-                ? 'border-coffee-accent text-coffee-accent bg-coffee-accent/8'
+                ? 'border-coffee-accent text-coffee-accent bg-coffee-accent/10'
                 : 'border-transparent text-coffee-light hover:text-coffee-dark'
             }`}
           >
@@ -647,9 +647,9 @@ export default function POSPage() {
             <button
               key={t.id}
               onClick={() => setSelectedTable(t.id)}
-              className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-t-xl text-sm font-semibold border-b-2 transition-all ${
+              className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-t-lg text-sm font-semibold border-b-2 transition-all ${
                 activeTableId === t.id
-                  ? 'border-coffee-accent text-coffee-accent bg-coffee-accent/8'
+                  ? 'border-coffee-accent text-coffee-accent bg-coffee-accent/10'
                   : 'border-transparent text-coffee-light hover:text-coffee-dark'
               }`}
             >
@@ -683,12 +683,12 @@ export default function POSPage() {
                 <button
                   key={cat}
                   onClick={() => setActiveCategory(cat)}
-                  className={`min-h-[44px] flex-shrink-0 px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-200 ${
+                  className={`min-h-[44px] flex-shrink-0 px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${
                     activeCategory === cat
                       ? 'text-white shadow-coffee'
                       : 'bg-cream-light text-coffee-medium hover:bg-cream-medium'
                   }`}
-                  style={activeCategory === cat ? { background: 'linear-gradient(135deg, #A76D42, #C8956C)' } : {}}
+                  style={activeCategory === cat ? { background: 'linear-gradient(135deg, #2563EB, #0EA5E9)' } : {}}
                 >
                   {cat}
                 </button>
@@ -711,11 +711,11 @@ export default function POSPage() {
         {/* Phím tắt cheat-sheet */}
         <div className="hidden lg:flex px-6 py-2 border-t border-cream-medium/40 bg-white/70 items-center justify-between text-[11px] text-coffee-medium flex-shrink-0">
           <div className="flex gap-4">
-            <span><kbd className="px-1.5 py-0.5 bg-gray-150 border border-gray-300 rounded font-mono text-[10px] shadow-sm font-bold text-gray-700 bg-white mr-1">F1</kbd>Tiền mặt</span>
-            <span><kbd className="px-1.5 py-0.5 bg-gray-150 border border-gray-300 rounded font-mono text-[10px] shadow-sm font-bold text-gray-700 bg-white mr-1">F2</kbd>Thẻ / QR</span>
-            <span><kbd className="px-1.5 py-0.5 bg-gray-150 border border-gray-300 rounded font-mono text-[10px] shadow-sm font-bold text-gray-700 bg-white mr-1">F3</kbd>Giữ đơn</span>
-            <span><kbd className="px-1.5 py-0.5 bg-gray-150 border border-gray-300 rounded font-mono text-[10px] shadow-sm font-bold text-gray-700 bg-white mr-1">F9</kbd>Tìm món</span>
-            <span><kbd className="px-1.5 py-0.5 bg-gray-150 border border-gray-300 rounded font-mono text-[10px] shadow-sm font-bold text-gray-700 bg-white mx-1">+</kbd>/<kbd className="px-1.5 py-0.5 bg-gray-150 border border-gray-300 rounded font-mono text-[10px] shadow-sm font-bold text-gray-700 bg-white mx-1">-</kbd>Tăng/Giảm món đầu</span>
+            <span><kbd className="px-1.5 py-0.5 bg-gray-100 border border-gray-300 rounded font-mono text-[10px] shadow-sm font-bold text-gray-700 bg-white mr-1">F1</kbd>Tiền mặt</span>
+            <span><kbd className="px-1.5 py-0.5 bg-gray-100 border border-gray-300 rounded font-mono text-[10px] shadow-sm font-bold text-gray-700 bg-white mr-1">F2</kbd>Thẻ / QR</span>
+            <span><kbd className="px-1.5 py-0.5 bg-gray-100 border border-gray-300 rounded font-mono text-[10px] shadow-sm font-bold text-gray-700 bg-white mr-1">F3</kbd>Giữ đơn</span>
+            <span><kbd className="px-1.5 py-0.5 bg-gray-100 border border-gray-300 rounded font-mono text-[10px] shadow-sm font-bold text-gray-700 bg-white mr-1">F9</kbd>Tìm món</span>
+            <span><kbd className="px-1.5 py-0.5 bg-gray-100 border border-gray-300 rounded font-mono text-[10px] shadow-sm font-bold text-gray-700 bg-white mx-1">+</kbd>/<kbd className="px-1.5 py-0.5 bg-gray-100 border border-gray-300 rounded font-mono text-[10px] shadow-sm font-bold text-gray-700 bg-white mx-1">-</kbd>Tăng/Giảm món đầu</span>
           </div>
           <span className="font-semibold text-coffee-accent hidden sm:inline">Phím tắt nhanh POS</span>
         </div>
@@ -725,7 +725,7 @@ export default function POSPage() {
       <div className={`w-full lg:w-80 xl:w-96 flex flex-col bg-white lg:border-l border-cream-medium/50 shadow-coffee lg:flex ${mobileTab === 'cart' ? 'flex' : 'hidden'}`}>
         {/* Shift Control bar */}
         {activeShift && (
-          <div className="px-5 py-2.5 bg-[#F6ECE2] border-b border-cream-medium/40 flex items-center justify-between">
+          <div className="px-5 py-2.5 bg-surface-muted border-b border-cream-medium/40 flex items-center justify-between">
             <div className="flex items-center gap-1.5">
               <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
               <span className="text-[11px] font-semibold text-coffee-medium">
@@ -769,7 +769,7 @@ export default function POSPage() {
           {/* Table selector */}
           <button
             onClick={() => setShowTablePicker(true)}
-            className="w-full flex items-center gap-2 px-3 py-2 rounded-xl border-2 border-dashed border-cream-dark hover:border-coffee-accent/50 transition-all group"
+            className="w-full flex items-center gap-2 px-3 py-2 rounded-lg border-2 border-dashed border-cream-dark hover:border-coffee-accent/50 transition-all group"
           >
             <Tag size={13} className="text-coffee-light group-hover:text-coffee-accent transition-colors" />
             <span className="text-sm text-coffee-medium group-hover:text-coffee-dark transition-colors flex-1 text-left">
@@ -786,7 +786,7 @@ export default function POSPage() {
         <div className="flex-1 overflow-y-auto px-5 py-3">
           {cart.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-center py-12">
-              <div className="w-16 h-16 rounded-2xl bg-cream-light flex items-center justify-center mb-4">
+              <div className="w-16 h-16 rounded-lg bg-cream-light flex items-center justify-center mb-4">
                 <ShoppingCart size={28} className="text-coffee-light" />
               </div>
               <p className="text-coffee-light font-medium">Giỏ hàng trống</p>
@@ -948,7 +948,7 @@ export default function POSPage() {
             <div className="grid grid-cols-2 gap-2">
               <button
                 onClick={() => setPaymentMethod('cash')}
-                className={`min-h-[44px] flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold border-2 transition-all ${
+                className={`min-h-[44px] flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-semibold border-2 transition-all ${
                   paymentMethod === 'cash'
                     ? 'border-coffee-accent bg-coffee-accent/10 text-coffee-accent'
                     : 'border-cream-dark text-coffee-light hover:border-coffee-accent/40'
@@ -959,7 +959,7 @@ export default function POSPage() {
               </button>
               <button
                 onClick={() => setPaymentMethod('card')}
-                className={`min-h-[44px] flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold border-2 transition-all ${
+                className={`min-h-[44px] flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-semibold border-2 transition-all ${
                   paymentMethod === 'card'
                     ? 'border-coffee-accent bg-coffee-accent/10 text-coffee-accent'
                     : 'border-cream-dark text-coffee-light hover:border-coffee-accent/40'
@@ -975,7 +975,7 @@ export default function POSPage() {
               <button
                 onClick={() => setShowOrderDiscount(true)}
                 disabled={currentUser?.role === 'staff' && !currentUser?.canApplyDiscount}
-                className={`min-h-[38px] flex items-center justify-center gap-1 rounded-xl text-xs font-semibold border-2 transition-all ${
+                className={`min-h-[38px] flex items-center justify-center gap-1 rounded-lg text-xs font-semibold border-2 transition-all ${
                   currentUser?.role === 'staff' && !currentUser?.canApplyDiscount
                     ? 'border-gray-200 text-gray-400 bg-gray-50 cursor-not-allowed'
                     : 'border-green-200 text-green-700 bg-green-50 hover:bg-green-100'
@@ -986,14 +986,14 @@ export default function POSPage() {
               </button>
               <button
                 onClick={handleHoldOrder}
-                className="min-h-[38px] flex items-center justify-center gap-1 rounded-xl text-xs font-semibold border-2 border-amber-200 text-amber-700 bg-amber-50 hover:bg-amber-100 transition-all"
+                className="min-h-[38px] flex items-center justify-center gap-1 rounded-lg text-xs font-semibold border-2 border-amber-200 text-amber-700 bg-amber-50 hover:bg-amber-100 transition-all"
               >
                 <Pause size={13} />
                 Giữ đơn
               </button>
               <button
                 onClick={() => setShowHeldOrders(true)}
-                className="min-h-[38px] flex items-center justify-center gap-1 rounded-xl text-[11px] sm:text-xs font-semibold border-2 border-amber-200 text-amber-700 bg-amber-50 hover:bg-amber-100 transition-all"
+                className="min-h-[38px] flex items-center justify-center gap-1 rounded-lg text-[11px] sm:text-xs font-semibold border-2 border-amber-200 text-amber-700 bg-amber-50 hover:bg-amber-100 transition-all"
                 title="Xem đơn tạm giữ"
               >
                 <Layers size={13} />
@@ -1012,7 +1012,7 @@ export default function POSPage() {
               <button
                 onClick={() => setShowReturnModal(true)}
                 disabled={currentUser?.role === 'staff' && !currentUser?.canRefund}
-                className={`flex-1 min-h-[44px] flex items-center justify-center gap-1.5 text-xs font-semibold border-2 rounded-xl transition-all ${
+                className={`flex-1 min-h-[44px] flex items-center justify-center gap-1.5 text-xs font-semibold border-2 rounded-lg transition-all ${
                   currentUser?.role === 'staff' && !currentUser?.canRefund
                     ? 'border-gray-200 text-gray-400 bg-gray-50 cursor-not-allowed'
                     : 'border-red-200 text-red-600 bg-red-50 hover:bg-red-100'
@@ -1047,7 +1047,7 @@ export default function POSPage() {
         <div className="lg:hidden fixed bottom-4 left-4 right-4 z-40 animate-slide-up">
           <button
             onClick={() => setMobileTab('cart')}
-            className="w-full bg-coffee-dark text-white px-5 py-3 rounded-2xl shadow-coffee-lg flex items-center justify-between active:scale-98 transition-transform"
+            className="w-full bg-coffee-dark text-white px-5 py-3 rounded-lg shadow-coffee-lg flex items-center justify-between active:scale-98 transition-transform"
           >
             <div className="flex items-center gap-2">
               <div className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center text-xs font-bold">
@@ -1078,10 +1078,10 @@ export default function POSPage() {
       {showPayConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in"
           style={{ background: 'rgba(26,15,10,0.65)', backdropFilter: 'blur(6px)' }}>
-          <div className="bg-white rounded-3xl shadow-coffee-lg w-full max-w-sm p-6 animate-slide-up">
+          <div className="bg-white rounded-lg shadow-coffee-lg w-full max-w-sm p-6 animate-slide-up">
             <div className="text-center mb-5">
-              <div className="w-14 h-14 rounded-2xl mx-auto mb-3 flex items-center justify-center"
-                style={{ background: 'linear-gradient(135deg, #A76D42, #C8956C)' }}>
+              <div className="w-14 h-14 rounded-lg mx-auto mb-3 flex items-center justify-center"
+                style={{ background: 'linear-gradient(135deg, #2563EB, #0EA5E9)' }}>
                 <Receipt size={26} className="text-white" />
               </div>
               <h3 className="font-display font-bold text-xl text-coffee-dark">Xác nhận thanh toán</h3>
@@ -1089,7 +1089,7 @@ export default function POSPage() {
                 {tableLabel} · {paymentMethod === 'cash' ? 'Tiền mặt' : 'Thẻ / QR Code'}
               </p>
             </div>
-            <div className="bg-cream-light rounded-2xl p-4 mb-5 space-y-2">
+            <div className="bg-cream-light rounded-lg p-4 mb-5 space-y-2">
               <div className="flex justify-between text-sm text-coffee-medium">
                 <span>Số món</span>
                 <span className="font-semibold">{cartCount} món</span>
@@ -1169,9 +1169,9 @@ export default function POSPage() {
       {showOpenShiftModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in"
           style={{ background: 'rgba(26,15,10,0.7)', backdropFilter: 'blur(8px)' }}>
-          <div className="bg-white rounded-3xl shadow-coffee-lg w-full max-w-sm p-6 animate-slide-up border border-cream-medium/40">
+          <div className="bg-white rounded-lg shadow-coffee-lg w-full max-w-sm p-6 animate-slide-up border border-cream-medium/40">
             <div className="text-center mb-5">
-              <div className="w-14 h-14 rounded-2xl mx-auto mb-3 flex items-center justify-center bg-coffee-accent/15 text-coffee-accent">
+              <div className="w-14 h-14 rounded-lg mx-auto mb-3 flex items-center justify-center bg-coffee-accent/15 text-coffee-accent">
                 <Lock size={26} />
               </div>
               <h3 className="font-display font-bold text-xl text-coffee-dark">Bắt đầu ca bán hàng</h3>
@@ -1213,7 +1213,7 @@ export default function POSPage() {
       {showCloseShiftModal && activeShift && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in"
           style={{ background: 'rgba(26,15,10,0.7)', backdropFilter: 'blur(8px)' }}>
-          <div className="bg-white rounded-3xl shadow-coffee-lg w-full max-w-md p-6 animate-slide-up border border-cream-medium/40 max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-lg shadow-coffee-lg w-full max-w-md p-6 animate-slide-up border border-cream-medium/40 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between pb-3 border-b border-cream-medium/40 mb-4">
               <div className="flex items-center gap-2 text-coffee-dark font-display font-bold text-lg">
                 <Clock size={20} className="text-coffee-accent animate-pulse-soft" />
@@ -1228,7 +1228,7 @@ export default function POSPage() {
             </div>
 
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-2 text-xs bg-cream-light/60 p-3 rounded-2xl border border-cream-medium/20">
+              <div className="grid grid-cols-2 gap-2 text-xs bg-cream-light/60 p-3 rounded-lg border border-cream-medium/20">
                 <div>
                   <span className="text-coffee-light block">Thu ngân:</span>
                   <span className="font-bold text-coffee-dark">{currentUser?.name}</span>
@@ -1272,7 +1272,7 @@ export default function POSPage() {
                 </div>
 
                 {actualCashInput !== '' && (
-                  <div className={`p-3 rounded-2xl border flex items-center justify-between text-xs font-semibold ${
+                  <div className={`p-3 rounded-lg border flex items-center justify-between text-xs font-semibold ${
                     Number(actualCashInput) - activeShift.expectedCash === 0
                       ? 'bg-green-50 border-green-200 text-green-800'
                       : Number(actualCashInput) - activeShift.expectedCash > 0
@@ -1287,7 +1287,7 @@ export default function POSPage() {
                 )}
 
                 {actualCashInput !== '' && Number(actualCashInput) - activeShift.expectedCash !== 0 && (
-                  <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-800">
+                  <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-800">
                     <AlertTriangle size={15} className="flex-shrink-0 mt-0.5" />
                     <div>
                       <p className="font-bold">Lệch két tiền mặt!</p>
@@ -1345,10 +1345,10 @@ export default function POSPage() {
       {showOrderDiscount && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in"
           style={{ background: 'rgba(26,15,10,0.55)', backdropFilter: 'blur(5px)' }}>
-          <div className="bg-white rounded-3xl shadow-coffee-lg w-full max-w-sm p-6 animate-slide-up">
+          <div className="bg-white rounded-lg shadow-coffee-lg w-full max-w-sm p-6 animate-slide-up">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
-                <div className="w-10 h-10 rounded-xl bg-green-50 flex items-center justify-center">
+                <div className="w-10 h-10 rounded-lg bg-green-50 flex items-center justify-center">
                   <Percent size={20} className="text-green-600" />
                 </div>
                 <h3 className="font-display font-bold text-coffee-dark">Giảm giá đơn hàng</h3>
@@ -1362,7 +1362,7 @@ export default function POSPage() {
               <div className="flex gap-1.5">
                 <button
                   onClick={() => setOrderDiscountType('PERCENT')}
-                  className={`flex-1 min-h-[40px] rounded-xl text-sm font-semibold transition-all border-2 ${
+                  className={`flex-1 min-h-[40px] rounded-lg text-sm font-semibold transition-all border-2 ${
                     orderDiscountType === 'PERCENT' ? 'bg-coffee-accent text-white border-coffee-accent' : 'bg-cream-light text-coffee-medium border-cream-dark'
                   }`}
                 >
@@ -1370,7 +1370,7 @@ export default function POSPage() {
                 </button>
                 <button
                   onClick={() => setOrderDiscountType('FIXED')}
-                  className={`flex-1 min-h-[40px] rounded-xl text-sm font-semibold transition-all border-2 ${
+                  className={`flex-1 min-h-[40px] rounded-lg text-sm font-semibold transition-all border-2 ${
                     orderDiscountType === 'FIXED' ? 'bg-coffee-accent text-white border-coffee-accent' : 'bg-cream-light text-coffee-medium border-cream-dark'
                   }`}
                 >
@@ -1399,7 +1399,7 @@ export default function POSPage() {
                 />
               </div>
               {orderDiscountValue && (
-                <div className="bg-green-50 border border-green-200 rounded-xl p-3 text-center">
+                <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-center">
                   <p className="text-xs text-green-700">Giảm giá dự kiến:</p>
                   <p className="text-lg font-bold text-green-700 font-mono">
                     -{(orderDiscountType === 'PERCENT'
@@ -1450,7 +1450,7 @@ export default function POSPage() {
       {/* Customer History Modal (Phase 3) */}
       {showCustomerHistoryModal && customer && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/45 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[85vh] animate-slide-up border border-cream-medium/30">
+          <div className="bg-white rounded-lg shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[85vh] animate-slide-up border border-cream-medium/30">
             <div className="px-6 py-4.5 border-b border-gray-100 flex justify-between items-center bg-cream-light/30">
               <div>
                 <h3 className="font-display font-bold text-coffee-dark text-lg">Lịch sử & Gợi ý món: {customer.name}</h3>
@@ -1487,7 +1487,7 @@ export default function POSPage() {
                                   showNotification('Món ăn hiện tại không còn phục vụ', 'error');
                                 }
                               }}
-                              className="bg-cream-light/50 border border-cream-medium/40 hover:border-coffee-accent hover:bg-cream-medium/30 p-3 rounded-2xl text-left transition-all relative group flex flex-col justify-between min-h-[90px]"
+                              className="bg-cream-light/50 border border-cream-medium/40 hover:border-coffee-accent hover:bg-cream-medium/30 p-3 rounded-lg text-left transition-all relative group flex flex-col justify-between min-h-[90px]"
                             >
                               <span className="font-bold text-coffee-dark text-xs line-clamp-2 leading-tight mb-1">{f.name}</span>
                               <div className="flex justify-between items-baseline mt-auto">
@@ -1511,7 +1511,7 @@ export default function POSPage() {
                     ) : (
                       <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1">
                         {customerHistory.orders.map((ord, idx) => (
-                          <div key={idx} className="p-3 border border-gray-150 rounded-xl bg-gray-50/50 hover:bg-gray-50 transition-colors">
+                          <div key={idx} className="p-3 border border-gray-150 rounded-lg bg-gray-50/50 hover:bg-gray-50 transition-colors">
                             <div className="flex justify-between items-center text-xs font-bold text-coffee-dark mb-1.5">
                               <span>HĐ: {ord.orderNumber}</span>
                               <span className="text-coffee-accent">{ord.total.toLocaleString()}đ</span>

@@ -48,11 +48,11 @@ export default function HeldOrdersPanel({ onClose, onRecall }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in"
       style={{ background: 'rgba(26,15,10,0.55)', backdropFilter: 'blur(5px)' }}>
-      <div className="bg-white rounded-3xl shadow-coffee-lg w-full max-w-md animate-slide-up max-h-[80vh] overflow-hidden flex flex-col">
+      <div className="bg-white rounded-lg shadow-coffee-lg w-full max-w-md animate-slide-up max-h-[80vh] overflow-hidden flex flex-col">
         {/* Header */}
         <div className="px-5 py-4 border-b border-cream-medium/50 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-lg bg-amber-50 flex items-center justify-center">
               <Pause size={20} className="text-amber-600" />
             </div>
             <div>
@@ -71,7 +71,7 @@ export default function HeldOrdersPanel({ onClose, onRecall }) {
             <div className="text-center py-12 text-coffee-light text-sm">Đang tải...</div>
           ) : heldOrders.length === 0 ? (
             <div className="text-center py-12">
-              <div className="w-14 h-14 rounded-2xl bg-cream-light mx-auto mb-3 flex items-center justify-center">
+              <div className="w-14 h-14 rounded-lg bg-cream-light mx-auto mb-3 flex items-center justify-center">
                 <Package size={24} className="text-coffee-light" />
               </div>
               <p className="text-sm text-coffee-light font-medium">Không có đơn tạm giữ</p>
@@ -83,7 +83,7 @@ export default function HeldOrdersPanel({ onClose, onRecall }) {
                 const totalQty = held.items.reduce((s, i) => s + i.qty, 0);
                 const totalPrice = held.items.reduce((s, i) => s + i.price * i.qty, 0);
                 return (
-                  <div key={held.id} className="bg-cream-light/50 rounded-2xl border border-cream-medium/30 p-4">
+                  <div key={held.id} className="bg-cream-light/50 rounded-lg border border-cream-medium/30 p-4">
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-bold text-coffee-dark">{held.tableName}</span>
@@ -125,7 +125,7 @@ export default function HeldOrdersPanel({ onClose, onRecall }) {
                         <button
                           onClick={() => handleRecall(held)}
                           className="min-h-[32px] px-3 rounded-lg flex items-center justify-center gap-1 text-xs font-bold text-white transition-all"
-                          style={{ background: 'linear-gradient(135deg, #A76D42, #C8956C)' }}
+                          style={{ background: 'linear-gradient(135deg, #2563EB, #0EA5E9)' }}
                         >
                           <Play size={12} />
                           Thu hồi

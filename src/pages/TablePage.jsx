@@ -7,7 +7,7 @@ import { useUI } from '../context/UIContext';
 // Hàm tính total từ giỏ hàng của bàn
 function calcTableTotal(cartItems = []) {
   const subtotal = cartItems.reduce((s, i) => s + i.price * i.qty, 0);
-  return Math.round(subtotal * 1.08); // with VAT
+  return Math.round(subtotal * 1.08); // đã gồm VAT
 }
 function calcTableItemCount(cartItems = []) {
   return cartItems.reduce((s, i) => s + i.qty, 0);
@@ -39,7 +39,7 @@ function TableCard({ table, onGoToPOS, onMarkClean, tableCarts, isEditMode, onEd
       label: 'Có khách',
       icon: <Users size={14} className="text-pink-500" />,
       btnLabel: 'Gọi thêm / Thu tiền',
-      btnClass: 'bg-gradient-to-r from-coffee-accent to-amber-600 text-white hover:from-amber-600 hover:to-amber-700',
+      btnClass: 'bg-primary-600 hover:bg-primary-700 text-white',
     },
     dirty: {
       border: 'border-yellow-200',
@@ -48,7 +48,7 @@ function TableCard({ table, onGoToPOS, onMarkClean, tableCarts, isEditMode, onEd
       badge: 'bg-yellow-100 text-yellow-700',
       label: 'Chưa dọn',
       icon: <RefreshCw size={14} className="text-yellow-600" />,
-      btnLabel: '✅ Đã dọn xong',
+      btnLabel: 'Đã dọn xong',
       btnClass: 'bg-yellow-100 text-yellow-800 border border-yellow-300 hover:bg-yellow-200',
     },
   };
@@ -63,7 +63,7 @@ function TableCard({ table, onGoToPOS, onMarkClean, tableCarts, isEditMode, onEd
   return (
     <div
       onClick={handleClick}
-      className={`relative rounded-2xl border-2 overflow-hidden transition-all duration-200 shadow-sm hover:shadow-md cursor-pointer ${s.border} ${s.bg} ${(table.status === 'dirty' || isEditMode) ? 'cursor-default' : 'hover:-translate-y-0.5'}`}
+      className={`relative rounded-lg border-2 overflow-hidden transition-all duration-200 shadow-sm hover:shadow-md cursor-pointer ${s.border} ${s.bg} ${(table.status === 'dirty' || isEditMode) ? 'cursor-default' : 'hover:-translate-y-0.5'}`}
     >
       {/* Top color bar */}
       <div className={`h-1.5 w-full ${s.topBar}`} />
@@ -86,7 +86,7 @@ function TableCard({ table, onGoToPOS, onMarkClean, tableCarts, isEditMode, onEd
 
         {/* Occupied: show order info */}
         {table.status === 'occupied' && (
-          <div className="mt-2 mb-3 bg-pink-50 rounded-xl p-2.5 border border-pink-100">
+          <div className="mt-2 mb-3 bg-pink-50 rounded-lg p-2.5 border border-pink-100">
             {hasCart ? (
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-1.5 text-coffee-medium">
@@ -122,14 +122,14 @@ function TableCard({ table, onGoToPOS, onMarkClean, tableCarts, isEditMode, onEd
           <div className="flex gap-2">
             <button
               onClick={e => { e.stopPropagation(); onEdit(table); }}
-              className="flex-1 min-h-[36px] py-1.5 bg-cream-light hover:bg-cream-medium text-coffee-dark text-xs font-bold rounded-xl border border-cream-medium/40 transition-all flex items-center justify-center gap-1"
+              className="flex-1 min-h-[36px] py-1.5 bg-cream-light hover:bg-cream-medium text-coffee-dark text-xs font-bold rounded-lg border border-cream-medium/40 transition-all flex items-center justify-center gap-1"
             >
               <Edit size={12} />
               Sửa
             </button>
             <button
               onClick={e => { e.stopPropagation(); onDelete(table.id); }}
-              className="flex-1 min-h-[36px] py-1.5 bg-red-50 hover:bg-red-100 text-red-600 text-xs font-bold rounded-xl border border-red-100 transition-all flex items-center justify-center gap-1"
+              className="flex-1 min-h-[36px] py-1.5 bg-red-50 hover:bg-red-100 text-red-600 text-xs font-bold rounded-lg border border-red-100 transition-all flex items-center justify-center gap-1"
             >
               <Trash2 size={12} />
               Xóa
@@ -138,14 +138,14 @@ function TableCard({ table, onGoToPOS, onMarkClean, tableCarts, isEditMode, onEd
         ) : table.status === 'dirty' ? (
           <button
             onClick={e => { e.stopPropagation(); onMarkClean(table.id); }}
-            className={`min-h-[40px] w-full py-2 rounded-xl text-sm font-semibold transition-all ${s.btnClass}`}
+            className={`min-h-[40px] w-full py-2 rounded-lg text-sm font-semibold transition-all ${s.btnClass}`}
           >
             {s.btnLabel}
           </button>
         ) : (
           <button
             onClick={e => { e.stopPropagation(); onGoToPOS(table); }}
-            className={`min-h-[40px] w-full py-2 rounded-xl text-sm font-semibold transition-all flex items-center justify-center gap-1.5 ${s.btnClass}`}
+            className={`min-h-[40px] w-full py-2 rounded-lg text-sm font-semibold transition-all flex items-center justify-center gap-1.5 ${s.btnClass}`}
           >
             {table.status === 'available' ? <Coffee size={14} /> : <ChevronRight size={14} />}
             {s.btnLabel}
@@ -261,7 +261,7 @@ export default function TablePage() {
             <button
               type="button"
               onClick={() => setIsEditMode(!isEditMode)}
-              className={`min-h-[36px] px-4 py-1.5 rounded-xl text-xs font-bold transition-all border ${
+              className={`min-h-[36px] px-4 py-1.5 rounded-lg text-xs font-bold transition-all border ${
                 isEditMode
                   ? 'bg-red-50 text-red-600 border-red-200 hover:bg-red-100'
                   : 'bg-coffee-accent/10 text-coffee-accent border-coffee-accent/20 hover:bg-coffee-accent/20'
@@ -269,7 +269,7 @@ export default function TablePage() {
             >
               {isEditMode ? 'Thoát Chế độ sửa' : 'Chế độ chỉnh sửa'}
             </button>
-            <div className="flex items-center gap-1.5 bg-cream-light px-3 py-1.5 rounded-xl text-xs text-coffee-medium">
+            <div className="flex items-center gap-1.5 bg-cream-light px-3 py-1.5 rounded-lg text-xs text-coffee-medium">
               <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse-soft" />
               Realtime
             </div>
@@ -283,7 +283,7 @@ export default function TablePage() {
             { count: stats.occupied,  label: 'Có khách',   color: 'bg-status-occupied text-status-occupiedText border-status-occupiedBorder', icon: <Users size={18} /> },
             { count: stats.dirty,     label: 'Chưa dọn',   color: 'bg-status-dirty text-status-dirtyText border-status-dirtyBorder', icon: <RefreshCw size={18} /> },
           ].map((s, i) => (
-            <div key={i} className={`flex items-center gap-3 px-4 py-3 rounded-2xl border ${s.color}`}>
+            <div key={i} className={`flex items-center gap-3 px-4 py-3 rounded-lg border ${s.color}`}>
               {s.icon}
               <div>
                 <span className="text-2xl font-bold block leading-none">{s.count}</span>
@@ -302,10 +302,10 @@ export default function TablePage() {
                 <button
                   key={zone}
                   onClick={() => setActiveZone(zone)}
-                  className={`min-h-[36px] px-4 py-1.5 rounded-xl text-sm font-semibold transition-all ${
+                  className={`min-h-[36px] px-4 py-1.5 rounded-lg text-sm font-semibold transition-all ${
                     activeZone === zone ? 'text-white shadow-coffee' : 'bg-cream-light text-coffee-medium hover:bg-cream-medium'
                   }`}
-                  style={activeZone === zone ? { background: 'linear-gradient(135deg, #A76D42, #C8956C)' } : {}}
+                  style={activeZone === zone ? { background: 'linear-gradient(135deg, #2563EB, #0EA5E9)' } : {}}
                 >
                   {zone}
                 </button>
@@ -316,7 +316,7 @@ export default function TablePage() {
             <button
               type="button"
               onClick={handleAddClick}
-              className="min-h-[36px] px-4 bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-md shadow-green-500/15"
+              className="min-h-[36px] px-4 bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all shadow-md shadow-green-500/15"
             >
               <Plus size={14} />
               Thêm bàn mới
@@ -332,13 +332,13 @@ export default function TablePage() {
           <div className="mb-6">
             <div
               onClick={() => { setSelectedTable(null); setView('pos'); }}
-              className="flex items-center gap-4 p-4 rounded-2xl border-2 border-dashed border-coffee-accent/40 bg-white hover:bg-coffee-accent/5 cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-md"
+              className="flex items-center gap-4 p-4 rounded-lg border-2 border-dashed border-coffee-accent/40 bg-white hover:bg-coffee-accent/5 cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-md"
             >
-              <div className="w-12 h-12 rounded-xl bg-coffee-accent/10 flex items-center justify-center flex-shrink-0">
+              <div className="w-12 h-12 rounded-lg bg-coffee-accent/10 flex items-center justify-center flex-shrink-0">
                 <ShoppingBag size={22} className="text-coffee-accent" />
               </div>
               <div className="flex-1">
-                <p className="font-bold text-coffee-dark">Mang về / Takeaway</p>
+                <p className="font-bold text-coffee-dark">Mang về</p>
                 <p className="text-sm text-coffee-light">Đơn hàng không gắn bàn</p>
               </div>
               <ChevronRight size={20} className="text-coffee-light" />
@@ -348,8 +348,8 @@ export default function TablePage() {
 
         {/* Empty state when there are no tables at all */}
         {tables.length === 0 && (
-          <div className="bg-white rounded-3xl border border-cream-medium/40 p-12 text-center max-w-md mx-auto mt-12 shadow-sm">
-            <div className="w-16 h-16 rounded-2xl bg-cream-light flex items-center justify-center mx-auto mb-4">
+          <div className="bg-white rounded-lg border border-cream-medium/40 p-12 text-center max-w-md mx-auto mt-12 shadow-sm">
+            <div className="w-16 h-16 rounded-lg bg-cream-light flex items-center justify-center mx-auto mb-4">
               <Coffee size={28} className="text-coffee-light" />
             </div>
             <h3 className="font-bold text-coffee-dark text-lg">Chưa có bàn nào</h3>
@@ -359,7 +359,7 @@ export default function TablePage() {
             <button
               type="button"
               onClick={() => { setIsEditMode(true); handleAddClick(); }}
-              className="mt-6 min-h-[44px] px-6 bg-gradient-to-r from-coffee-accent to-amber-600 text-white rounded-xl text-sm font-bold shadow-md shadow-coffee-light/20 flex items-center gap-2 mx-auto hover:scale-[1.02] active:scale-[0.98] transition-all"
+              className="mt-6 min-h-[44px] px-6 bg-primary-600 hover:bg-primary-700 text-white rounded-lg text-sm font-bold shadow-sm flex items-center gap-2 mx-auto active:scale-98 transition-all"
             >
               <Plus size={16} />
               Tạo bàn đầu tiên
@@ -373,7 +373,7 @@ export default function TablePage() {
           return (
             <div key={zone} className="mb-8">
               <div className="flex items-center gap-3 mb-4">
-                <div className="w-1 h-6 rounded-full" style={{ background: 'linear-gradient(135deg, #A76D42, #C8956C)' }} />
+                <div className="w-1 h-6 rounded-full" style={{ background: 'linear-gradient(135deg, #2563EB, #0EA5E9)' }} />
                 <h2 className="font-display font-bold text-coffee-dark text-lg">{zone}</h2>
                 <span className="text-coffee-light text-sm">({zoneTables.length} bàn)</span>
               </div>
@@ -399,7 +399,7 @@ export default function TablePage() {
       {/* Add / Edit Table Modal */}
       {showModal && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 animate-fade-in" style={{ background: 'rgba(26,15,10,0.4)', backdropFilter: 'blur(4px)' }}>
-          <div className="bg-white rounded-3xl border border-cream-medium/40 shadow-2xl w-full max-w-sm overflow-hidden animate-slide-up">
+          <div className="bg-white rounded-lg border border-cream-medium/40 shadow-2xl w-full max-w-sm overflow-hidden animate-slide-up">
             {/* Modal Header */}
             <div className="px-5 py-4 border-b border-cream-light flex justify-between items-center">
               <h3 className="font-bold text-coffee-dark text-base">
@@ -420,7 +420,7 @@ export default function TablePage() {
                   value={formName}
                   onChange={e => setFormName(e.target.value)}
                   placeholder="Nhập tên bàn..."
-                  className="w-full min-h-[40px] px-3.5 py-2 text-sm rounded-xl border border-coffee-light/20 focus:outline-none focus:border-coffee-accent bg-cream-warm/10"
+                  className="w-full min-h-[40px] px-3.5 py-2 text-sm rounded-lg border border-coffee-light/20 focus:outline-none focus:border-coffee-accent bg-cream-warm/10"
                 />
               </div>
 
@@ -433,7 +433,7 @@ export default function TablePage() {
                   onChange={e => setFormZone(e.target.value)}
                   placeholder="Nhập khu vực..."
                   list="zone-suggestions"
-                  className="w-full min-h-[40px] px-3.5 py-2 text-sm rounded-xl border border-coffee-light/20 focus:outline-none focus:border-coffee-accent bg-cream-warm/10"
+                  className="w-full min-h-[40px] px-3.5 py-2 text-sm rounded-lg border border-coffee-light/20 focus:outline-none focus:border-coffee-accent bg-cream-warm/10"
                 />
                 <datalist id="zone-suggestions">
                   {zonesList.map(z => <option key={z} value={z} />)}
@@ -448,7 +448,7 @@ export default function TablePage() {
                   min={1}
                   value={formCapacity}
                   onChange={e => setFormCapacity(e.target.value)}
-                  className="w-full min-h-[40px] px-3.5 py-2 text-sm rounded-xl border border-coffee-light/20 focus:outline-none focus:border-coffee-accent bg-cream-warm/10"
+                  className="w-full min-h-[40px] px-3.5 py-2 text-sm rounded-lg border border-coffee-light/20 focus:outline-none focus:border-coffee-accent bg-cream-warm/10"
                 />
               </div>
 
@@ -456,13 +456,13 @@ export default function TablePage() {
                 <button
                   type="button"
                   onClick={() => setShowModal(false)}
-                  className="flex-1 min-h-[44px] bg-cream-light hover:bg-cream-medium text-coffee-dark font-bold text-sm rounded-xl border border-cream-medium/40 transition-all"
+                  className="flex-1 min-h-[44px] bg-cream-light hover:bg-cream-medium text-coffee-dark font-bold text-sm rounded-lg border border-cream-medium/40 transition-all"
                 >
                   Hủy
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 min-h-[44px] bg-gradient-to-r from-coffee-accent to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white font-bold text-sm rounded-xl shadow-md shadow-coffee-light/20 transition-all"
+                  className="flex-1 min-h-[44px] bg-primary-600 hover:bg-primary-700 text-white font-bold text-sm rounded-lg shadow-sm transition-all"
                 >
                   Lưu lại
                 </button>

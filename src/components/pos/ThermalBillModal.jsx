@@ -77,7 +77,7 @@ export default function ThermalBillModal({ order, store: propStore, onConfirm, o
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 animate-fade-in"
       style={{ background: 'rgba(26,15,10,0.75)', backdropFilter: 'blur(8px)' }}>
-      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm animate-slide-up flex flex-col" style={{ maxHeight: '90vh' }}>
+      <div className="relative bg-white rounded-lg shadow-2xl w-full max-w-sm animate-slide-up flex flex-col" style={{ maxHeight: '90vh' }}>
         {/* Close */}
         <button onClick={onClose}
           className="absolute top-3 right-3 min-w-[36px] min-h-[36px] rounded-full bg-gray-100 flex items-center justify-center text-gray-500 hover:bg-gray-200 transition z-10">
@@ -86,7 +86,7 @@ export default function ThermalBillModal({ order, store: propStore, onConfirm, o
 
         {/* Header of modal */}
         <div className="px-5 pt-5 pb-3 border-b border-gray-100 flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #A76D42, #C8956C)' }}>
+          <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #2563EB, #0EA5E9)' }}>
             <Printer size={18} className="text-white" />
           </div>
           <div>
@@ -97,7 +97,7 @@ export default function ThermalBillModal({ order, store: propStore, onConfirm, o
 
         {/* Thermal receipt body */}
         <div className="flex-1 overflow-y-auto p-4">
-          <div id="thermal-receipt" className="bg-gray-50 rounded-xl p-4 border border-gray-200"
+          <div id="thermal-receipt" className="bg-gray-50 rounded-lg p-4 border border-gray-200"
             style={{ fontFamily: "'Courier New', Courier, monospace", fontSize: '11px', lineHeight: '1.6', color: '#111', letterSpacing: '0.01em' }}>
 
             {/* Shop header */}

@@ -143,7 +143,7 @@ export default function KitchenPage() {
       {/* KDS Navigation Header */}
       <header className="bg-slate-900 border-b border-slate-800 px-6 py-4 flex items-center justify-between flex-shrink-0">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-primary-600 flex items-center justify-center text-white">
+          <div className="w-10 h-10 rounded-lg bg-primary-600 flex items-center justify-center text-white">
             <Coffee size={22} />
           </div>
           <div>
@@ -167,7 +167,7 @@ export default function KitchenPage() {
 
           <button
             onClick={() => setSoundEnabled(!soundEnabled)}
-            className={`w-10 h-10 rounded-xl border flex items-center justify-center transition-all ${
+            className={`w-10 h-10 rounded-lg border flex items-center justify-center transition-all ${
               soundEnabled
                 ? 'bg-slate-800 border-slate-700 text-primary-400'
                 : 'bg-slate-900 border-slate-800 text-slate-500'
@@ -180,7 +180,7 @@ export default function KitchenPage() {
           {currentUser && (currentUser.role === 'admin' || currentUser.role === 'staff') && (
             <button
               onClick={() => setView('pos')}
-              className="w-10 h-10 rounded-xl bg-slate-800 border border-slate-700 text-slate-300 hover:bg-slate-700 hover:text-white flex items-center justify-center transition-all"
+              className="w-10 h-10 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 hover:bg-slate-700 hover:text-white flex items-center justify-center transition-all"
               title="Quay lại bán hàng (POS)"
             >
               <ArrowLeft size={18} />
@@ -189,7 +189,7 @@ export default function KitchenPage() {
 
           <button
             onClick={logout}
-            className="w-10 h-10 rounded-xl bg-red-950/40 border border-red-900/40 text-red-400 hover:bg-red-900 hover:text-white flex items-center justify-center transition-all"
+            className="w-10 h-10 rounded-lg bg-red-950/40 border border-red-900/40 text-red-400 hover:bg-red-900 hover:text-white flex items-center justify-center transition-all"
             title="Đăng xuất khỏi quầy bếp"
           >
             <LogOut size={18} />
@@ -243,7 +243,7 @@ export default function KitchenPage() {
             {filteredOrders.map(order => (
               <div
                 key={order.id}
-                className={`bg-slate-900 border rounded-2xl overflow-hidden shadow-xl transition-all flex flex-col ${
+                className={`bg-slate-900 border rounded-lg overflow-hidden shadow-xl transition-all flex flex-col ${
                   order.prepStatus === 'preparing'
                     ? 'border-yellow-500/40 shadow-yellow-500/5'
                     : 'border-slate-800 hover:border-slate-700'
@@ -297,7 +297,7 @@ export default function KitchenPage() {
                           )}
                           {item.note && (
                             <span className="text-[10px] font-bold bg-red-950/50 text-red-400 border border-red-900/40 px-1.5 py-0.5 rounded w-full mt-0.5">
-                              ⚠️ Chú ý: {item.note}
+                              Chú ý: {item.note}
                             </span>
                           )}
                         </div>
@@ -307,7 +307,7 @@ export default function KitchenPage() {
                   
                   {/* Order level note */}
                   {order.discountReason && (
-                    <div className="p-2.5 rounded-xl bg-slate-950/80 border border-slate-800 text-xs text-slate-400">
+                    <div className="p-2.5 rounded-lg bg-slate-950/80 border border-slate-800 text-xs text-slate-400">
                       <strong>Ghi chú:</strong> {order.discountReason}
                     </div>
                   )}
@@ -318,7 +318,7 @@ export default function KitchenPage() {
                   {order.prepStatus === 'pending' ? (
                     <button
                       onClick={() => updateStatus(order.id, 'preparing')}
-                      className="w-full min-h-[40px] bg-yellow-600 hover:bg-yellow-700 text-slate-950 font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-lg active:scale-95 transition-all"
+                      className="w-full min-h-[40px] bg-yellow-600 hover:bg-yellow-700 text-slate-950 font-bold text-xs rounded-lg flex items-center justify-center gap-1.5 shadow-lg active:scale-95 transition-all"
                     >
                       <Play size={14} className="fill-slate-950" />
                       BẮT ĐẦU PHA CHẾ
@@ -326,7 +326,7 @@ export default function KitchenPage() {
                   ) : (
                     <button
                       onClick={() => updateStatus(order.id, 'completed')}
-                      className="w-full min-h-[40px] bg-green-600 hover:bg-green-700 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-lg active:scale-95 transition-all"
+                      className="w-full min-h-[40px] bg-green-600 hover:bg-green-700 text-white font-bold text-xs rounded-lg flex items-center justify-center gap-1.5 shadow-lg active:scale-95 transition-all"
                     >
                       <CheckCircle2 size={14} />
                       HOÀN THÀNH ĐỒ UỐNG

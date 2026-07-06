@@ -7,7 +7,7 @@ export default {
   theme: {
     extend: {
       colors: {
-        // KiotViet/Sapo blue palette
+        // Operational SaaS palette: neutral surfaces, clear blue actions.
         primary: {
           50:  '#EFF6FF',
           100: '#DBEAFE',
@@ -35,6 +35,14 @@ export default {
           muted:  '#F1F5F9',
           hover:  '#F8FAFC',
         },
+        // Legacy aliases used by older screens. Keep them mapped to the
+        // current neutral system so every generated utility has real CSS.
+        cream: {
+          warm:   '#F8FAFC',
+          light:  '#F1F5F9',
+          medium: '#E2E8F0',
+          dark:   '#CBD5E1',
+        },
         ink: {
           dark:   '#0F172A',
           medium: '#475569',
@@ -60,10 +68,14 @@ export default {
         // Keep coffee for branding elements
         coffee: {
           accent: '#2563EB',
-          gold:   '#F59E0B',
+          gold:   '#0EA5E9',
           dark:   '#0F172A',
           medium: '#475569',
-          light:  '#94A3B8',
+          light:  '#64748B',
+        },
+        gray: {
+          750: '#374151',
+          850: '#1F2937',
         },
       },
       fontFamily: {
@@ -78,11 +90,16 @@ export default {
         'coffee-gradient': 'linear-gradient(180deg, #0F172A 0%, #0F172A 100%)',
       },
       boxShadow: {
-        'coffee':    '0 4px 20px rgba(37,99,235,0.15)',
-        'coffee-lg': '0 8px 40px rgba(37,99,235,0.25)',
+        'coffee':    '0 1px 2px rgba(37,99,235,0.14)',
+        'coffee-sm': '0 1px 2px rgba(15,23,42,0.06)',
+        'coffee-lg': '0 12px 32px rgba(15,23,42,0.16)',
         'card':      '0 1px 3px rgba(15,23,42,0.08), 0 1px 2px rgba(15,23,42,0.06)',
         'card-hover':'0 4px 16px rgba(15,23,42,0.12)',
         'glass':     '0 8px 32px rgba(15,23,42,0.10)',
+      },
+      scale: {
+        98: '0.98',
+        102: '1.02',
       },
       animation: {
         'fade-in':       'fadeIn 0.2s ease-out',
