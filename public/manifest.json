@@ -1,7 +1,7 @@
 {
-  "name": "Manager Coffee POS System",
+  "name": "Manager Coffee",
   "short_name": "ManagerCoffee",
-  "description": "Hệ thống quản lý quán cà phê chuyên nghiệp SaaS Multi-Tenant",
+  "description": "Hệ thống quản lý bán hàng, bàn, bếp, kho và báo cáo cho quán cà phê",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#030712",
