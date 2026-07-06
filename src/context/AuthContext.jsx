@@ -23,6 +23,9 @@ export function AuthProvider({ children }) {
     try {
       const saved = sessionStorage.getItem(AUTH_KEY);
       const user = saved ? JSON.parse(saved) : null;
+      if (user?.role === 'platform_admin') {
+        return user;
+      }
       if (user && !user.storeId) {
         // Old session without storeId, force logout
         sessionStorage.removeItem(AUTH_KEY);
@@ -85,6 +88,23 @@ export function AuthProvider({ children }) {
     }
   };
 
+  const loginPlatform = async (email, password) => {
+    setIsLoading(true);
+    try {
+      const user = await api.post('/platform/auth/login', { email, password });
+      setCurrentUser(user);
+      setPinError('');
+      sessionStorage.setItem(AUTH_KEY, JSON.stringify(user));
+      return true;
+    } catch (err) {
+      const errorMsg = err.response?.data?.error || 'Email hoặc mật khẩu quản trị nền tảng không chính xác.';
+      setPinError(errorMsg);
+      return false;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const logout = () => {
     setCurrentUser(null);
     setPinError('');
@@ -105,6 +125,7 @@ export function AuthProvider({ children }) {
       currentUser,
       login,
       loginAdmin,
+      loginPlatform,
       logout,
       isAdmin,
       canAccess,

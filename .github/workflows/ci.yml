@@ -69,3 +69,6 @@ jobs:
 
       - name: Smoke shifts
         run: npm run test:smoke:shifts
+
+      - name: Smoke load
+        run: npm run test:smoke:load

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Delete, Coffee, Building2, Store, UserPlus, ChevronLeft } from 'lucide-react';
+import { Delete, Coffee, Building2, Store, UserPlus, ChevronLeft, Shield } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../api';
 
@@ -11,10 +11,13 @@ const PAD_KEYS = [
 ];
 
 export default function LockScreen() {
-  const { login, loginAdmin, pinError, setPinError, isLoading } = useAuth();
+  const { login, loginAdmin, loginPlatform, pinError, setPinError, isLoading } = useAuth();
   const demoAdminEmail = 'admin@espresso-lab.vn';
   const demoAdminPassword = 'admin123456';
+  const demoPlatformEmail = 'platform@managercoffee.local';
+  const demoPlatformPassword = 'platform123456';
   const showDemoCredentials = import.meta.env.DEV;
+  const [isPlatformMode, setIsPlatformMode] = useState(() => window.location.hash === '#platform');
   const [storeCode, setStoreCode] = useState(() => localStorage.getItem('manager_coffee_store_code') || '');
   const [isSelectingStore, setIsSelectingStore] = useState(!storeCode);
   const [tempStoreCode, setTempStoreCode] = useState(storeCode);
@@ -27,6 +30,8 @@ export default function LockScreen() {
   const [isAdminMode, setIsAdminMode] = useState(false);
   const [adminEmail, setAdminEmail] = useState('');
   const [adminPassword, setAdminPassword] = useState('');
+  const [platformEmail, setPlatformEmail] = useState('');
+  const [platformPassword, setPlatformPassword] = useState('');
 
   // Giao diện đăng ký cửa hàng mới
   const [showRegister, setShowRegister] = useState(false);
@@ -89,6 +94,20 @@ export default function LockScreen() {
       return;
     }
     const ok = await loginAdmin(storeCode, adminEmail.trim(), adminPassword.trim());
+    if (!ok) {
+      setShake(true);
+      setTimeout(() => setShake(false), 600);
+    }
+  };
+
+  const handlePlatformLoginSubmit = async (e) => {
+    e.preventDefault();
+    setPinError('');
+    if (!platformEmail.trim() || !platformPassword.trim()) {
+      setPinError('Vui lòng điền email và mật khẩu quản trị nền tảng.');
+      return;
+    }
+    const ok = await loginPlatform(platformEmail.trim(), platformPassword.trim());
     if (!ok) {
       setShake(true);
       setTimeout(() => setShake(false), 600);
@@ -191,6 +210,72 @@ export default function LockScreen() {
 
           {isSelectingStore ? (
             /* --- Form chọn cửa hàng --- */
+            isPlatformMode ? (
+              <div className="space-y-6">
+                <div className="text-center">
+                  <h3 className="text-white font-bold text-2xl mb-1">Quản trị nền tảng</h3>
+                  <p className="text-slate-400 text-sm">Dành cho chủ hệ thống Manager Coffee</p>
+                </div>
+
+                {showDemoCredentials && (
+                  <div className="bg-white/10 rounded-xl p-3 border border-white/10 text-xs text-white/80 leading-relaxed">
+                    Platform demo: <span className="font-bold text-yellow-300">{demoPlatformEmail}</span> / <span className="font-bold text-yellow-300">{demoPlatformPassword}</span>
+                  </div>
+                )}
+
+                <form onSubmit={handlePlatformLoginSubmit} className="space-y-4">
+                  <div>
+                    <label htmlFor="platformEmailInput" className="block text-slate-300 text-xs font-semibold uppercase tracking-wider mb-2">Email nền tảng</label>
+                    <input
+                      id="platformEmailInput"
+                      type="email"
+                      required
+                      value={platformEmail}
+                      onChange={(e) => setPlatformEmail(e.target.value)}
+                      placeholder={showDemoCredentials ? demoPlatformEmail : 'owner@yourdomain.vn'}
+                      className="w-full min-h-[44px] bg-slate-800 text-white border border-slate-700 rounded-xl px-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
+                    />
+                  </div>
+
+                  <div>
+                    <label htmlFor="platformPasswordInput" className="block text-slate-300 text-xs font-semibold uppercase tracking-wider mb-2">Mật khẩu</label>
+                    <input
+                      id="platformPasswordInput"
+                      type="password"
+                      required
+                      value={platformPassword}
+                      onChange={(e) => setPlatformPassword(e.target.value)}
+                      placeholder={showDemoCredentials ? demoPlatformPassword : 'Nhập mật khẩu nền tảng'}
+                      className="w-full min-h-[44px] bg-slate-800 text-white border border-slate-700 rounded-xl px-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
+                    />
+                  </div>
+
+                  {pinError && (
+                    <p className="text-red-400 text-xs text-center font-medium">{pinError}</p>
+                  )}
+
+                  <button
+                    type="submit"
+                    disabled={isLoading}
+                    className="w-full min-h-[44px] bg-primary-600 hover:bg-primary-700 text-white rounded-xl font-bold text-sm transition-all shadow-lg active:scale-95 disabled:opacity-50"
+                  >
+                    {isLoading ? 'Đang đăng nhập...' : 'Đăng nhập nền tảng'}
+                  </button>
+                </form>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    window.location.hash = '';
+                    setIsPlatformMode(false);
+                    setPinError('');
+                  }}
+                  className="w-full text-center text-primary-400 hover:text-primary-300 font-semibold text-sm hover:underline block pt-2"
+                >
+                  Quay lại đăng nhập cửa hàng
+                </button>
+              </div>
+            ) : (
             <div className="space-y-6">
               <div className="text-center">
                 <h3 className="text-white font-bold text-2xl mb-1">Đăng nhập hệ thống</h3>
@@ -230,8 +315,20 @@ export default function LockScreen() {
                 >
                   <UserPlus size={16} /> Tạo cửa hàng mới (Free)
                 </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    window.location.hash = 'platform';
+                    setIsPlatformMode(true);
+                    setPinError('');
+                  }}
+                  className="text-slate-500 hover:text-slate-300 font-semibold text-xs flex items-center gap-1.5 justify-center mx-auto"
+                >
+                  <Shield size={14} /> Quản trị nền tảng
+                </button>
               </div>
             </div>
+            )
           ) : (
             /* --- Vùng Đăng nhập --- */
             <div>

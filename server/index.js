@@ -22,6 +22,9 @@ if (!process.env.JWT_SECRET) {
 }
 
 const JWT_SECRET = process.env.JWT_SECRET || DEFAULT_JWT_SECRET;
+const PLATFORM_ADMIN_EMAIL = process.env.PLATFORM_ADMIN_EMAIL || (!IS_PRODUCTION ? 'platform@managercoffee.local' : null);
+const PLATFORM_ADMIN_PASSWORD = process.env.PLATFORM_ADMIN_PASSWORD || (!IS_PRODUCTION ? 'platform123456' : null);
+const PLATFORM_ADMIN_PASSWORD_HASH = process.env.PLATFORM_ADMIN_PASSWORD_HASH || null;
 
 if (IS_PRODUCTION && !process.env.INTEGRATION_SECRET_KEY) {
   console.warn('[INTEGRATIONS] Nen dat INTEGRATION_SECRET_KEY rieng de ma hoa secret tich hop theo tung store.');
@@ -42,6 +45,14 @@ const io = new Server(httpServer, {
 });
 
 const prisma = new PrismaClient();
+const apiMetrics = {
+  startedAt: new Date().toISOString(),
+  totalRequests: 0,
+  errorResponses: 0,
+  slowRequests: 0,
+  totalDurationMs: 0,
+  maxDurationMs: 0
+};
 
 // ===== VIETNAM TIMEZONE HELPERS (UTC+7) =====
 // Converts a UTC Date to Vietnam time by adding 7 hours offset
@@ -86,7 +97,12 @@ app.use((req, res, next) => {
   res.on('finish', () => {
     if (!req.path.startsWith('/api/')) return;
     const durationMs = Date.now() - startedAt;
+    apiMetrics.totalRequests += 1;
+    apiMetrics.totalDurationMs += durationMs;
+    apiMetrics.maxDurationMs = Math.max(apiMetrics.maxDurationMs, durationMs);
+    if (res.statusCode >= 500) apiMetrics.errorResponses += 1;
     if (durationMs > 1000) {
+      apiMetrics.slowRequests += 1;
       console.warn(`[SLOW_API] ${req.method} ${req.originalUrl} ${res.statusCode} ${durationMs}ms`);
     }
   });
@@ -604,6 +620,32 @@ function requireRefundAccess(req, res) {
   return true;
 }
 
+function requirePlatformAdmin(req, res) {
+  if (req.platformUser?.scope !== 'platform_admin') {
+    res.status(403).json({ error: 'Bạn không có quyền quản trị nền tảng.' });
+    return false;
+  }
+  return true;
+}
+
+async function platformPasswordMatches(password) {
+  if (!password) return false;
+  if (PLATFORM_ADMIN_PASSWORD_HASH) {
+    return bcrypt.compare(password, PLATFORM_ADMIN_PASSWORD_HASH);
+  }
+  return Boolean(PLATFORM_ADMIN_PASSWORD) && password === PLATFORM_ADMIN_PASSWORD;
+}
+
+function buildApiMetricsSnapshot() {
+  return {
+    ...apiMetrics,
+    avgDurationMs: apiMetrics.totalRequests > 0
+      ? Math.round(apiMetrics.totalDurationMs / apiMetrics.totalRequests)
+      : 0,
+    uptimeSec: Math.round(process.uptime())
+  };
+}
+
 // --- IN-MEMORY CARTS (For Realtime Sync) ---
 // Structure: { storeId: { tableId: cart, __takeaway__: cart } }
 let storeCarts = {};
@@ -633,6 +675,28 @@ const broadcast = (event, data, storeId) => {
 
 // --- MULTI-TENANT & AUTH MIDDLEWARE ---
 app.use((req, res, next) => {
+  if (req.path === '/api/platform/auth/login') {
+    return next();
+  }
+
+  if (req.path.startsWith('/api/platform/')) {
+    const authHeader = req.headers['authorization'];
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Thiếu token quản trị nền tảng' });
+    }
+    try {
+      const token = authHeader.substring(7);
+      const payload = jwt.verify(token, JWT_SECRET);
+      if (payload.scope !== 'platform_admin') {
+        return res.status(403).json({ error: 'Token không có quyền quản trị nền tảng' });
+      }
+      req.platformUser = payload;
+      return next();
+    } catch {
+      return res.status(401).json({ error: 'Phiên quản trị nền tảng hết hạn hoặc không hợp lệ' });
+    }
+  }
+
   // Cho phép bỏ qua kiểm tra đăng nhập/đăng ký/webhook PayOS
   if (
     req.path === '/api/health' ||
@@ -703,6 +767,170 @@ app.get('/api/ready', async (req, res) => {
       error: err.message,
       time: new Date().toISOString()
     });
+  }
+});
+
+app.post('/api/platform/auth/login', async (req, res) => {
+  const { email, password } = req.body || {};
+  if (!PLATFORM_ADMIN_EMAIL || (!PLATFORM_ADMIN_PASSWORD && !PLATFORM_ADMIN_PASSWORD_HASH)) {
+    return res.status(503).json({ error: 'Chưa cấu hình tài khoản quản trị nền tảng.' });
+  }
+  if (!email || !password) {
+    return res.status(400).json({ error: 'Vui lòng nhập email và mật khẩu quản trị nền tảng.' });
+  }
+  if (String(email).trim().toLowerCase() !== PLATFORM_ADMIN_EMAIL.toLowerCase() || !(await platformPasswordMatches(password))) {
+    return res.status(401).json({ error: 'Email hoặc mật khẩu quản trị nền tảng không đúng.' });
+  }
+
+  const token = jwt.sign(
+    {
+      scope: 'platform_admin',
+      email: PLATFORM_ADMIN_EMAIL,
+      name: 'Platform Admin'
+    },
+    JWT_SECRET,
+    { expiresIn: '12h' }
+  );
+
+  res.json({
+    id: 'platform-admin',
+    role: 'platform_admin',
+    name: 'Platform Admin',
+    email: PLATFORM_ADMIN_EMAIL,
+    token
+  });
+});
+
+app.get('/api/platform/overview', async (req, res) => {
+  if (!requirePlatformAdmin(req, res)) return;
+  try {
+    const [
+      totalStores,
+      activeStores,
+      trialStores,
+      paidStores,
+      totalUsers,
+      totalOrders,
+      recentStores
+    ] = await Promise.all([
+      prisma.store.count(),
+      prisma.store.count({ where: { isActive: true } }),
+      prisma.store.count({ where: { subscriptionStatus: 'trial' } }),
+      prisma.store.count({ where: { subscriptionStatus: 'active' } }),
+      prisma.user.count(),
+      prisma.order.count(),
+      prisma.store.findMany({
+        orderBy: { createdAt: 'desc' },
+        take: 5,
+        select: {
+          id: true,
+          name: true,
+          code: true,
+          isActive: true,
+          plan: true,
+          subscriptionStatus: true,
+          createdAt: true
+        }
+      })
+    ]);
+
+    res.json({
+      ok: true,
+      time: new Date().toISOString(),
+      counts: {
+        totalStores,
+        activeStores,
+        inactiveStores: totalStores - activeStores,
+        trialStores,
+        paidStores,
+        totalUsers,
+        totalOrders
+      },
+      api: buildApiMetricsSnapshot(),
+      recentStores
+    });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.get('/api/platform/stores', async (req, res) => {
+  if (!requirePlatformAdmin(req, res)) return;
+  const search = String(req.query.q || '').trim();
+  try {
+    const stores = await prisma.store.findMany({
+      where: search ? {
+        OR: [
+          { name: { contains: search, mode: 'insensitive' } },
+          { code: { contains: search, mode: 'insensitive' } },
+          { phone: { contains: search, mode: 'insensitive' } }
+        ]
+      } : {},
+      orderBy: { createdAt: 'desc' },
+      include: {
+        _count: {
+          select: {
+            users: true,
+            products: true,
+            orders: true,
+            integrations: true
+          }
+        }
+      }
+    });
+    res.json(stores);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put('/api/platform/stores/:id', async (req, res) => {
+  if (!requirePlatformAdmin(req, res)) return;
+  const allowedPlans = ['trial', 'starter', 'pro', 'enterprise'];
+  const allowedStatuses = ['trial', 'active', 'past_due', 'suspended', 'cancelled'];
+  const data = {};
+
+  if (req.body?.isActive !== undefined) data.isActive = Boolean(req.body.isActive);
+  if (req.body?.plan !== undefined) {
+    if (!allowedPlans.includes(req.body.plan)) {
+      return res.status(400).json({ error: 'Gói dịch vụ không hợp lệ' });
+    }
+    data.plan = req.body.plan;
+  }
+  if (req.body?.subscriptionStatus !== undefined) {
+    if (!allowedStatuses.includes(req.body.subscriptionStatus)) {
+      return res.status(400).json({ error: 'Trạng thái thuê bao không hợp lệ' });
+    }
+    data.subscriptionStatus = req.body.subscriptionStatus;
+  }
+  if (req.body?.subscriptionExpiresAt !== undefined) {
+    data.subscriptionExpiresAt = req.body.subscriptionExpiresAt ? new Date(req.body.subscriptionExpiresAt) : null;
+    if (data.subscriptionExpiresAt && Number.isNaN(data.subscriptionExpiresAt.getTime())) {
+      return res.status(400).json({ error: 'Ngày hết hạn không hợp lệ' });
+    }
+  }
+  if (req.body?.platformNotes !== undefined) {
+    data.platformNotes = String(req.body.platformNotes || '').slice(0, 1000);
+  }
+
+  try {
+    const store = await prisma.store.update({
+      where: { id: req.params.id },
+      data,
+      include: {
+        _count: {
+          select: {
+            users: true,
+            products: true,
+            orders: true,
+            integrations: true
+          }
+        }
+      }
+    });
+    res.json(store);
+  } catch (err) {
+    res.status(404).json({ error: 'Không tìm thấy store cần cập nhật' });
   }
 });
 
@@ -1253,7 +1481,9 @@ app.post('/api/auth/register-store', async (req, res) => {
         name: storeName,
         code: storeCode,
         address: 'Địa chỉ quán của bạn',
-        phone: 'Số điện thoại liên hệ'
+        phone: 'Số điện thoại liên hệ',
+        plan: 'trial',
+        subscriptionStatus: 'trial'
       }
     });
 
@@ -1293,6 +1523,9 @@ app.post('/api/auth/login-admin', async (req, res) => {
 
     if (!user || user.role !== 'admin' || !user.password || user.store?.code !== storeCode) {
       return res.status(401).json({ error: 'Email hoặc mật khẩu không chính xác.' });
+    }
+    if (!user.store?.isActive) {
+      return res.status(403).json({ error: 'Cửa hàng đang bị tạm khóa. Vui lòng liên hệ quản trị nền tảng.' });
     }
 
     // Kiểm tra mật khẩu mã hóa
@@ -1338,6 +1571,10 @@ app.post('/api/auth/login', async (req, res) => {
     const store = await prisma.store.findUnique({ where: { code: storeCode } });
     const user = store ? await findUserByPin(store.id, pin) : null;
     
+    if (store && !store.isActive) {
+      return res.status(403).json({ error: 'Cửa hàng đang bị tạm khóa. Vui lòng liên hệ quản trị nền tảng.' });
+    }
+
     if (!user) {
       return res.status(401).json({ error: 'Mã cửa hàng hoặc mã PIN không chính xác' });
     }

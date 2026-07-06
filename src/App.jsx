@@ -19,6 +19,7 @@ const EmployeeManagementPage = lazy(() => import('./pages/EmployeeManagementPage
 const PromotionManagementPage = lazy(() => import('./pages/PromotionManagementPage'));
 const StoreSettingsPage = lazy(() => import('./pages/StoreSettingsPage'));
 const KitchenPage = lazy(() => import('./pages/KitchenPage'));
+const PlatformAdminPage = lazy(() => import('./pages/PlatformAdminPage'));
 
 function PageFallback() {
   return (
@@ -128,6 +129,13 @@ function AuthenticatedApp() {
 function AppRoot() {
   const { currentUser } = useAuth();
   if (!currentUser) return <LockScreen />;
+  if (currentUser.role === 'platform_admin') {
+    return (
+      <Suspense fallback={<PageFallback />}>
+        <PlatformAdminPage />
+      </Suspense>
+    );
+  }
   return <AuthenticatedApp />;
 }
 

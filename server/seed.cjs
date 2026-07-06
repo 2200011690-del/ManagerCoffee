@@ -82,7 +82,9 @@ async function main() {
       name: 'Espresso Lab',
       code: 'espresso-lab',
       address: '123 Nguyen Hue, Dist 1, HCMC',
-      phone: '0909000111'
+      phone: '0909000111',
+      plan: 'trial',
+      subscriptionStatus: 'trial'
     }
   });
 

@@ -9,22 +9,26 @@ generator client {
 }
 
 model Store {
-  id              String   @id @default(cuid())
-  name            String
-  code            String   @unique // e.g. espresso-lab
-  address         String?
-  phone           String?
-  logo            String?
-  vatRate         Float    @default(0.08) // 8% VAT
-  pointsRate      Float    @default(0.1) // 10% of total = points
-  currency        String   @default("VNĐ")
-  printHeader     String? // Custom header text for receipts
-  printFooter     String? // Custom footer text for receipts
-  bankId          String?  @default("MB")
-  bankAccountNo   String?  @default("")
-  bankAccountName String?  @default("")
-  isActive        Boolean  @default(true)
-  createdAt       DateTime @default(now())
+  id                    String    @id @default(cuid())
+  name                  String
+  code                  String    @unique // e.g. espresso-lab
+  address               String?
+  phone                 String?
+  logo                  String?
+  vatRate               Float     @default(0.08) // 8% VAT
+  pointsRate            Float     @default(0.1) // 10% of total = points
+  currency              String    @default("VNĐ")
+  printHeader           String? // Custom header text for receipts
+  printFooter           String? // Custom footer text for receipts
+  bankId                String?   @default("MB")
+  bankAccountNo         String?   @default("")
+  bankAccountName       String?   @default("")
+  isActive              Boolean   @default(true)
+  plan                  String    @default("trial")
+  subscriptionStatus    String    @default("trial")
+  subscriptionExpiresAt DateTime?
+  platformNotes         String?
+  createdAt             DateTime  @default(now())
 
   users        User[]
   products     Product[]

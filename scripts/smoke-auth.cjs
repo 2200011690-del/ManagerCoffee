@@ -100,6 +100,41 @@ async function main() {
     const ready = await request('/api/ready');
     assert(ready.status === 200 && ready.body?.ok === true, 'Ready endpoint public phai kiem tra duoc database', ready);
 
+    const platformLogin = await request('/api/platform/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({
+        email: process.env.PLATFORM_ADMIN_EMAIL || 'platform@managercoffee.local',
+        password: process.env.PLATFORM_ADMIN_PASSWORD || 'platform123456',
+      }),
+    });
+    assert(platformLogin.status === 200 && platformLogin.body?.token, 'Dang nhap platform admin phai hoat dong', platformLogin);
+    const platformToken = platformLogin.body.token;
+
+    const platformOverview = await request('/api/platform/overview', {
+      headers: { Authorization: `Bearer ${platformToken}` },
+    });
+    assert(platformOverview.status === 200 && platformOverview.body?.counts?.totalStores >= 1, 'Platform overview phai co so lieu store', platformOverview);
+
+    const platformStores = await request('/api/platform/stores', {
+      headers: { Authorization: `Bearer ${platformToken}` },
+    });
+    const demoStore = Array.isArray(platformStores.body)
+      ? platformStores.body.find((store) => store.code === 'espresso-lab')
+      : null;
+    assert(platformStores.status === 200 && demoStore, 'Platform admin phai xem duoc danh sach store', platformStores);
+
+    const platformUpdate = await request(`/api/platform/stores/${demoStore.id}`, {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${platformToken}` },
+      body: JSON.stringify({
+        plan: 'trial',
+        subscriptionStatus: 'trial',
+        isActive: true,
+        platformNotes: 'Smoke test verified platform admin controls',
+      }),
+    });
+    assert(platformUpdate.status === 200 && platformUpdate.body?.code === 'espresso-lab', 'Platform admin phai cap nhat duoc store', platformUpdate);
+
     const noAuthUsers = await request('/api/users');
     assert(noAuthUsers.status === 401, 'API quan tri phai chan request khong token', noAuthUsers);
 

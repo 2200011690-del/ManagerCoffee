@@ -37,6 +37,8 @@ Restore catalog sẽ thay menu, công thức, bàn, tồn kho, nhà cung cấp, 
 NODE_ENV=production
 JWT_SECRET=chuoi-bi-mat-dai-va-ngau-nhien
 INTEGRATION_SECRET_KEY=chuoi-bi-mat-rieng-de-ma-hoa-api-key-tung-store
+PLATFORM_ADMIN_EMAIL=owner@domain-cua-ban.vn
+PLATFORM_ADMIN_PASSWORD_HASH=bcrypt-hash-cua-mat-khau-platform
 CORS_ORIGIN=https://domain-web-app-cua-ban.vn
 DATABASE_URL=postgresql://...
 DIRECT_URL=postgresql://...
@@ -44,6 +46,18 @@ JSON_BODY_LIMIT=5mb
 ```
 
 API key/secret của payOS, HĐĐT, GrabFood, ShopeeFood và Web Order được nhập trong Cấu hình cửa hàng -> Tích hợp ngoài cho từng store. Không đặt chung các khóa này trong `.env` nếu đang chạy mô hình SaaS nhiều quán.
+
+## Quản trị SaaS cho chủ nền tảng
+
+Truy cập đường dẫn có hash `#platform`, ví dụ:
+
+```text
+https://domain-web-app-cua-ban.vn/#platform
+```
+
+Tài khoản đăng nhập lấy từ `PLATFORM_ADMIN_EMAIL` và `PLATFORM_ADMIN_PASSWORD_HASH`. Màn hình này dùng để xem tổng store, số user, số order, chỉ số API cơ bản, khóa/mở store và đổi gói thuê bao.
+
+Không đưa tài khoản platform admin cho chủ quán. Chủ quán chỉ dùng tài khoản admin trong store của họ.
 
 ## Những phần cần credential hoặc thiết bị thật
 
@@ -56,6 +70,7 @@ API key/secret của payOS, HĐĐT, GrabFood, ShopeeFood và Web Order được 
 ## Checklist trước khi chạy thật
 
 - CI pass đủ lint, build và smoke tests.
+- CI chạy cả smoke load để kiểm checkout đồng thời không trùng mã hóa đơn và không lệch tồn kho.
 - Database production có backup tự động, retention rõ ràng và đã thử restore trên môi trường staging.
 - Admin tạo store thật riêng; store demo `espresso-lab` chỉ dùng test.
 - Webhook thanh toán dùng nội dung chuyển khoản có prefix mã store.
