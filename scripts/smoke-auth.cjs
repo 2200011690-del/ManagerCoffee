@@ -171,6 +171,50 @@ async function main() {
       integrationsStatus
     );
 
+    const integrationSettings = await request('/api/integrations/settings', {
+      headers: { Authorization: `Bearer ${adminToken}` },
+    });
+    assert(
+      integrationSettings.status === 200 && integrationSettings.body?.integrations?.payos,
+      'Admin phai xem duoc cau hinh tich hop theo store',
+      integrationSettings
+    );
+
+    const updatePayos = await request('/api/integrations/settings/payos', {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${adminToken}` },
+      body: JSON.stringify({
+        isEnabled: true,
+        config: {
+          mode: 'sandbox',
+          webhookUrl: 'https://example.com/api/payments/payos-webhook',
+        },
+        secrets: {
+          clientId: 'smoke-client-id',
+          apiKey: 'smoke-api-key',
+          checksumKey: 'smoke-checksum-key',
+          webhookSecret: 'smoke-webhook-secret',
+        },
+      }),
+    });
+    assert(
+      updatePayos.status === 200 &&
+        updatePayos.body?.integration?.secretsConfigured?.clientId === true &&
+        updatePayos.body?.integration?.secretsConfigured?.webhookSecret === true &&
+        updatePayos.body?.integration?.secrets === undefined,
+      'Luu payOS theo store phai thanh cong va khong tra secret thuan',
+      updatePayos
+    );
+
+    const integrationsStatusAfterSave = await request('/api/integrations/status', {
+      headers: { Authorization: `Bearer ${adminToken}` },
+    });
+    assert(
+      integrationsStatusAfterSave.status === 200 && integrationsStatusAfterSave.body?.payments?.webhook?.protected === true,
+      'Webhook payment phai bao protected sau khi luu secret theo store',
+      integrationsStatusAfterSave
+    );
+
     const auditLogsAsStaff = await request('/api/audit-logs', {
       headers: { Authorization: `Bearer ${staffToken}` },
     });

@@ -7,6 +7,7 @@ import { PrismaClient } from '@prisma/client';
 import jwt from 'jsonwebtoken';
 import net from 'net';
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 
 dotenv.config();
 const DEFAULT_JWT_SECRET = 'manager-coffee-super-secret-key-1234';
@@ -21,6 +22,10 @@ if (!process.env.JWT_SECRET) {
 }
 
 const JWT_SECRET = process.env.JWT_SECRET || DEFAULT_JWT_SECRET;
+
+if (IS_PRODUCTION && !process.env.INTEGRATION_SECRET_KEY) {
+  console.warn('[INTEGRATIONS] Nen dat INTEGRATION_SECRET_KEY rieng de ma hoa secret tich hop theo tung store.');
+}
 
 const allowedOrigins = process.env.CORS_ORIGIN 
   ? process.env.CORS_ORIGIN.split(',') 
@@ -181,8 +186,157 @@ function hasText(value) {
   return typeof value === 'string' && value.trim().length > 0;
 }
 
-function envConfigured(...keys) {
-  return keys.every((key) => hasText(process.env[key]));
+const INTEGRATION_DEFS = {
+  payos: {
+    provider: 'payos',
+    label: 'payOS',
+    category: 'payments',
+    configFields: ['mode', 'webhookUrl'],
+    secretFields: ['clientId', 'apiKey', 'checksumKey', 'webhookSecret']
+  },
+  einvoice: {
+    provider: 'einvoice',
+    label: 'Hóa đơn điện tử',
+    category: 'invoice',
+    configFields: ['providerName', 'apiUrl', 'taxCode', 'invoiceTemplate', 'invoiceSeries'],
+    secretFields: ['apiKey', 'username', 'password', 'signingToken']
+  },
+  grabfood: {
+    provider: 'grabfood',
+    label: 'GrabFood',
+    category: 'delivery',
+    configFields: ['apiUrl', 'merchantId', 'storeCode'],
+    secretFields: ['apiKey', 'clientSecret', 'webhookSecret']
+  },
+  shopeefood: {
+    provider: 'shopeefood',
+    label: 'ShopeeFood',
+    category: 'delivery',
+    configFields: ['apiUrl', 'merchantId', 'storeCode'],
+    secretFields: ['apiKey', 'clientSecret', 'webhookSecret']
+  },
+  web_order: {
+    provider: 'web_order',
+    label: 'Web Order',
+    category: 'delivery',
+    configFields: ['publicOrderUrl', 'channelName'],
+    secretFields: ['webhookSecret']
+  }
+};
+
+function getIntegrationEncryptionKey() {
+  const source = process.env.INTEGRATION_SECRET_KEY || JWT_SECRET;
+  return crypto.createHash('sha256').update(source).digest();
+}
+
+function encryptIntegrationSecrets(secrets = {}) {
+  const cleanedSecrets = Object.fromEntries(
+    Object.entries(secrets)
+      .filter(([, value]) => hasText(value))
+      .map(([key, value]) => [key, String(value).trim()])
+  );
+  if (Object.keys(cleanedSecrets).length === 0) return null;
+
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv('aes-256-gcm', getIntegrationEncryptionKey(), iv);
+  const encrypted = Buffer.concat([
+    cipher.update(JSON.stringify(cleanedSecrets), 'utf8'),
+    cipher.final()
+  ]);
+  const tag = cipher.getAuthTag();
+
+  return JSON.stringify({
+    v: 1,
+    alg: 'aes-256-gcm',
+    iv: iv.toString('base64'),
+    tag: tag.toString('base64'),
+    data: encrypted.toString('base64')
+  });
+}
+
+function decryptIntegrationSecrets(encryptedSecrets) {
+  if (!encryptedSecrets) return {};
+  try {
+    const payload = JSON.parse(encryptedSecrets);
+    if (payload?.v !== 1 || payload?.alg !== 'aes-256-gcm') return {};
+    const decipher = crypto.createDecipheriv(
+      'aes-256-gcm',
+      getIntegrationEncryptionKey(),
+      Buffer.from(payload.iv, 'base64')
+    );
+    decipher.setAuthTag(Buffer.from(payload.tag, 'base64'));
+    const decrypted = Buffer.concat([
+      decipher.update(Buffer.from(payload.data, 'base64')),
+      decipher.final()
+    ]);
+    return JSON.parse(decrypted.toString('utf8'));
+  } catch (err) {
+    console.error('[INTEGRATIONS] Khong the giai ma secret:', err.message);
+    return {};
+  }
+}
+
+function parseIntegrationConfig(value) {
+  if (!value) return {};
+  try {
+    return typeof value === 'string' ? JSON.parse(value) : value;
+  } catch {
+    return {};
+  }
+}
+
+function pickAllowedFields(source = {}, allowedFields = []) {
+  const result = {};
+  for (const field of allowedFields) {
+    if (source[field] !== undefined && source[field] !== null) {
+      result[field] = typeof source[field] === 'string' ? source[field].trim() : source[field];
+    }
+  }
+  return result;
+}
+
+function integrationSecretFlags(provider, encryptedSecrets) {
+  const def = INTEGRATION_DEFS[provider];
+  const secrets = decryptIntegrationSecrets(encryptedSecrets);
+  return Object.fromEntries((def?.secretFields || []).map((field) => [field, hasText(secrets[field])]));
+}
+
+function serializeIntegration(provider, record = null) {
+  const def = INTEGRATION_DEFS[provider];
+  if (!def) {
+    return {
+      provider,
+      label: provider,
+      category: record?.category || 'custom',
+      isEnabled: Boolean(record?.isEnabled),
+      config: parseIntegrationConfig(record?.config),
+      secretsConfigured: { any: Boolean(record?.secrets) },
+      updatedAt: record?.updatedAt || null
+    };
+  }
+  return {
+    provider,
+    label: def.label,
+    category: def.category,
+    isEnabled: Boolean(record?.isEnabled),
+    config: parseIntegrationConfig(record?.config),
+    secretsConfigured: integrationSecretFlags(provider, record?.secrets),
+    updatedAt: record?.updatedAt || null
+  };
+}
+
+async function getStoreIntegrationRecord(storeId, provider) {
+  return prisma.storeIntegration.findUnique({
+    where: { storeId_provider: { storeId, provider } }
+  });
+}
+
+async function getStoreIntegrationMap(storeId) {
+  const records = await prisma.storeIntegration.findMany({ where: { storeId } });
+  return records.reduce((acc, record) => {
+    acc[record.provider] = record;
+    return acc;
+  }, {});
 }
 
 function sanitizeClientRequestId(value) {
@@ -593,14 +747,21 @@ app.get('/api/system/status', async (req, res) => {
 app.get('/api/integrations/status', async (req, res) => {
   if (!requireAdmin(req, res)) return;
   try {
+    const storeId = req.storeId;
     const store = await prisma.store.findUnique({
-      where: { id: req.storeId },
+      where: { id: storeId },
       select: {
         bankId: true,
         bankAccountNo: true,
         bankAccountName: true
       }
     });
+    const integrations = await getStoreIntegrationMap(storeId);
+    const payos = serializeIntegration('payos', integrations.payos);
+    const einvoice = serializeIntegration('einvoice', integrations.einvoice);
+    const grabfood = serializeIntegration('grabfood', integrations.grabfood);
+    const shopeefood = serializeIntegration('shopeefood', integrations.shopeefood);
+    const webOrder = serializeIntegration('web_order', integrations.web_order);
 
     res.json({
       ok: true,
@@ -613,29 +774,30 @@ app.get('/api/integrations/status', async (req, res) => {
           hasAccountName: Boolean(store?.bankAccountName)
         },
         webhook: {
-          provider: 'payos-or-bank-webhook',
-          protected: envConfigured('PAYMENT_WEBHOOK_SECRET'),
+          provider: 'payos',
+          configured: payos.isEnabled && payos.secretsConfigured.clientId && payos.secretsConfigured.apiKey && payos.secretsConfigured.checksumKey,
+          protected: Boolean(payos.secretsConfigured.webhookSecret),
           scopedByStoreCode: true,
-          unscopedFallbackEnabled: !IS_PRODUCTION && process.env.PAYMENT_WEBHOOK_ALLOW_UNSCOPED_MATCH === '1'
+          source: payos.updatedAt ? 'store' : 'not_configured'
         },
         simulation: {
           enabled: !IS_PRODUCTION
         }
       },
       invoice: {
-        provider: process.env.EINVOICE_PROVIDER || null,
-        configured: envConfigured('EINVOICE_PROVIDER', 'EINVOICE_API_URL', 'EINVOICE_API_KEY'),
+        provider: einvoice.config.providerName || null,
+        configured: einvoice.isEnabled && hasText(einvoice.config.providerName) && hasText(einvoice.config.apiUrl) && einvoice.secretsConfigured.apiKey,
         needsRealProviderContract: true
       },
       delivery: {
         grabFood: {
-          configured: envConfigured('GRABFOOD_API_URL', 'GRABFOOD_API_KEY')
+          configured: grabfood.isEnabled && hasText(grabfood.config.merchantId) && grabfood.secretsConfigured.apiKey
         },
         shopeeFood: {
-          configured: envConfigured('SHOPEEFOOD_API_URL', 'SHOPEEFOOD_API_KEY')
+          configured: shopeefood.isEnabled && hasText(shopeefood.config.merchantId) && shopeefood.secretsConfigured.apiKey
         },
         webOrder: {
-          configured: envConfigured('WEB_ORDER_SECRET')
+          configured: webOrder.isEnabled && webOrder.secretsConfigured.webhookSecret
         }
       },
       printer: {
@@ -646,6 +808,79 @@ app.get('/api/integrations/status', async (req, res) => {
     });
   } catch (err) {
     res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.get('/api/integrations/settings', async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  try {
+    const records = await getStoreIntegrationMap(req.storeId);
+    res.json({
+      ok: true,
+      integrations: Object.keys(INTEGRATION_DEFS).reduce((acc, provider) => {
+        acc[provider] = serializeIntegration(provider, records[provider]);
+        return acc;
+      }, {})
+    });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.put('/api/integrations/settings/:provider', async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const provider = req.params.provider;
+  const def = INTEGRATION_DEFS[provider];
+  if (!def) {
+    return res.status(404).json({ error: 'Nhà cung cấp tích hợp không hợp lệ' });
+  }
+
+  try {
+    const existing = await getStoreIntegrationRecord(req.storeId, provider);
+    const existingSecrets = decryptIntegrationSecrets(existing?.secrets);
+    const incomingConfig = pickAllowedFields(req.body?.config || {}, def.configFields);
+    const incomingSecrets = pickAllowedFields(req.body?.secrets || {}, def.secretFields);
+    const clearSecretFields = Array.isArray(req.body?.clearSecretFields)
+      ? req.body.clearSecretFields.filter((field) => def.secretFields.includes(field))
+      : [];
+
+    const nextSecrets = { ...existingSecrets };
+    for (const field of clearSecretFields) {
+      delete nextSecrets[field];
+    }
+    for (const [field, value] of Object.entries(incomingSecrets)) {
+      if (hasText(value)) nextSecrets[field] = String(value).trim();
+    }
+
+    const record = await prisma.storeIntegration.upsert({
+      where: { storeId_provider: { storeId: req.storeId, provider } },
+      update: {
+        isEnabled: Boolean(req.body?.isEnabled),
+        category: def.category,
+        config: JSON.stringify({ ...parseIntegrationConfig(existing?.config), ...incomingConfig }),
+        secrets: encryptIntegrationSecrets(nextSecrets)
+      },
+      create: {
+        storeId: req.storeId,
+        provider,
+        category: def.category,
+        isEnabled: Boolean(req.body?.isEnabled),
+        config: JSON.stringify(incomingConfig),
+        secrets: encryptIntegrationSecrets(nextSecrets)
+      }
+    });
+
+    await writeAuditLog(req, 'update', 'storeIntegration', record.id, {
+      provider,
+      isEnabled: record.isEnabled,
+      configFields: Object.keys(incomingConfig),
+      secretFieldsUpdated: Object.keys(incomingSecrets).filter((field) => hasText(incomingSecrets[field])),
+      secretFieldsCleared: clearSecretFields
+    });
+
+    res.json({ ok: true, integration: serializeIntegration(provider, record) });
+  } catch (err) {
+    res.status(500).json({ error: 'Không thể lưu cấu hình tích hợp: ' + err.message });
   }
 });
 
@@ -669,6 +904,7 @@ app.get('/api/backup/export', async (req, res) => {
       promotions,
       attendances,
       cashShifts,
+      integrations,
       auditLogs
     ] = await Promise.all([
       prisma.store.findUnique({ where: { id: storeId } }),
@@ -686,6 +922,7 @@ app.get('/api/backup/export', async (req, res) => {
       prisma.promotion.findMany({ where: { storeId }, orderBy: { createdAt: 'desc' } }),
       prisma.attendance.findMany({ where: { storeId }, orderBy: { clockIn: 'desc' }, take: 5000 }),
       prisma.cashShift.findMany({ where: { storeId }, orderBy: { openedAt: 'desc' }, take: 5000 }),
+      prisma.storeIntegration.findMany({ where: { storeId }, orderBy: { provider: 'asc' } }),
       prisma.auditLog.findMany({ where: { storeId }, orderBy: { createdAt: 'desc' }, take: 5000 })
     ]);
 
@@ -709,6 +946,7 @@ app.get('/api/backup/export', async (req, res) => {
       promotions,
       attendances,
       cashShifts,
+      integrations: integrations.map((record) => serializeIntegration(record.provider, record)),
       auditLogs
     };
 
@@ -3539,13 +3777,6 @@ app.post('/api/payments/simulate-success', async (req, res) => {
 });
 
 app.post('/api/payments/payos-webhook', async (req, res) => {
-  if (process.env.PAYMENT_WEBHOOK_SECRET) {
-    const providedSecret = req.headers['x-webhook-secret'] || req.headers['x-payos-secret'];
-    if (providedSecret !== process.env.PAYMENT_WEBHOOK_SECRET) {
-      return res.status(401).json({ success: false, error: 'Webhook secret không hợp lệ' });
-    }
-  }
-
   const payload = req.body;
   console.log('PayOS Webhook received payload:', payload);
   
@@ -3573,6 +3804,16 @@ app.post('/api/payments/payos-webhook', async (req, res) => {
         }
         
         if (matchedStore && matchedOrderNumber) {
+          const payosIntegration = await getStoreIntegrationRecord(matchedStore.id, 'payos');
+          const payosSecrets = decryptIntegrationSecrets(payosIntegration?.secrets);
+          const expectedWebhookSecret = payosSecrets.webhookSecret || process.env.PAYMENT_WEBHOOK_SECRET;
+          if (expectedWebhookSecret) {
+            const providedSecret = req.headers['x-webhook-secret'] || req.headers['x-payos-secret'];
+            if (providedSecret !== expectedWebhookSecret) {
+              return res.status(401).json({ success: false, error: 'Webhook secret không hợp lệ' });
+            }
+          }
+
           const pendingOrders = await prisma.order.findMany({
             where: { storeId: matchedStore.id, status: 'pending' }
           });

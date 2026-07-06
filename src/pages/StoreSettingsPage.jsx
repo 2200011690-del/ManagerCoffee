@@ -3,6 +3,74 @@ import { Settings, Save, Globe, Receipt, Gift, Percent, RefreshCw, AlertTriangle
 import { api } from '../api';
 import { useUI } from '../context/UIContext';
 
+const INTEGRATION_FIELDS = {
+  payos: {
+    title: 'payOS',
+    config: [
+      ['mode', 'Chế độ', 'production'],
+      ['webhookUrl', 'Webhook URL', 'https://api.domain-cua-ban.vn/api/payments/payos-webhook']
+    ],
+    secrets: [
+      ['clientId', 'Client ID'],
+      ['apiKey', 'API Key'],
+      ['checksumKey', 'Checksum Key'],
+      ['webhookSecret', 'Webhook Secret']
+    ]
+  },
+  einvoice: {
+    title: 'Hóa đơn điện tử',
+    config: [
+      ['providerName', 'Nhà cung cấp', 'MISA / VNPT / Viettel'],
+      ['apiUrl', 'API URL', 'https://sandbox.example.vn'],
+      ['taxCode', 'Mã số thuế', '0312345678'],
+      ['invoiceTemplate', 'Mẫu số', '1C25TYY'],
+      ['invoiceSeries', 'Ký hiệu', 'C25TAA']
+    ],
+    secrets: [
+      ['apiKey', 'API Key'],
+      ['username', 'Username'],
+      ['password', 'Password'],
+      ['signingToken', 'Signing Token']
+    ]
+  },
+  grabfood: {
+    title: 'GrabFood',
+    config: [
+      ['apiUrl', 'API URL', 'https://partner-api.grab.com'],
+      ['merchantId', 'Merchant ID', 'merchant_xxx'],
+      ['storeCode', 'Store Code', 'store_xxx']
+    ],
+    secrets: [
+      ['apiKey', 'API Key'],
+      ['clientSecret', 'Client Secret'],
+      ['webhookSecret', 'Webhook Secret']
+    ]
+  },
+  shopeefood: {
+    title: 'ShopeeFood',
+    config: [
+      ['apiUrl', 'API URL', 'https://partner-api.shopeefood.vn'],
+      ['merchantId', 'Merchant ID', 'merchant_xxx'],
+      ['storeCode', 'Store Code', 'store_xxx']
+    ],
+    secrets: [
+      ['apiKey', 'API Key'],
+      ['clientSecret', 'Client Secret'],
+      ['webhookSecret', 'Webhook Secret']
+    ]
+  },
+  web_order: {
+    title: 'Web Order',
+    config: [
+      ['publicOrderUrl', 'URL đặt hàng', 'https://order.domain-cua-quan.vn'],
+      ['channelName', 'Tên kênh', 'Website']
+    ],
+    secrets: [
+      ['webhookSecret', 'Webhook Secret']
+    ]
+  }
+};
+
 export default function StoreSettingsPage() {
   const { showNotification } = useUI();
   const [activeTab, setActiveTab] = useState('general'); // 'general', 'receipt', 'loyalty'
@@ -11,6 +79,9 @@ export default function StoreSettingsPage() {
   const [printerIp, setPrinterIp] = useState(localStorage.getItem('lan_printer_ip') || '');
   const [testingPrint, setTestingPrint] = useState(false);
   const [integrationStatus, setIntegrationStatus] = useState(null);
+  const [integrationSettings, setIntegrationSettings] = useState({});
+  const [integrationSecrets, setIntegrationSecrets] = useState({});
+  const [integrationSaving, setIntegrationSaving] = useState(null);
   const [settings, setSettings] = useState({
     name: '',
     code: '',
@@ -49,9 +120,12 @@ export default function StoreSettingsPage() {
         });
       }
       try {
+        const settingsData = await api.get('/integrations/settings');
+        setIntegrationSettings(settingsData?.integrations || {});
         const status = await api.get('/integrations/status');
         setIntegrationStatus(status);
       } catch {
+        setIntegrationSettings({});
         setIntegrationStatus(null);
       }
     } catch {
@@ -93,6 +167,66 @@ export default function StoreSettingsPage() {
       showNotification('Lỗi khi lưu cấu hình', 'error');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const updateIntegrationConfig = (provider, field, value) => {
+    setIntegrationSettings(prev => ({
+      ...prev,
+      [provider]: {
+        ...(prev[provider] || {}),
+        config: {
+          ...((prev[provider] || {}).config || {}),
+          [field]: value
+        }
+      }
+    }));
+  };
+
+  const updateIntegrationEnabled = (provider, checked) => {
+    setIntegrationSettings(prev => ({
+      ...prev,
+      [provider]: {
+        ...(prev[provider] || {}),
+        isEnabled: checked
+      }
+    }));
+  };
+
+  const updateIntegrationSecret = (provider, field, value) => {
+    setIntegrationSecrets(prev => ({
+      ...prev,
+      [provider]: {
+        ...(prev[provider] || {}),
+        [field]: value
+      }
+    }));
+  };
+
+  const handleSaveIntegration = async (provider) => {
+    const current = integrationSettings[provider] || {};
+    setIntegrationSaving(provider);
+    try {
+      const saved = await api.put(`/integrations/settings/${provider}`, {
+        isEnabled: Boolean(current.isEnabled),
+        config: current.config || {},
+        secrets: integrationSecrets[provider] || {}
+      });
+      setIntegrationSettings(prev => ({
+        ...prev,
+        [provider]: saved.integration
+      }));
+      setIntegrationSecrets(prev => ({
+        ...prev,
+        [provider]: {}
+      }));
+      const status = await api.get('/integrations/status');
+      setIntegrationStatus(status);
+      showNotification('Đã lưu cấu hình tích hợp cho cửa hàng này', 'success');
+    } catch (err) {
+      showNotification(err.response?.data?.error || 'Không thể lưu cấu hình tích hợp', 'error');
+    } finally {
+      setIntegrationSaving(null);
     }
   };
 
@@ -539,8 +673,8 @@ export default function StoreSettingsPage() {
           {activeTab === 'integrations' && (
             <div className="space-y-6 animate-fade-in">
               <div className="border-b border-coffee-light/10 pb-4">
-                <h2 className="text-lg font-bold text-coffee-dark">Trạng thái tích hợp ngoài</h2>
-                <p className="text-xs text-coffee-medium/70">Theo dõi cấu hình thanh toán, hóa đơn điện tử, kênh giao đồ ăn và thiết bị tại quầy.</p>
+                <h2 className="text-lg font-bold text-coffee-dark">Tích hợp theo từng cửa hàng</h2>
+                <p className="text-xs text-coffee-medium/70">Mỗi cửa hàng dùng tài khoản/API key riêng của chính cửa hàng đó.</p>
               </div>
 
               <div className="divide-y divide-coffee-light/10 rounded-2xl border border-coffee-light/10 overflow-hidden">
@@ -593,6 +727,87 @@ export default function StoreSettingsPage() {
                   </div>
                   {statusBadge(Boolean(printerIp), 'Dùng in trình duyệt')}
                 </div>
+              </div>
+
+              <div className="space-y-4">
+                {Object.entries(INTEGRATION_FIELDS).map(([provider, meta]) => {
+                  const current = integrationSettings[provider] || {};
+                  const config = current.config || {};
+                  const secretFlags = current.secretsConfigured || {};
+                  const pendingSecrets = integrationSecrets[provider] || {};
+
+                  return (
+                    <div key={provider} className="rounded-2xl border border-coffee-light/10 bg-[#FCFBF8] p-4 space-y-4">
+                      <div className="flex items-center justify-between gap-4">
+                        <div>
+                          <p className="text-sm font-bold text-coffee-dark">{meta.title}</p>
+                          <p className="text-xs text-coffee-medium/70 mt-0.5">
+                            {current.updatedAt ? 'Đã có cấu hình cho cửa hàng này' : 'Chưa lưu cấu hình'}
+                          </p>
+                        </div>
+                        <label className="inline-flex items-center gap-2 text-xs font-bold text-coffee-medium">
+                          <input
+                            type="checkbox"
+                            checked={Boolean(current.isEnabled)}
+                            onChange={(e) => updateIntegrationEnabled(provider, e.target.checked)}
+                            className="w-4 h-4 accent-coffee-accent"
+                          />
+                          Bật
+                        </label>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {meta.config.map(([field, label, placeholder]) => (
+                          <div key={field} className="space-y-1.5">
+                            <label className="text-xs font-semibold text-coffee-medium">{label}</label>
+                            <input
+                              type="text"
+                              value={config[field] || ''}
+                              onChange={(e) => updateIntegrationConfig(provider, field, e.target.value)}
+                              placeholder={placeholder || label}
+                              className="w-full min-h-[40px] px-3.5 py-2 text-sm rounded-xl border border-coffee-light/20 focus:outline-none focus:border-coffee-accent bg-white"
+                            />
+                          </div>
+                        ))}
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {meta.secrets.map(([field, label]) => (
+                          <div key={field} className="space-y-1.5">
+                            <label className="text-xs font-semibold text-coffee-medium flex items-center justify-between gap-2">
+                              <span>{label}</span>
+                              {secretFlags[field] ? (
+                                <span className="text-[10px] text-emerald-700 font-bold">Đã lưu</span>
+                              ) : (
+                                <span className="text-[10px] text-amber-700 font-bold">Chưa có</span>
+                              )}
+                            </label>
+                            <input
+                              type="password"
+                              value={pendingSecrets[field] || ''}
+                              onChange={(e) => updateIntegrationSecret(provider, field, e.target.value)}
+                              placeholder={secretFlags[field] ? 'Để trống nếu không đổi' : label}
+                              className="w-full min-h-[40px] px-3.5 py-2 text-sm rounded-xl border border-coffee-light/20 focus:outline-none focus:border-coffee-accent bg-white"
+                              autoComplete="new-password"
+                            />
+                          </div>
+                        ))}
+                      </div>
+
+                      <div className="flex justify-end">
+                        <button
+                          type="button"
+                          onClick={() => handleSaveIntegration(provider)}
+                          disabled={integrationSaving === provider}
+                          className="min-h-[40px] px-4 bg-coffee-accent hover:bg-amber-700 text-white rounded-xl text-xs font-bold transition-all disabled:opacity-50 flex items-center gap-2"
+                        >
+                          {integrationSaving === provider && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
+                          <span>Lưu {meta.title}</span>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}

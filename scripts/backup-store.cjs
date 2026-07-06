@@ -22,6 +22,25 @@ function sanitizeUser(user) {
   };
 }
 
+function safeJson(value) {
+  try {
+    return value ? JSON.parse(value) : {};
+  } catch {
+    return {};
+  }
+}
+
+function sanitizeIntegration(record) {
+  return {
+    provider: record.provider,
+    category: record.category,
+    isEnabled: record.isEnabled,
+    config: safeJson(record.config),
+    hasSecrets: Boolean(record.secrets),
+    updatedAt: record.updatedAt,
+  };
+}
+
 async function main() {
   const storeCode = readArg('--store-code');
   const storeIdArg = readArg('--store-id');
@@ -54,6 +73,7 @@ async function main() {
     promotions,
     attendances,
     cashShifts,
+    integrations,
     auditLogs,
   ] = await Promise.all([
     prisma.user.findMany({ where: { storeId }, orderBy: { name: 'asc' } }),
@@ -70,6 +90,7 @@ async function main() {
     prisma.promotion.findMany({ where: { storeId }, orderBy: { createdAt: 'desc' } }),
     prisma.attendance.findMany({ where: { storeId }, orderBy: { clockIn: 'desc' } }),
     prisma.cashShift.findMany({ where: { storeId }, orderBy: { openedAt: 'desc' } }),
+    prisma.storeIntegration.findMany({ where: { storeId }, orderBy: { provider: 'asc' } }),
     prisma.auditLog.findMany({ where: { storeId }, orderBy: { createdAt: 'desc' } }),
   ]);
 
@@ -93,6 +114,7 @@ async function main() {
     promotions,
     attendances,
     cashShifts,
+    integrations: integrations.map(sanitizeIntegration),
     auditLogs,
   };
 

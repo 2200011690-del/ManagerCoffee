@@ -41,6 +41,7 @@ model Store {
   heldOrders   HeldOrder[]
   promotions   Promotion[]
   auditLogs    AuditLog[]
+  integrations StoreIntegration[]
 }
 
 model User {
@@ -409,4 +410,20 @@ model AuditLog {
   @@index([storeId, createdAt])
   @@index([storeId, action])
   @@index([storeId, entity])
+}
+
+model StoreIntegration {
+  id        String   @id @default(cuid())
+  storeId   String
+  store     Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  provider  String
+  category  String
+  isEnabled Boolean  @default(false)
+  config    String   @default("{}")
+  secrets   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([storeId, provider])
+  @@index([storeId, category])
 }

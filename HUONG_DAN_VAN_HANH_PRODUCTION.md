@@ -36,26 +36,20 @@ Restore catalog sẽ thay menu, công thức, bàn, tồn kho, nhà cung cấp, 
 ```env
 NODE_ENV=production
 JWT_SECRET=chuoi-bi-mat-dai-va-ngau-nhien
+INTEGRATION_SECRET_KEY=chuoi-bi-mat-rieng-de-ma-hoa-api-key-tung-store
 CORS_ORIGIN=https://domain-web-app-cua-ban.vn
 DATABASE_URL=postgresql://...
 DIRECT_URL=postgresql://...
-PAYMENT_WEBHOOK_SECRET=secret-do-ban-tu-dat-va-cau-hinh-o-cong-thanh-toan
-EINVOICE_PROVIDER=ten-nha-cung-cap-hddt
-EINVOICE_API_URL=https://...
-EINVOICE_API_KEY=...
-GRABFOOD_API_URL=https://...
-GRABFOOD_API_KEY=...
-SHOPEEFOOD_API_URL=https://...
-SHOPEEFOOD_API_KEY=...
-WEB_ORDER_SECRET=secret-cho-kenh-dat-hang-web
 JSON_BODY_LIMIT=5mb
 ```
+
+API key/secret của payOS, HĐĐT, GrabFood, ShopeeFood và Web Order được nhập trong Cấu hình cửa hàng -> Tích hợp ngoài cho từng store. Không đặt chung các khóa này trong `.env` nếu đang chạy mô hình SaaS nhiều quán.
 
 ## Những phần cần credential hoặc thiết bị thật
 
 - Hóa đơn điện tử: cần hợp đồng/API key từ nhà cung cấp HĐĐT hợp pháp, mẫu hóa đơn, ký số và môi trường test của họ.
 - GrabFood/ShopeeFood: cần API partner/merchant chính thức, webhook URL, secret và mapping menu theo chuẩn từng nền tảng.
-- Thanh toán tự động: cần cấu hình webhook thật từ PayOS/ngân hàng hoặc cổng thanh toán, sau đó đặt `PAYMENT_WEBHOOK_SECRET`.
+- Thanh toán tự động: cần cấu hình webhook thật từ PayOS/ngân hàng hoặc cổng thanh toán, sau đó nhập webhook secret trong Cấu hình cửa hàng -> Tích hợp ngoài của từng store. `PAYMENT_WEBHOOK_SECRET` chỉ nên dùng làm fallback nền tảng.
 - Máy in bill: cần test với IP máy in thật trong cùng mạng LAN.
 - Backup production đầy đủ: cần bật backup tự động/PITR ở database provider, không chỉ dựa vào JSON export.
 
