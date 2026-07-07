@@ -269,6 +269,7 @@ async function main() {
       }),
     });
     assert(returnOrder.status === 200 && returnOrder.body?.returnNumber, 'Tra hang hop le phai tao phieu tra', returnOrder);
+    assert(returnOrder.body.refundAmount === checkout.body.total, 'Tra hang phai hoan theo tien da thanh toan tren hoa don, khong chi theo gia client gui', returnOrder);
 
     const returnedOrderSearch = await request(`/api/orders/search/${encodeURIComponent(checkout.body.orderNumber)}`, {
       headers: auth(staffToken),
@@ -348,6 +349,84 @@ async function main() {
       arabicaAfterPay && Math.abs(arabicaAfterPay.qty - expectedAfterPay) < 0.000001,
       'Xac nhan QR paid phai tru kho theo so luong pending',
       { before: arabicaBefore.qty, afterPay: arabicaAfterPay?.qty, expectedAfterPay }
+    );
+
+    const badSplitPayment = await request('/api/orders/checkout', {
+      method: 'POST',
+      headers: auth(staffToken),
+      body: JSON.stringify({
+        tableId: null,
+        tableName: 'Mang về',
+        cart: [{
+          id: product.id,
+          name: product.name,
+          price: product.price,
+          qty: 1,
+          sugar: '100%',
+          ice: 'Nhiều đá',
+          note: '',
+        }],
+        subtotal,
+        vatAmount,
+        total,
+        paymentMethod: 'mixed',
+        payments: [{ method: 'cash', amount: 1 }],
+        employeeId: staffUser.id,
+      }),
+    });
+    assert(badSplitPayment.status === 400, 'Thanh toan tach nhieu phuong thuc sai tong tien phai bi chan', badSplitPayment);
+
+    const tamperedCheckout = await request('/api/orders/checkout', {
+      method: 'POST',
+      headers: auth(staffToken),
+      body: JSON.stringify({
+        tableId: null,
+        tableName: 'Mang về',
+        cart: [{
+          id: product.id,
+          name: product.name,
+          price: 1,
+          qty: 1,
+          sugar: '100%',
+          ice: 'Nhiều đá',
+          note: '',
+        }],
+        subtotal: 1,
+        vatAmount: 0,
+        total: 1,
+        paymentMethod: 'cash',
+        employeeId: staffUser.id,
+      }),
+    });
+    assert(tamperedCheckout.status === 200, 'Checkout client sua gia van phai duoc server tinh lai neu san pham hop le', tamperedCheckout);
+    assert(
+      tamperedCheckout.body?.items?.[0]?.price === product.price
+        && tamperedCheckout.body?.subtotal === subtotal
+        && tamperedCheckout.body?.total === total,
+      'Server phai bo qua gia/subtotal/total do client gui va tinh theo gia DB',
+      tamperedCheckout
+    );
+
+    const tamperedReturn = await request(`/api/orders/${tamperedCheckout.body.id}/return`, {
+      method: 'POST',
+      headers: auth(staffToken),
+      body: JSON.stringify({
+        employeeId: staffUser.id,
+        refundMethod: 'cash',
+        reason: 'Smoke test tampered return price',
+        items: [{
+          orderItemId: tamperedCheckout.body.items[0].id,
+          orderItemName: product.name,
+          price: 1,
+          qty: 1,
+        }],
+      }),
+    });
+    assert(tamperedReturn.status === 200, 'Tra hang voi gia client bi sua van phai xu ly theo hoa don goc', tamperedReturn);
+    assert(
+      tamperedReturn.body?.refundAmount === tamperedCheckout.body.total,
+      'Server phai bo qua so tien hoan do client gui va tinh theo hoa don goc',
+      tamperedReturn
     );
 
     console.log('Smoke sales test passed.');

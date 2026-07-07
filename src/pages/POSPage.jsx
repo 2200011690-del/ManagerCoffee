@@ -342,9 +342,9 @@ export default function POSPage() {
 
   const totalDiscount = discountAmount + orderDiscountAmount;
   const tempTotal = total - totalDiscount > 0 ? total - totalDiscount : 0;
-  const maxPointsNeeded = Math.floor(tempTotal / 1000);
+  const maxPointsNeeded = Math.floor(tempTotal);
   const pointsToDeduct = usePoints && customer ? Math.min(customer.points, maxPointsNeeded) : 0;
-  const pointsDiscount = pointsToDeduct * 1000;
+  const pointsDiscount = pointsToDeduct;
   const finalTotal = tempTotal - pointsDiscount > 0 ? tempTotal - pointsDiscount : 0;
 
   const finalizePaidCart = (order) => {

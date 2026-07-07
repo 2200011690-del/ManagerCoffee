@@ -156,7 +156,7 @@ export default function ThermalBillModal({ order, store: propStore, onConfirm, o
             {/* Totals */}
             <p>{padLine('Tạm tính:', order.subtotal.toLocaleString('vi-VN') + 'đ')}</p>
             {(() => {
-              const pointsDisc = (order.usedPoints || 0) * 1000;
+              const pointsDisc = order.usedPoints || 0;
               const promoDisc = (order.discountAmount || 0) - pointsDisc;
               return (
                 <>

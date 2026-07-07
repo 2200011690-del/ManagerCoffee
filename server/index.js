@@ -112,8 +112,11 @@ app.use((req, res, next) => {
 const isAdminUser = (user) => user?.role === 'admin';
 const canViewReports = (user) => isAdminUser(user) || user?.canViewReports === true;
 const canRefundOrders = (user) => isAdminUser(user) || user?.canRefund === true;
+const canApplyManualDiscount = (user) => isAdminUser(user) || user?.canApplyDiscount === true || (!IS_PRODUCTION && !user);
 const canManageUserRecord = (user, userId) => isAdminUser(user) || user?.userId === userId;
 const BCRYPT_HASH_RE = /^\$2[aby]\$\d{2}\$/;
+const POINT_VALUE_VND = 1;
+const PAYMENT_METHODS = new Set(['cash', 'card', 'transfer', 'momo', 'zalopay']);
 const storeQueues = new Map();
 
 async function withStoreQueue(storeId, task) {
@@ -200,6 +203,13 @@ function normalizeCartProductId(item) {
 
 function hasText(value) {
   return typeof value === 'string' && value.trim().length > 0;
+}
+
+function businessError(message, status = 400) {
+  const err = new Error(message);
+  err.status = status;
+  err.code = 'BUSINESS_RULE';
+  return err;
 }
 
 const INTEGRATION_DEFS = {
@@ -399,6 +409,360 @@ function resolveCashAmount(order, fallbackPaymentMethod = null, fallbackTotal = 
   return method === 'cash' ? totalAmount : 0;
 }
 
+function roundMoney(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return 0;
+  return Math.round(number);
+}
+
+function parsePositiveInt(value, fieldName) {
+  const number = Number(value);
+  if (!Number.isInteger(number) || number <= 0) {
+    throw new Error(`${fieldName} phải là số nguyên lớn hơn 0`);
+  }
+  return number;
+}
+
+function normalizePaymentMethod(method) {
+  const clean = String(method || 'cash').trim().toLowerCase();
+  if (!PAYMENT_METHODS.has(clean)) {
+    throw new Error('Phương thức thanh toán không hợp lệ');
+  }
+  return clean;
+}
+
+function normalizePayments(payments, total) {
+  if (!Array.isArray(payments) || payments.length === 0) return [];
+
+  const cleanPayments = payments
+    .map((payment) => ({
+      method: normalizePaymentMethod(payment.method),
+      amount: roundMoney(payment.amount),
+      reference: hasText(payment.reference) ? String(payment.reference).trim().slice(0, 128) : null
+    }))
+    .filter((payment) => payment.amount > 0);
+
+  if (cleanPayments.length === 0) return [];
+
+  const paidTotal = cleanPayments.reduce((sum, payment) => sum + payment.amount, 0);
+  if (Math.abs(paidTotal - total) > 1) {
+    throw new Error('Tổng tiền theo các phương thức thanh toán không khớp với tổng hóa đơn');
+  }
+
+  return cleanPayments;
+}
+
+function getManualDiscountLimitPct(user) {
+  if (isAdminUser(user) || (!IS_PRODUCTION && !user)) return 100;
+  const pct = Number(user?.maxDiscountPct);
+  if (!Number.isFinite(pct)) return 0;
+  return Math.max(0, Math.min(100, pct));
+}
+
+function assertManualDiscountAllowed(req, amount, baseAmount, label) {
+  if (amount <= 0) return;
+  if (!canApplyManualDiscount(req.user)) {
+    throw new Error(`Tài khoản của bạn không có quyền áp dụng ${label}`);
+  }
+  if (baseAmount <= 0) {
+    throw new Error(`${label} không hợp lệ`);
+  }
+
+  const pct = (amount / baseAmount) * 100;
+  const maxPct = getManualDiscountLimitPct(req.user);
+  if (pct > maxPct + 0.000001) {
+    throw new Error(`${label} vượt quá hạn mức giảm giá tối đa ${maxPct}%`);
+  }
+}
+
+function parsePromotionConfig(value) {
+  if (!value) return {};
+  if (typeof value === 'object') return value;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return {};
+  }
+}
+
+function isPromotionActiveNow(promotion, now) {
+  if (promotion.isActive === false) return false;
+  if (promotion.startDate && now < new Date(promotion.startDate)) return false;
+  if (promotion.endDate && now > new Date(promotion.endDate)) return false;
+  return true;
+}
+
+async function calculateAutoPromotions(tx, storeId, lines) {
+  const promotions = await tx.promotion.findMany({
+    where: { storeId, isActive: true },
+    orderBy: { createdAt: 'asc' }
+  });
+  const now = new Date();
+  const activePromotions = promotions.filter((promotion) => isPromotionActiveNow(promotion, now));
+  const currentHourMin = getVNTimeStr(now);
+  const itemDiscounts = new Map();
+  let comboDiscount = 0;
+  let buyXGetYDiscount = 0;
+
+  const happyHourPromos = activePromotions.filter((promotion) => {
+    if (promotion.type !== 'HAPPY_HOUR') return false;
+    const conditions = parsePromotionConfig(promotion.conditions);
+    return conditions.startHour && conditions.endHour
+      && currentHourMin >= conditions.startHour
+      && currentHourMin <= conditions.endHour;
+  });
+
+  if (happyHourPromos.length > 0) {
+    const promo = happyHourPromos[0];
+    const conditions = parsePromotionConfig(promo.conditions);
+    const rewards = parsePromotionConfig(promo.rewards);
+    const productIds = Array.isArray(conditions.productIds) ? conditions.productIds : [];
+    const discountPct = Math.max(0, Math.min(100, Number(rewards.discountPct) || 0));
+
+    for (const line of lines) {
+      if (productIds.length === 0 || productIds.includes(line.productId)) {
+        itemDiscounts.set(line.key, roundMoney(line.lineTotal * (discountPct / 100)));
+      }
+    }
+  }
+
+  const availableProductQtys = {};
+  const firstPriceByProductId = new Map();
+  for (const line of lines) {
+    availableProductQtys[line.productId] = (availableProductQtys[line.productId] || 0) + line.qty;
+    if (!firstPriceByProductId.has(line.productId)) {
+      firstPriceByProductId.set(line.productId, line.price);
+    }
+  }
+
+  const comboPromos = activePromotions.filter((promotion) => promotion.type === 'COMBO');
+  for (const promo of comboPromos) {
+    const conditions = parsePromotionConfig(promo.conditions);
+    const rewards = parsePromotionConfig(promo.rewards);
+    const comboProducts = Array.isArray(conditions.comboProducts) ? conditions.comboProducts : [];
+    const comboPrice = Number(rewards.comboPrice) || 0;
+    if (comboProducts.length < 2 || comboPrice <= 0) continue;
+
+    let numCombos = Infinity;
+    for (const comboProduct of comboProducts) {
+      const qtyNeeded = Number(comboProduct.qty) || 0;
+      if (!comboProduct.productId || qtyNeeded <= 0) {
+        numCombos = 0;
+        break;
+      }
+      const availableQty = availableProductQtys[comboProduct.productId] || 0;
+      numCombos = Math.min(numCombos, Math.floor(availableQty / qtyNeeded));
+    }
+
+    if (numCombos > 0 && Number.isFinite(numCombos)) {
+      let normalTotalForCombo = 0;
+      for (const comboProduct of comboProducts) {
+        const qtyNeeded = Number(comboProduct.qty) || 0;
+        availableProductQtys[comboProduct.productId] -= qtyNeeded * numCombos;
+        normalTotalForCombo += (firstPriceByProductId.get(comboProduct.productId) || 0) * qtyNeeded * numCombos;
+      }
+
+      const discount = normalTotalForCombo - comboPrice * numCombos;
+      if (discount > 0) {
+        comboDiscount += roundMoney(discount);
+      }
+    }
+  }
+
+  const buyXGetYPromos = activePromotions.filter((promotion) => promotion.type === 'BUY_X_GET_Y');
+  for (const promo of buyXGetYPromos) {
+    const conditions = parsePromotionConfig(promo.conditions);
+    const rewards = parsePromotionConfig(promo.rewards);
+    const buyProductId = conditions.buyProductId;
+    const getProductId = rewards.getProductId;
+    const minQty = Number(conditions.minQty) || 0;
+    const freeQty = Number(rewards.freeQty) || 0;
+    if (!buyProductId || !getProductId || minQty <= 0 || freeQty <= 0) continue;
+
+    const availableBuy = availableProductQtys[buyProductId] || 0;
+    const numTriggers = Math.floor(availableBuy / minQty);
+    if (numTriggers <= 0) continue;
+
+    const giftQtyInCart = lines
+      .filter((line) => line.productId === getProductId)
+      .reduce((sum, line) => sum + line.qty, 0);
+    const discountableQty = Math.min(giftQtyInCart, freeQty * numTriggers);
+    if (discountableQty > 0) {
+      buyXGetYDiscount += roundMoney((firstPriceByProductId.get(getProductId) || 0) * discountableQty);
+    }
+  }
+
+  return {
+    itemDiscounts,
+    globalDiscount: roundMoney(comboDiscount + buyXGetYDiscount)
+  };
+}
+
+async function resolveCheckoutLine(tx, req, item, index) {
+  const storeId = req.storeId;
+  const productId = normalizeCartProductId(item);
+  let product = productId ? await tx.product.findFirst({ where: { id: productId, storeId } }) : null;
+  if (!product && hasText(item.name)) {
+    product = await tx.product.findFirst({ where: { storeId, name: String(item.name).trim() } });
+  }
+  if (!product) {
+    throw new Error(`Sản phẩm dòng ${index + 1} không thuộc cửa hàng hiện tại`);
+  }
+
+  const qty = parsePositiveInt(item.qty, `Số lượng ${product.name}`);
+  const price = roundMoney(product.price);
+  const lineTotal = price * qty;
+  const manualDiscount = Math.max(0, roundMoney(item.discount));
+  if (manualDiscount > lineTotal) {
+    throw new Error(`Giảm giá món ${product.name} vượt quá giá trị món`);
+  }
+  assertManualDiscountAllowed(req, manualDiscount, lineTotal, `giảm giá món ${product.name}`);
+
+  return {
+    key: item.cartItemId || `${product.id}:${index}`,
+    cartItemId: item.cartItemId || null,
+    productId: product.id,
+    name: product.name,
+    price,
+    qty,
+    lineTotal,
+    manualDiscount,
+    manualDiscountType: manualDiscount > 0 ? (item.discountType || 'FIXED') : null,
+    sugar: hasText(item.sugar) ? String(item.sugar).trim().slice(0, 32) : null,
+    ice: hasText(item.ice) ? String(item.ice).trim().slice(0, 32) : null,
+    note: hasText(item.note) ? String(item.note).trim().slice(0, 255) : null,
+    finalDiscount: 0,
+    finalDiscountType: null
+  };
+}
+
+async function resolveVoucherDiscount(tx, storeId, voucherCode, orderValue) {
+  if (!hasText(voucherCode)) {
+    return { voucherCode: null, amount: 0 };
+  }
+
+  const code = String(voucherCode).trim().toUpperCase();
+  const voucher = await tx.voucher.findUnique({ where: { storeId_code: { storeId, code } } });
+  if (!voucher) throw new Error('Mã giảm giá không tồn tại');
+  if (!voucher.isActive) throw new Error('Mã giảm giá đã bị vô hiệu hóa');
+  if (voucher.expiryDate && new Date(voucher.expiryDate) < new Date()) {
+    throw new Error('Mã giảm giá đã hết hạn');
+  }
+  if (orderValue < voucher.minOrderValue) {
+    throw new Error(`Đơn hàng tối thiểu ${voucher.minOrderValue.toLocaleString('vi-VN')}đ để áp dụng mã này`);
+  }
+
+  let amount = 0;
+  if (voucher.type === 'FIXED') {
+    amount = voucher.value;
+  } else {
+    amount = orderValue * (voucher.value / 100);
+    if (voucher.maxDiscount && amount > voucher.maxDiscount) {
+      amount = voucher.maxDiscount;
+    }
+  }
+
+  return { voucherCode: code, amount: Math.max(0, roundMoney(amount)) };
+}
+
+async function buildAuthoritativeCheckout(tx, req, payload) {
+  const storeId = req.storeId;
+  const store = await tx.store.findUnique({ where: { id: storeId } });
+  if (!store) throw new Error('Không tìm thấy cửa hàng hiện tại');
+
+  const lines = [];
+  for (let index = 0; index < payload.cart.length; index += 1) {
+    lines.push(await resolveCheckoutLine(tx, req, payload.cart[index], index));
+  }
+
+  const autoPromotions = await calculateAutoPromotions(tx, storeId, lines);
+  const subtotalBeforeGlobalDiscounts = lines.reduce((sum, line) => {
+    const autoDiscount = autoPromotions.itemDiscounts.get(line.key) || 0;
+    const discount = line.manualDiscount > 0 ? line.manualDiscount : autoDiscount;
+    line.finalDiscount = Math.min(line.lineTotal, roundMoney(discount));
+    line.finalDiscountType = line.finalDiscount > 0
+      ? (line.manualDiscount > 0 ? line.manualDiscountType : 'AUTO')
+      : null;
+    return sum + line.lineTotal - line.finalDiscount;
+  }, 0);
+
+  const subtotal = Math.max(0, roundMoney(subtotalBeforeGlobalDiscounts - autoPromotions.globalDiscount));
+  const vatRate = Number.isFinite(Number(store.vatRate)) ? Number(store.vatRate) : 0.08;
+  const vatAmount = Math.max(0, roundMoney(subtotal * vatRate));
+  const totalBeforeManualDiscounts = subtotal + vatAmount;
+
+  const voucher = await resolveVoucherDiscount(tx, storeId, payload.voucherCode, subtotal);
+  assertManualDiscountAllowed(req, voucher.amount, totalBeforeManualDiscounts, 'mã giảm giá');
+  const voucherDiscount = Math.min(voucher.amount, totalBeforeManualDiscounts);
+
+  const rawOrderDiscount = Math.max(0, roundMoney(payload.orderDiscount));
+  assertManualDiscountAllowed(req, rawOrderDiscount, totalBeforeManualDiscounts, 'giảm giá toàn đơn');
+  const availableForOrderDiscount = Math.max(0, totalBeforeManualDiscounts - voucherDiscount);
+  const orderDiscountAmount = Math.min(rawOrderDiscount, availableForOrderDiscount);
+  const cleanOrderDiscountType = orderDiscountAmount > 0 ? (payload.orderDiscountType || 'FIXED') : null;
+
+  let customerId = payload.customerId || null;
+  let customer = null;
+  if (customerId) {
+    customer = await tx.customer.findFirst({ where: { id: customerId, storeId } });
+    if (!customer) {
+      throw new Error('Khách hàng không thuộc cửa hàng hiện tại');
+    }
+  }
+
+  const rawUsedPoints = Number(payload.usedPoints || 0);
+  if (!Number.isInteger(rawUsedPoints) || rawUsedPoints < 0) {
+    throw new Error('Số điểm sử dụng không hợp lệ');
+  }
+  const usedPoints = rawUsedPoints > 0 ? parsePositiveInt(rawUsedPoints, 'Số điểm sử dụng') : 0;
+  if (usedPoints > 0) {
+    if (!customer) {
+      throw new Error('Phải chọn khách hàng trước khi dùng điểm tích lũy');
+    }
+    if (usedPoints > customer.points) {
+      throw new Error('Số điểm sử dụng vượt quá số điểm hiện có của khách hàng');
+    }
+  }
+
+  const afterVoucherAndOrderDiscount = Math.max(0, totalBeforeManualDiscounts - voucherDiscount - orderDiscountAmount);
+  const pointsDiscount = usedPoints * POINT_VALUE_VND;
+  if (pointsDiscount > afterVoucherAndOrderDiscount) {
+    throw new Error('Số điểm sử dụng vượt quá số tiền còn phải thanh toán');
+  }
+
+  const total = Math.max(0, roundMoney(afterVoucherAndOrderDiscount - pointsDiscount));
+  const discountAmount = roundMoney(voucherDiscount + orderDiscountAmount + pointsDiscount);
+  const normalizedPayments = normalizePayments(payload.payments, total);
+  const paymentMethod = normalizedPayments.length > 1
+    ? 'mixed'
+    : normalizedPayments[0]?.method || normalizePaymentMethod(payload.paymentMethod);
+
+  return {
+    subtotal,
+    vatAmount,
+    total,
+    paymentMethod,
+    customerId,
+    voucherCode: voucher.voucherCode,
+    discountAmount,
+    orderDiscount: orderDiscountAmount,
+    orderDiscountType: cleanOrderDiscountType,
+    usedPoints,
+    payments: normalizedPayments,
+    items: lines.map((line) => ({
+      productId: line.productId,
+      name: line.name,
+      price: line.price,
+      qty: line.qty,
+      sugar: line.sugar,
+      ice: line.ice,
+      note: line.note,
+      discount: line.finalDiscount,
+      discountType: line.finalDiscountType
+    }))
+  };
+}
+
 async function deductInventoryForItems(tx, storeId, items, orderNumber) {
   for (const item of items) {
     const productId = normalizeCartProductId(item);
@@ -419,10 +783,19 @@ async function deductInventoryForItems(tx, storeId, items, orderNumber) {
         where: { id: recipe.inventoryId, storeId }
       });
       if (!inventory) continue;
+      if (inventory.qty < amount) {
+        throw businessError(`Không đủ tồn kho ${inventory.name} cho món ${item.name}`);
+      }
 
-      const updatedInventory = await tx.inventory.update({
-        where: { id: recipe.inventoryId },
+      const deducted = await tx.inventory.updateMany({
+        where: { id: recipe.inventoryId, storeId, qty: { gte: amount } },
         data: { qty: { decrement: amount } }
+      });
+      if (deducted.count === 0) {
+        throw businessError(`Không đủ tồn kho ${inventory.name} cho món ${item.name}`);
+      }
+      const updatedInventory = await tx.inventory.findFirst({
+        where: { id: recipe.inventoryId, storeId }
       });
 
       await tx.stockTransaction.create({
@@ -2247,8 +2620,8 @@ const completeOrderPayment = async (orderId, storeId) => {
 
 async function handleCheckout(req, res) {
   const { 
-    tableId, tableName, cart, subtotal, vatAmount, total, paymentMethod,
-    customerId, voucherCode, discountAmount, employeeId,
+    tableId, tableName, cart, paymentMethod,
+    customerId, voucherCode, employeeId,
     orderDiscount, orderDiscountType, discountReason,
     payments,
     status, // "pending" hoặc "paid"
@@ -2258,6 +2631,10 @@ async function handleCheckout(req, res) {
   const storeId = req.storeId;
   const orderStatus = status || 'paid';
   const clientRequestId = sanitizeClientRequestId(bodyClientRequestId || req.headers['idempotency-key']);
+
+  if (!['paid', 'pending'].includes(orderStatus)) {
+    return res.status(400).json({ error: 'Trạng thái hóa đơn không hợp lệ' });
+  }
 
   if (clientRequestId) {
     const existingOrder = await prisma.order.findFirst({
@@ -2299,73 +2676,88 @@ async function handleCheckout(req, res) {
   const timeStr = getVNTimeStr(date);
   let reusedIdempotentOrder = false;
   
-  const order = await prisma.$transaction(async (tx) => {
-    if (clientRequestId) {
-      const existingOrder = await tx.order.findFirst({
-        where: { storeId, clientRequestId },
-        include: { items: true, employee: true, payments: true, customer: true }
-      });
-      if (existingOrder) {
-        reusedIdempotentOrder = true;
-        return existingOrder;
+  let order;
+  try {
+    order = await prisma.$transaction(async (tx) => {
+      if (clientRequestId) {
+        const existingOrder = await tx.order.findFirst({
+          where: { storeId, clientRequestId },
+          include: { items: true, employee: true, payments: true, customer: true }
+        });
+        if (existingOrder) {
+          reusedIdempotentOrder = true;
+          return existingOrder;
+        }
       }
-    }
 
-    const orderNumber = await nextOrderNumber(tx, storeId);
-    const createdOrder = await tx.order.create({
-      data: {
-        storeId,
-        orderNumber,
-        clientRequestId,
-        tableId,
-        tableName: tableName || 'Mang về',
-        subtotal,
-        vatAmount,
-        total,
-        paymentMethod: payments && payments.length > 1 ? 'mixed' : paymentMethod,
-        status: orderStatus,
-        time: timeStr,
-        date: dateStr,
+      const orderNumber = await nextOrderNumber(tx, storeId);
+      const checkout = await buildAuthoritativeCheckout(tx, req, {
+        cart,
+        paymentMethod,
         customerId,
         voucherCode,
-        discountAmount,
-        employeeId,
-        orderDiscount: orderDiscount || 0,
-        orderDiscountType: orderDiscountType || null,
-        discountReason: discountReason || null,
-        usedPoints: usedPoints ? Number(usedPoints) : 0,
-        items: {
-          create: cart.map(item => ({
-            productId: normalizeCartProductId(item),
-            name: item.name,
-            price: item.price,
-            qty: item.qty,
-            sugar: item.sugar,
-            ice: item.ice,
-            note: item.note,
-            discount: item.discount || 0,
-            discountType: item.discountType || null
-          }))
-        },
-        ...(payments && payments.length > 0 ? {
-          payments: {
-            create: payments.map(p => ({
-              method: p.method,
-              amount: Number(p.amount) || 0,
-              reference: p.reference || null
+        orderDiscount,
+        orderDiscountType,
+        payments,
+        usedPoints
+      });
+      const createdOrder = await tx.order.create({
+        data: {
+          storeId,
+          orderNumber,
+          clientRequestId,
+          tableId,
+          tableName: tableName || 'Mang về',
+          subtotal: checkout.subtotal,
+          vatAmount: checkout.vatAmount,
+          total: checkout.total,
+          paymentMethod: checkout.paymentMethod,
+          status: orderStatus,
+          time: timeStr,
+          date: dateStr,
+          customerId: checkout.customerId,
+          voucherCode: checkout.voucherCode,
+          discountAmount: checkout.discountAmount,
+          employeeId,
+          orderDiscount: checkout.orderDiscount,
+          orderDiscountType: checkout.orderDiscountType,
+          discountReason: discountReason || null,
+          usedPoints: checkout.usedPoints,
+          items: {
+            create: checkout.items.map(item => ({
+              productId: item.productId,
+              name: item.name,
+              price: item.price,
+              qty: item.qty,
+              sugar: item.sugar,
+              ice: item.ice,
+              note: item.note,
+              discount: item.discount || 0,
+              discountType: item.discountType || null
             }))
-          }
-        } : {})
-      },
-      include: { items: true, employee: true, payments: true, customer: true }
-    });
+          },
+          ...(checkout.payments.length > 0 ? {
+            payments: {
+              create: checkout.payments.map(p => ({
+                method: p.method,
+                amount: p.amount,
+                reference: p.reference || null
+              }))
+            }
+          } : {})
+        },
+        include: { items: true, employee: true, payments: true, customer: true }
+      });
 
-    if (orderStatus === 'paid') {
-      await applyPaidOrderEffects(tx, storeId, createdOrder, { payments });
-    }
+      if (orderStatus === 'paid') {
+        await applyPaidOrderEffects(tx, storeId, createdOrder, { payments: checkout.payments });
+      }
 
-    return createdOrder;
-  }, { maxWait: 10000, timeout: 20000 });
+      return createdOrder;
+    }, { maxWait: 10000, timeout: 20000 });
+  } catch (err) {
+    return res.status(err.status || 400).json({ error: err.message });
+  }
 
   if (reusedIdempotentOrder) {
     return res.json(order);
@@ -2414,7 +2806,7 @@ app.put('/api/orders/:id/pay', async (req, res) => {
     });
     res.json(updated);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(err.status || 500).json({ error: err.message });
   }
 });
 
@@ -3221,10 +3613,14 @@ app.post('/api/orders/:orderId/return', async (req, res) => {
   const { orderId } = req.params;
   const { items, reason, refundMethod, employeeId } = req.body;
   const refundEmployeeId = employeeId || req.user?.userId || null;
-  // items: [{ orderItemId, orderItemName, price, qty, reason? }]
+  const cleanRefundMethod = ['cash', 'card', 'store_credit'].includes(refundMethod) ? refundMethod : 'cash';
+  // items: [{ orderItemId, orderItemName, qty, reason? }]
   try {
     if (!Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ error: 'Vui lòng chọn ít nhất một món cần trả' });
+    }
+    if (!hasText(reason)) {
+      return res.status(400).json({ error: 'Vui lòng nhập lý do trả hàng' });
     }
 
     const order = await prisma.order.findFirst({
@@ -3242,9 +3638,16 @@ app.post('/api/orders/:orderId/return', async (req, res) => {
       }
     }
 
+    const orderItemBaseTotal = order.items.reduce((sum, item) => {
+      return sum + Math.max(0, item.price * item.qty - (item.discount || 0));
+    }, 0);
+    const validatedItems = [];
+
     for (const returnItem of items) {
-      const qty = Number(returnItem.qty) || 0;
-      if (qty <= 0) {
+      let qty = 0;
+      try {
+        qty = parsePositiveInt(returnItem.qty, 'Số lượng trả hàng');
+      } catch {
         return res.status(400).json({ error: 'Số lượng trả hàng không hợp lệ' });
       }
 
@@ -3259,9 +3662,23 @@ app.post('/api/orders/:orderId/return', async (req, res) => {
       if (qty > remainingQty) {
         return res.status(400).json({ error: `Số lượng trả của ${returnItem.orderItemName} vượt quá số lượng còn lại` });
       }
+
+      const lineBaseTotal = Math.max(0, orderItem.price * orderItem.qty - (orderItem.discount || 0));
+      const linePaidTotal = orderItemBaseTotal > 0
+        ? (order.total * lineBaseTotal) / orderItemBaseTotal
+        : orderItem.price * orderItem.qty;
+      const lineRefundAmount = roundMoney((linePaidTotal * qty) / orderItem.qty);
+      validatedItems.push({
+        originalOrderItem: orderItem,
+        orderItemName: orderItem.name,
+        price: qty > 0 ? lineRefundAmount / qty : 0,
+        qty,
+        refundAmount: lineRefundAmount,
+        reason: returnItem.reason || reason
+      });
     }
 
-    const refundAmount = items.reduce((sum, it) => sum + (it.price * it.qty), 0);
+    const refundAmount = validatedItems.reduce((sum, it) => sum + it.refundAmount, 0);
 
     const returnOrder = await prisma.$transaction(async (tx) => {
       const returnNumber = await nextReturnNumber(tx, storeId);
@@ -3272,10 +3689,10 @@ app.post('/api/orders/:orderId/return', async (req, res) => {
           returnNumber,
           reason: reason || 'Khách trả hàng',
           refundAmount,
-          refundMethod: refundMethod || 'cash',
+          refundMethod: cleanRefundMethod,
           employeeId: refundEmployeeId,
           items: {
-            create: items.map(it => ({
+            create: validatedItems.map(it => ({
               orderItemName: it.orderItemName,
               price: it.price,
               qty: it.qty,
@@ -3286,11 +3703,8 @@ app.post('/api/orders/:orderId/return', async (req, res) => {
         include: { items: true, order: true }
       });
 
-      for (const returnItem of items) {
-        const originalOrderItem = returnItem.orderItemId
-          ? order.items.find(oi => oi.id === returnItem.orderItemId)
-          : order.items.find(oi => oi.name === returnItem.orderItemName);
-        if (!originalOrderItem) continue;
+      for (const returnItem of validatedItems) {
+        const originalOrderItem = returnItem.originalOrderItem;
 
         await tx.orderItem.update({
           where: { id: originalOrderItem.id },
@@ -3335,7 +3749,7 @@ app.post('/api/orders/:orderId/return', async (req, res) => {
         }
       }
 
-      if ((refundMethod || 'cash') === 'cash' && refundEmployeeId) {
+      if (cleanRefundMethod === 'cash' && refundEmployeeId) {
         const activeShift = await tx.cashShift.findFirst({
           where: { storeId, userId: refundEmployeeId, status: 'open' }
         });
@@ -3357,7 +3771,7 @@ app.post('/api/orders/:orderId/return', async (req, res) => {
       returnOrderId: returnOrder.id,
       returnNumber: returnOrder.returnNumber,
       refundAmount,
-      refundMethod: refundMethod || 'cash',
+      refundMethod: cleanRefundMethod,
       itemCount: items.length
     });
     broadcast('inventoryUpdated', await prisma.inventory.findMany({ where: { storeId } }), storeId);
