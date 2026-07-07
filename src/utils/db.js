@@ -30,7 +30,7 @@ export function openDB() {
   });
 }
 
-export async function saveOfflineOrder(order) {
+export async function saveOfflineOrder(order, storeId = order.storeId) {
   const db = await openDB();
   return new Promise((resolve, reject) => {
     const transaction = db.transaction([STORE_NAME], 'readwrite');
@@ -41,6 +41,7 @@ export async function saveOfflineOrder(order) {
     const orderNumber = `HD-OFF-${Date.now()}`;
     const orderWithId = { 
       ...order, 
+      storeId,
       clientRequestId,
       tempId, 
       id: tempId, // fallback ID for client keys
@@ -58,14 +59,17 @@ export async function saveOfflineOrder(order) {
   });
 }
 
-export async function getOfflineOrders() {
+export async function getOfflineOrders(storeId = null) {
   const db = await openDB();
   return new Promise((resolve, reject) => {
     const transaction = db.transaction([STORE_NAME], 'readonly');
     const store = transaction.objectStore(STORE_NAME);
     const request = store.getAll();
 
-    request.onsuccess = () => resolve(request.result || []);
+    request.onsuccess = () => {
+      const orders = request.result || [];
+      resolve(storeId ? orders.filter(order => order.storeId === storeId) : orders);
+    };
     request.onerror = () => reject(request.error);
   });
 }

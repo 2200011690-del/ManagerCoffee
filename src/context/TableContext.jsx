@@ -1,40 +1,61 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { api } from '../api';
 import { socket } from '../socket';
+import { useAuth } from './AuthContext';
 
 const TableContext = createContext(null);
+const TABLES_CACHE_PREFIX = 'cached_tables_list';
+
+function tablesCacheKey(storeId) {
+  return `${TABLES_CACHE_PREFIX}:${storeId}`;
+}
 
 export function TableProvider({ children }) {
+  const { currentUser } = useAuth();
+  const storeId = currentUser?.storeId;
   const [tables, setTables] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const fetchTables = async () => {
+  const fetchTables = useCallback(async () => {
+    if (!storeId) {
+      setTables([]);
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    const cacheKey = tablesCacheKey(storeId);
     try {
       const data = await api.get('/tables');
       const list = Array.isArray(data) ? data : [];
       setTables(list);
-      localStorage.setItem('cached_tables_list', JSON.stringify(list));
+      localStorage.setItem(cacheKey, JSON.stringify(list));
+      localStorage.removeItem(TABLES_CACHE_PREFIX);
     } catch (err) {
       console.error('Failed to fetch tables, loading cached version:', err);
-      const cached = localStorage.getItem('cached_tables_list');
+      const cached = localStorage.getItem(cacheKey);
       if (cached) {
         setTables(JSON.parse(cached));
+      } else {
+        setTables([]);
       }
     } finally {
       setLoading(false);
     }
-  };
+  }, [storeId]);
 
   useEffect(() => {
+    setTables([]);
     fetchTables();
 
     const handleTableUpdated = (updatedTable) => {
+      if (updatedTable?.storeId && updatedTable.storeId !== storeId) return;
       setTables(prev => prev.map(t => t.id === updatedTable.id ? updatedTable : t));
     };
 
     socket.on('tableUpdated', handleTableUpdated);
     return () => socket.off('tableUpdated', handleTableUpdated);
-  }, []);
+  }, [fetchTables, storeId]);
 
   const updateTableStatus = useCallback(async (id, status) => {
     try {
@@ -49,7 +70,7 @@ export function TableProvider({ children }) {
       console.error(err);
       fetchTables(); // revert if fail
     }
-  }, []);
+  }, [fetchTables]);
 
   const createTable = useCallback(async (data) => {
     try {
@@ -60,7 +81,7 @@ export function TableProvider({ children }) {
       console.error(err);
       throw err;
     }
-  }, []);
+  }, [fetchTables]);
 
   const updateTable = useCallback(async (id, data) => {
     try {
@@ -71,7 +92,7 @@ export function TableProvider({ children }) {
       console.error(err);
       throw err;
     }
-  }, []);
+  }, [fetchTables]);
 
   const deleteTable = useCallback(async (id) => {
     try {
@@ -81,7 +102,7 @@ export function TableProvider({ children }) {
       console.error(err);
       throw err;
     }
-  }, []);
+  }, [fetchTables]);
 
   const value = { 
     tables, 

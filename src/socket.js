@@ -6,8 +6,25 @@ export const socket = io(URL, {
   autoConnect: true,
 });
 
-export const joinStore = (storeId) => {
-  if (storeId) {
-    socket.emit('joinStore', storeId);
+let joinedStoreId = null;
+
+socket.on('connect', () => {
+  if (joinedStoreId) {
+    socket.emit('joinStore', joinedStoreId);
   }
+});
+
+export const joinStore = (storeId) => {
+  if (!storeId || joinedStoreId === storeId) return;
+  if (joinedStoreId) {
+    socket.emit('leaveStore', joinedStoreId);
+  }
+  joinedStoreId = storeId;
+  socket.emit('joinStore', storeId);
+};
+
+export const leaveStore = () => {
+  if (!joinedStoreId) return;
+  socket.emit('leaveStore', joinedStoreId);
+  joinedStoreId = null;
 };

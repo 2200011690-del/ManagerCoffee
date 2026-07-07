@@ -1,34 +1,55 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { api } from '../api';
 import { socket } from '../socket';
+import { useAuth } from './AuthContext';
 
 const MenuContext = createContext(null);
+const MENU_CACHE_PREFIX = 'cached_menu_list';
+
+function menuCacheKey(storeId) {
+  return `${MENU_CACHE_PREFIX}:${storeId}`;
+}
 
 export function MenuProvider({ children }) {
+  const { currentUser } = useAuth();
+  const storeId = currentUser?.storeId;
   const [menuList, setMenuList] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const fetchMenu = async () => {
+  const fetchMenu = useCallback(async () => {
+    if (!storeId) {
+      setMenuList([]);
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    const cacheKey = menuCacheKey(storeId);
     try {
       const data = await api.get('/products');
       const list = Array.isArray(data) ? data : [];
       setMenuList(list);
-      localStorage.setItem('cached_menu_list', JSON.stringify(list));
+      localStorage.setItem(cacheKey, JSON.stringify(list));
+      localStorage.removeItem(MENU_CACHE_PREFIX);
     } catch (err) {
       console.error('Failed to fetch menu, loading cached version:', err);
-      const cached = localStorage.getItem('cached_menu_list');
+      const cached = localStorage.getItem(cacheKey);
       if (cached) {
         setMenuList(JSON.parse(cached));
+      } else {
+        setMenuList([]);
       }
     } finally {
       setLoading(false);
     }
-  };
+  }, [storeId]);
 
   useEffect(() => {
+    setMenuList([]);
     fetchMenu();
 
     const handleProductUpdated = ({ action, product, id }) => {
+      if (product?.storeId && product.storeId !== storeId) return;
       if (action === 'create') setMenuList(prev => [...prev, product]);
       if (action === 'update') setMenuList(prev => prev.map(p => p.id === product.id ? product : p));
       if (action === 'delete') setMenuList(prev => prev.filter(p => p.id !== id));
@@ -36,7 +57,7 @@ export function MenuProvider({ children }) {
 
     socket.on('productUpdated', handleProductUpdated);
     return () => socket.off('productUpdated', handleProductUpdated);
-  }, []);
+  }, [fetchMenu, storeId]);
 
   const visibleMenu = menuList.filter(i => !i.hidden);
 

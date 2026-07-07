@@ -1,6 +1,6 @@
 import { createContext, useContext, useState } from 'react';
 import { api } from '../api';
-import { joinStore } from '../socket';
+import { joinStore, leaveStore } from '../socket';
 
 const AuthContext = createContext(null);
 const AUTH_KEY = 'manager_coffee_auth_session';
@@ -109,7 +109,7 @@ export function AuthProvider({ children }) {
     setCurrentUser(null);
     setPinError('');
     sessionStorage.removeItem(AUTH_KEY);
-    // In a real app we might want to emit a leaveStore event, but a full reload is also fine.
+    leaveStore();
     window.location.reload();
   };
 

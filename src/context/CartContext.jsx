@@ -2,23 +2,31 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
 import { useUI } from './UIContext';
 import { api } from '../api';
 import { socket } from '../socket';
+import { useAuth } from './AuthContext';
 
 const CartContext = createContext(null);
 
 const ACTIVE_TABLE_KEY = 'manager_coffee_active_table';
 
-function loadActiveTable() {
+function activeTableKey(storeId) {
+  return `${ACTIVE_TABLE_KEY}:${storeId}`;
+}
+
+function loadActiveTable(storeId) {
+  if (!storeId) return null;
   try {
-    const saved = localStorage.getItem(ACTIVE_TABLE_KEY);
+    const saved = localStorage.getItem(activeTableKey(storeId));
     return saved ? JSON.parse(saved) : null;
   } catch { return null; }
 }
 
 export function CartProvider({ children }) {
   const { showNotification } = useUI();
+  const { currentUser } = useAuth();
+  const storeId = currentUser?.storeId;
 
   const [tableCarts, setTableCarts] = useState({});
-  const [activeTableId, setActiveTableId] = useState(loadActiveTable);
+  const [activeTableId, setActiveTableId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [promotions, setPromotions] = useState([]);
 
@@ -40,8 +48,20 @@ export function CartProvider({ children }) {
     }
   };
 
+  useEffect(() => {
+    setTableCarts({});
+    setActiveTableId(loadActiveTable(storeId));
+  }, [storeId]);
+
   // Load carts & promotions from backend
   useEffect(() => {
+    if (!storeId) {
+      setTableCarts({});
+      setPromotions([]);
+      setLoading(false);
+      return;
+    }
+
     const fetchCarts = async () => {
       try {
         const data = await api.get('/carts');
@@ -74,11 +94,13 @@ export function CartProvider({ children }) {
 
     socket.on('cartSync', handleCartSync);
     return () => socket.off('cartSync', handleCartSync);
-  }, []);
+  }, [storeId]);
 
   useEffect(() => {
-    localStorage.setItem(ACTIVE_TABLE_KEY, JSON.stringify(activeTableId));
-  }, [activeTableId]);
+    if (!storeId) return;
+    localStorage.setItem(activeTableKey(storeId), JSON.stringify(activeTableId));
+    localStorage.removeItem(ACTIVE_TABLE_KEY);
+  }, [activeTableId, storeId]);
 
   const TAKEAWAY_KEY = '__takeaway__';
   const cartKey = activeTableId ?? TAKEAWAY_KEY;

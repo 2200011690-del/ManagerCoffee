@@ -655,10 +655,24 @@ io.on('connection', (socket) => {
   console.log(`User connected: ${socket.id}`);
   
   socket.on('joinStore', (storeId) => {
+    if (!storeId) return;
+    if (socket.data.storeId && socket.data.storeId !== storeId) {
+      socket.leave(socket.data.storeId);
+    }
+    socket.data.storeId = storeId;
     socket.join(storeId);
     console.log(`Socket ${socket.id} joined store ${storeId}`);
     if (!storeCarts[storeId]) storeCarts[storeId] = {};
     socket.emit('cartSync', storeCarts[storeId]);
+  });
+
+  socket.on('leaveStore', (storeId) => {
+    if (storeId) {
+      socket.leave(storeId);
+    }
+    if (!storeId || socket.data.storeId === storeId) {
+      socket.data.storeId = null;
+    }
   });
 
   socket.on('disconnect', () => {

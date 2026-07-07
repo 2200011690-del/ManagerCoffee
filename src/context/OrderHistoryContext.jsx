@@ -2,8 +2,14 @@ import { createContext, useContext, useState, useEffect, useCallback } from 'rea
 import { api } from '../api';
 import { socket } from '../socket';
 import { saveOfflineOrder, getOfflineOrders, deleteOfflineOrder, createClientRequestId } from '../utils/db';
+import { useAuth } from './AuthContext';
 
 const OrderHistoryContext = createContext(null);
+const ORDERS_CACHE_PREFIX = 'cached_orders_list';
+
+function ordersCacheKey(storeId) {
+  return `${ORDERS_CACHE_PREFIX}:${storeId}`;
+}
 
 function withClientRequestId(orderData) {
   return {
@@ -13,26 +19,36 @@ function withClientRequestId(orderData) {
 }
 
 export function OrderHistoryProvider({ children }) {
+  const { currentUser } = useAuth();
+  const storeId = currentUser?.storeId;
   const [orderHistory, setOrderHistory] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  const fetchOrders = async () => {
+  const fetchOrders = useCallback(async () => {
+    if (!storeId) {
+      setOrderHistory([]);
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     let onlineOrders = [];
+    const cacheKey = ordersCacheKey(storeId);
     try {
       const data = await api.get('/orders');
       onlineOrders = Array.isArray(data) ? data : [];
-      localStorage.setItem('cached_orders_list', JSON.stringify(onlineOrders));
+      localStorage.setItem(cacheKey, JSON.stringify(onlineOrders));
+      localStorage.removeItem(ORDERS_CACHE_PREFIX);
     } catch (err) {
       console.error('Lỗi tải hóa đơn từ server, dùng cache:', err);
-      const cached = localStorage.getItem('cached_orders_list');
+      const cached = localStorage.getItem(cacheKey);
       if (cached) {
         onlineOrders = JSON.parse(cached);
       }
     }
 
     try {
-      const offlineOrders = await getOfflineOrders();
+      const offlineOrders = await getOfflineOrders(storeId);
       const onlineRequestIds = new Set(onlineOrders.map(order => order.clientRequestId).filter(Boolean));
       const pendingOfflineOrders = offlineOrders.filter(order => !onlineRequestIds.has(order.clientRequestId));
       const merged = [...pendingOfflineOrders, ...onlineOrders];
@@ -43,15 +59,15 @@ export function OrderHistoryProvider({ children }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [storeId]);
 
   const addOrder = useCallback(async (orderData) => {
-    const orderPayload = withClientRequestId(orderData);
+    const orderPayload = withClientRequestId({ ...orderData, storeId });
 
     // Nếu thiết bị mất mạng vật lý
     if (!navigator.onLine) {
       try {
-        const offlineOrder = await saveOfflineOrder(orderPayload);
+        const offlineOrder = await saveOfflineOrder(orderPayload, storeId);
         setOrderHistory(prev => [offlineOrder, ...prev]);
         return offlineOrder;
       } catch (dbErr) {
@@ -71,7 +87,7 @@ export function OrderHistoryProvider({ children }) {
       const isNetworkError = !err.response || err.code === 'ERR_NETWORK' || err.message === 'Network Error';
       if (isNetworkError) {
         try {
-          const offlineOrder = await saveOfflineOrder(orderPayload);
+          const offlineOrder = await saveOfflineOrder(orderPayload, storeId);
           setOrderHistory(prev => [offlineOrder, ...prev]);
           return offlineOrder;
         } catch (dbErr) {
@@ -80,14 +96,14 @@ export function OrderHistoryProvider({ children }) {
       }
       throw err;
     }
-  }, []);
+  }, [storeId]);
 
   // Luồng chạy ngầm đồng bộ hóa đơn offline lên server
   const syncOfflineOrders = useCallback(async () => {
-    if (!navigator.onLine) return;
+    if (!navigator.onLine || !storeId) return;
 
     try {
-      const offlineOrders = await getOfflineOrders();
+      const offlineOrders = await getOfflineOrders(storeId);
       if (offlineOrders.length === 0) return;
 
       console.log(`Phát hiện ${offlineOrders.length} đơn hàng ngoại tuyến cần đồng bộ...`);
@@ -103,6 +119,7 @@ export function OrderHistoryProvider({ children }) {
             date: _date,
             time: _time,
             orderNumber: _orderNumber,
+            storeId: _storeId,
             ...serverData
           } = order;
           const newOrder = await api.post('/orders/checkout', serverData, {
@@ -128,12 +145,14 @@ export function OrderHistoryProvider({ children }) {
     } catch (err) {
       console.error('Lỗi trong tiến trình chạy ngầm đồng bộ đơn:', err);
     }
-  }, []);
+  }, [storeId]);
 
   useEffect(() => {
+    setOrderHistory([]);
     fetchOrders();
 
     const handleOrderCreated = (order) => {
+      if (order?.storeId && order.storeId !== storeId) return;
       // Tránh trùng lặp đơn vừa được đồng bộ
       setOrderHistory(prev => {
         if (prev.some(o => o.id === order.id || o.orderNumber === order.orderNumber || (order.clientRequestId && o.clientRequestId === order.clientRequestId))) {
@@ -159,7 +178,7 @@ export function OrderHistoryProvider({ children }) {
       window.removeEventListener('online', syncOfflineOrders);
       clearInterval(interval);
     };
-  }, [syncOfflineOrders]);
+  }, [fetchOrders, syncOfflineOrders, storeId]);
 
   const clearHistory = useCallback(() => {
     // logic tùy chọn
