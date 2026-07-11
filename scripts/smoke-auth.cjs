@@ -1,5 +1,6 @@
 const { spawn } = require('node:child_process');
 const { once } = require('node:events');
+const { io } = require('socket.io-client');
 
 const cwd = process.cwd();
 const port = process.env.SMOKE_PORT || '4011';
@@ -56,6 +57,20 @@ function assert(condition, message, details) {
   if (!condition) {
     throw new Error(`${message}${details ? `\n${JSON.stringify(details, null, 2)}` : ''}`);
   }
+}
+
+function waitForSocketEvent(socket, eventName, timeoutMs = 5000) {
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      socket.off(eventName, onEvent);
+      reject(new Error(`Timed out waiting for socket event ${eventName}`));
+    }, timeoutMs);
+    const onEvent = (payload) => {
+      clearTimeout(timeout);
+      resolve(payload);
+    };
+    socket.once(eventName, onEvent);
+  });
 }
 
 async function waitForServer(child) {
@@ -157,6 +172,40 @@ async function main() {
     const staffToken = staffLogin.body.token;
     const adminToken = adminLogin.body.token;
 
+    const unauthorizedSocket = io(baseUrl, {
+      autoConnect: false,
+      reconnection: false,
+      transports: ['websocket'],
+    });
+    const unauthorizedErrorPromise = waitForSocketEvent(unauthorizedSocket, 'connect_error');
+    unauthorizedSocket.connect();
+    const unauthorizedError = await unauthorizedErrorPromise;
+    unauthorizedSocket.close();
+    assert(
+      ['AUTH_REQUIRED', 'AUTH_INVALID'].includes(unauthorizedError?.message),
+      'WebSocket khong token phai bi tu choi',
+      { message: unauthorizedError?.message }
+    );
+
+    const staffSocket = io(baseUrl, {
+      autoConnect: false,
+      reconnection: false,
+      transports: ['websocket'],
+      auth: { token: staffToken },
+    });
+    const connectedPromise = waitForSocketEvent(staffSocket, 'connect');
+    staffSocket.connect();
+    await connectedPromise;
+    const authorizationErrorPromise = waitForSocketEvent(staffSocket, 'authorizationError');
+    staffSocket.emit('joinStore', 'store-khong-thuoc-token');
+    const authorizationError = await authorizationErrorPromise;
+    staffSocket.close();
+    assert(
+      authorizationError?.error,
+      'WebSocket khong duoc tham gia store khac voi store trong token',
+      authorizationError
+    );
+
     const staffUsersBlocked = await request('/api/users', {
       headers: { Authorization: `Bearer ${staffToken}` },
     });
@@ -187,10 +236,28 @@ async function main() {
     });
     assert(staffTableConfigBlocked.status === 403, 'Staff khong duoc sua cau hinh ban', staffTableConfigBlocked);
 
+    const persistedCart = await request(`/api/carts/${tableId}`, {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${staffToken}` },
+      body: JSON.stringify({ cart: [{ id: 'smoke-cart-item', name: 'Smoke cart', qty: 1 }] }),
+    });
+    assert(persistedCart.status === 200, 'Gio hang realtime phai luu duoc vao database', persistedCart);
+    const carts = await request('/api/carts', { headers: { Authorization: `Bearer ${staffToken}` } });
+    assert(Array.isArray(carts.body?.[tableId]) && carts.body[tableId].length === 1, 'Gio hang da luu phai doc lai duoc', carts);
+    await request(`/api/carts/${tableId}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${staffToken}` },
+    });
+
     const adminUsers = await request('/api/users', {
       headers: { Authorization: `Bearer ${adminToken}` },
     });
     assert(adminUsers.status === 200 && Array.isArray(adminUsers.body), 'Admin phai xem duoc danh sach nhan su', adminUsers);
+    assert(
+      adminUsers.body.every((user) => user.pin === undefined && user.pinHash === undefined && user.password === undefined),
+      'API nhan su khong duoc tra PIN, PIN hash hoac password',
+      adminUsers.body
+    );
 
     const systemStatus = await request('/api/system/status', {
       headers: { Authorization: `Bearer ${adminToken}` },
@@ -265,7 +332,7 @@ async function main() {
     });
     assert(backup.status === 200 && backup.body?.store && Array.isArray(backup.body?.users), 'Admin phai export duoc backup', backup);
     assert(
-      backup.body.users.every((user) => user.pin === undefined && user.password === undefined),
+      backup.body.users.every((user) => user.pin === undefined && user.pinHash === undefined && user.password === undefined),
       'Backup khong duoc lo PIN/password nhan vien',
       backup.body.users
     );
@@ -280,6 +347,66 @@ async function main() {
       }),
     });
     assert(restoreDryRun.status === 200 && restoreDryRun.body?.dryRun === true, 'Restore catalog dry-run phai hoat dong', restoreDryRun);
+
+    const branchCode = `smoke-branch-${Date.now()}`;
+    const createdBranch = await request('/api/branches', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${adminToken}` },
+      body: JSON.stringify({ name: 'Smoke Branch', code: branchCode, copyCatalog: false }),
+    });
+    assert(createdBranch.status === 200 && createdBranch.body?.id, 'Admin phai tao duoc chi nhanh rong', createdBranch);
+    const switchedBranch = await request(`/api/branches/${createdBranch.body.id}/switch`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${adminToken}` },
+    });
+    assert(switchedBranch.status === 200 && switchedBranch.body?.token, 'Admin phai chuyen duoc sang chi nhanh cung to chuc', switchedBranch);
+    const emptyBranchProducts = await request('/api/products', {
+      headers: { Authorization: `Bearer ${switchedBranch.body.token}` },
+    });
+    assert(emptyBranchProducts.status === 200 && emptyBranchProducts.body.length === 0, 'Chi nhanh moi khong sao chep catalog phai rong', emptyBranchProducts);
+    const deletedBranch = await request(`/api/branches/${createdBranch.body.id}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${adminToken}` },
+    });
+    assert(deletedBranch.status === 200, 'Chi nhanh chua co giao dich phai xoa duoc', deletedBranch);
+
+    const permissionUpdate = await request(`/api/users/${staffLogin.body.id}`, {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${adminToken}` },
+      body: JSON.stringify({ canViewReports: true }),
+    });
+    assert(permissionUpdate.status === 200, 'Admin phai cap nhat duoc quyen nhan vien', permissionUpdate);
+    const revokedStaffToken = await request('/api/tables', {
+      headers: { Authorization: `Bearer ${staffToken}` },
+    });
+    assert(revokedStaffToken.status === 401, 'Token cu phai bi thu hoi sau khi doi quyen', revokedStaffToken);
+    await request(`/api/users/${staffLogin.body.id}`, {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${adminToken}` },
+      body: JSON.stringify({ canViewReports: false }),
+    });
+
+    const failedLogins = [];
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      failedLogins.push(await request('/api/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({ storeCode: 'smoke-rate-limit', pin: '0000' }),
+      }));
+    }
+    assert(
+      failedLogins.every((result) => result.status === 401),
+      'Nam lan dang nhap sai dau tien phai bi tu choi nhu thong tin dang nhap khong hop le',
+      failedLogins
+    );
+    const blockedLogin = await request('/api/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ storeCode: 'smoke-rate-limit', pin: '0000' }),
+    });
+    assert(
+      blockedLogin.status === 429 && Number(blockedLogin.body?.retryAfterSec) > 0,
+      'Dang nhap sai qua nguong phai bi khoa tam thoi',
+      blockedLogin
+    );
 
     console.log('Smoke auth test passed.');
   } finally {

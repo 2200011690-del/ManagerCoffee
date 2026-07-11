@@ -40,6 +40,9 @@ jobs:
         with:
           node-version: 22
           cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            server/package-lock.json
 
       - name: Install frontend dependencies
         run: npm ci
@@ -51,8 +54,8 @@ jobs:
         run: npx prisma generate
         working-directory: server
 
-      - name: Push database schema
-        run: npx prisma db push --skip-generate
+      - name: Apply database migrations
+        run: npx prisma migrate deploy
         working-directory: server
 
       - name: Lint
@@ -60,6 +63,11 @@ jobs:
 
       - name: Build
         run: npm run build
+
+      - name: Audit production dependencies
+        run: |
+          npm audit --omit=dev --audit-level=high
+          npm audit --prefix server --omit=dev --audit-level=high
 
       - name: Smoke auth
         run: npm run test:smoke
@@ -69,6 +77,9 @@ jobs:
 
       - name: Smoke shifts
         run: npm run test:smoke:shifts
+
+      - name: Smoke QR and reservations
+        run: npm run test:smoke:operations
 
       - name: Smoke load
         run: npm run test:smoke:load

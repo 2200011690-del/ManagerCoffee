@@ -328,17 +328,22 @@ async function main() {
       { before: arabicaBefore.qty, afterPending: arabicaAfterPending?.qty }
     );
 
-    const payPending = await request(`/api/orders/${pendingCheckout.body.id}/pay`, {
-      method: 'PUT',
-      headers: auth(staffToken),
-    });
-    assert(payPending.status === 200 && payPending.body?.status === 'paid', 'Xac nhan thanh toan pending phai chuyen sang paid', payPending);
-
-    const payPendingAgain = await request(`/api/orders/${pendingCheckout.body.id}/pay`, {
-      method: 'PUT',
-      headers: auth(staffToken),
-    });
-    assert(payPendingAgain.status === 404, 'Hoa don pending da paid khong duoc xac nhan lai lan 2', payPendingAgain);
+    const concurrentPayments = await Promise.all([
+      request(`/api/orders/${pendingCheckout.body.id}/pay`, {
+        method: 'PUT',
+        headers: auth(staffToken),
+      }),
+      request(`/api/orders/${pendingCheckout.body.id}/pay`, {
+        method: 'PUT',
+        headers: auth(staffToken),
+      }),
+    ]);
+    assert(
+      concurrentPayments.filter((result) => result.status === 200 && result.body?.status === 'paid').length === 1
+        && concurrentPayments.filter((result) => result.status === 404).length === 1,
+      'Hai xac nhan thanh toan dong thoi chi duoc mot yeu cau thanh cong',
+      concurrentPayments
+    );
 
     const inventoryAfterPay = await request('/api/inventory', {
       headers: auth(staffToken),
@@ -399,34 +404,59 @@ async function main() {
       }),
     });
     assert(tamperedCheckout.status === 200, 'Checkout client sua gia van phai duoc server tinh lai neu san pham hop le', tamperedCheckout);
+    const authoritativeLine = tamperedCheckout.body?.items?.[0];
+    const authoritativeSubtotal = authoritativeLine
+      ? authoritativeLine.price * authoritativeLine.qty - (authoritativeLine.discount || 0)
+      : null;
     assert(
-      tamperedCheckout.body?.items?.[0]?.price === product.price
-        && tamperedCheckout.body?.subtotal === subtotal
-        && tamperedCheckout.body?.total === total,
+      authoritativeLine?.price === product.price
+        && tamperedCheckout.body?.subtotal === authoritativeSubtotal
+        && tamperedCheckout.body?.total === tamperedCheckout.body?.subtotal + tamperedCheckout.body?.vatAmount,
       'Server phai bo qua gia/subtotal/total do client gui va tinh theo gia DB',
       tamperedCheckout
     );
-
-    const tamperedReturn = await request(`/api/orders/${tamperedCheckout.body.id}/return`, {
-      method: 'POST',
-      headers: auth(staffToken),
-      body: JSON.stringify({
-        employeeId: staffUser.id,
-        refundMethod: 'cash',
-        reason: 'Smoke test tampered return price',
-        items: [{
-          orderItemId: tamperedCheckout.body.items[0].id,
-          orderItemName: product.name,
-          price: 1,
-          qty: 1,
-        }],
-      }),
-    });
-    assert(tamperedReturn.status === 200, 'Tra hang voi gia client bi sua van phai xu ly theo hoa don goc', tamperedReturn);
     assert(
-      tamperedReturn.body?.refundAmount === tamperedCheckout.body.total,
+      tamperedCheckout.body?.employee
+        && tamperedCheckout.body.employee.pin === undefined
+        && tamperedCheckout.body.employee.pinHash === undefined
+        && tamperedCheckout.body.employee.password === undefined,
+      'Response hoa don khong duoc lo PIN, PIN hash hoac password nhan vien',
+      tamperedCheckout.body?.employee
+    );
+
+    const returnPayload = {
+      employeeId: staffUser.id,
+      refundMethod: 'cash',
+      reason: 'Smoke test tampered return price',
+      items: [{
+        orderItemId: tamperedCheckout.body.items[0].id,
+        orderItemName: product.name,
+        price: 1,
+        qty: 1,
+      }],
+    };
+    const concurrentReturns = await Promise.all([
+      request(`/api/orders/${tamperedCheckout.body.id}/return`, {
+        method: 'POST',
+        headers: auth(staffToken),
+        body: JSON.stringify(returnPayload),
+      }),
+      request(`/api/orders/${tamperedCheckout.body.id}/return`, {
+        method: 'POST',
+        headers: auth(staffToken),
+        body: JSON.stringify(returnPayload),
+      }),
+    ]);
+    const successfulReturn = concurrentReturns.find((result) => result.status === 200);
+    assert(
+      successfulReturn && concurrentReturns.filter((result) => result.status === 400).length === 1,
+      'Hai yeu cau tra cung mot dong hoa don chi duoc mot yeu cau thanh cong',
+      concurrentReturns
+    );
+    assert(
+      successfulReturn.body?.refundAmount === tamperedCheckout.body.total,
       'Server phai bo qua so tien hoan do client gui va tinh theo hoa don goc',
-      tamperedReturn
+      successfulReturn
     );
 
     console.log('Smoke sales test passed.');

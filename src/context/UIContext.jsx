@@ -1,4 +1,4 @@
-import { createContext, useContext, useState } from 'react';
+import { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react';
 
 const UIContext = createContext(null);
 
@@ -6,20 +6,29 @@ export function UIProvider({ children }) {
   const [currentView, setCurrentView] = useState('pos'); // 'pos' | 'tables' | 'dashboard'
   const [notification, setNotification] = useState(null); // { message, type: 'success'|'error'|'info' }
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const notificationTimer = useRef(null);
 
-  const setView = (view) => {
+  const setView = useCallback((view) => {
     setCurrentView(view);
     setIsMobileMenuOpen(false);
-  };
+  }, []);
 
-  const clearNotification = () => setNotification(null);
+  const clearNotification = useCallback(() => {
+    if (notificationTimer.current) clearTimeout(notificationTimer.current);
+    notificationTimer.current = null;
+    setNotification(null);
+  }, []);
 
-  const showNotification = (message, type = 'success') => {
+  const showNotification = useCallback((message, type = 'success') => {
+    if (notificationTimer.current) clearTimeout(notificationTimer.current);
     setNotification({ message, type });
-    setTimeout(() => clearNotification(), 2500);
-  };
+    notificationTimer.current = setTimeout(() => {
+      notificationTimer.current = null;
+      setNotification(null);
+    }, 2500);
+  }, []);
 
-  const value = {
+  const value = useMemo(() => ({
     currentView,
     setView,
     notification,
@@ -28,7 +37,7 @@ export function UIProvider({ children }) {
     clearNotification,
     isMobileMenuOpen,
     setIsMobileMenuOpen
-  };
+  }), [clearNotification, currentView, isMobileMenuOpen, notification, setView, showNotification]);
 
   return <UIContext.Provider value={value}>{children}</UIContext.Provider>;
 }

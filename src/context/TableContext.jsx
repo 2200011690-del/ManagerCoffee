@@ -50,11 +50,21 @@ export function TableProvider({ children }) {
 
     const handleTableUpdated = (updatedTable) => {
       if (updatedTable?.storeId && updatedTable.storeId !== storeId) return;
-      setTables(prev => prev.map(t => t.id === updatedTable.id ? updatedTable : t));
+      setTables((prev) => prev.some((table) => table.id === updatedTable.id)
+        ? prev.map((table) => table.id === updatedTable.id ? updatedTable : table)
+        : [...prev, updatedTable]);
+    };
+    const handleTableDeleted = ({ id, storeId: deletedStoreId }) => {
+      if (deletedStoreId && deletedStoreId !== storeId) return;
+      setTables((prev) => prev.filter((table) => table.id !== id));
     };
 
     socket.on('tableUpdated', handleTableUpdated);
-    return () => socket.off('tableUpdated', handleTableUpdated);
+    socket.on('tableDeleted', handleTableDeleted);
+    return () => {
+      socket.off('tableUpdated', handleTableUpdated);
+      socket.off('tableDeleted', handleTableDeleted);
+    };
   }, [fetchTables, storeId]);
 
   const updateTableStatus = useCallback(async (id, status) => {
@@ -104,12 +114,19 @@ export function TableProvider({ children }) {
     }
   }, [fetchTables]);
 
+  const rotateOrderToken = useCallback(async (id) => {
+    const updated = await api.post(`/tables/${id}/rotate-order-token`, {});
+    setTables((prev) => prev.map((table) => table.id === id ? updated : table));
+    return updated;
+  }, []);
+
   const value = { 
     tables, 
     updateTableStatus, 
     createTable, 
     updateTable, 
     deleteTable, 
+    rotateOrderToken,
     fetchTables,
     loading 
   };

@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
-import { Coffee, LayoutGrid, BarChart3, ChefHat, Wifi, WifiOff, LogOut, Shield, Users, ShoppingBag, Clock, Settings, Gift } from 'lucide-react';
+import { Coffee, LayoutGrid, BarChart3, ChefHat, Wifi, WifiOff, LogOut, Shield, Users, ShoppingBag, Clock, Settings, Gift, AlertTriangle } from 'lucide-react';
 import { useUI } from '../context/UIContext';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { useInventory } from '../context/InventoryContext';
 import QuickAttendanceModal from './pos/QuickAttendanceModal';
+import OfflineOrdersModal from './pos/OfflineOrdersModal';
+import { useOrderHistory } from '../context/OrderHistoryContext';
 
 const ALL_NAV_ITEMS = [
   { id: 'pos',       label: 'Bán hàng',   icon: ShoppingBag, subtitle: 'Quầy POS',      roles: ['admin', 'staff'] },
@@ -22,9 +24,11 @@ export default function Sidebar() {
   const { cartCount } = useCart();
   const { currentUser, logout, isAdmin, canAccess } = useAuth();
   const { lowStockItems } = useInventory();
+  const { offlineQueue, conflictedOfflineOrders } = useOrderHistory();
 
   const [now, setNow] = useState(new Date());
   const [showAttendanceModal, setShowAttendanceModal] = useState(false);
+  const [showOfflineOrders, setShowOfflineOrders] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
 
   useEffect(() => {
@@ -103,6 +107,22 @@ export default function Sidebar() {
           </div>
         </div>
       </div>
+      {offlineQueue.length > 0 && (
+        <button
+          type="button"
+          onClick={() => setShowOfflineOrders(true)}
+          className={`mx-3 mt-2 flex min-h-[38px] items-center gap-2 rounded-lg border px-3 text-xs font-semibold ${
+            conflictedOfflineOrders.length > 0
+              ? 'border-red-500/40 bg-red-500/10 text-red-300'
+              : 'border-amber-500/40 bg-amber-500/10 text-amber-300'
+          }`}
+        >
+          {conflictedOfflineOrders.length > 0 ? <AlertTriangle size={14} /> : <WifiOff size={14} />}
+          <span className="flex-1 text-left">
+            {conflictedOfflineOrders.length > 0 ? `${conflictedOfflineOrders.length} đơn cần xử lý` : `${offlineQueue.length} đơn chờ đồng bộ`}
+          </span>
+        </button>
+      )}
 
       {/* Nav */}
       <nav className="flex-1 px-3 py-3 space-y-0.5 overflow-y-auto">
@@ -166,6 +186,7 @@ export default function Sidebar() {
       {showAttendanceModal && (
         <QuickAttendanceModal onClose={() => setShowAttendanceModal(false)} />
       )}
+      {showOfflineOrders && <OfflineOrdersModal onClose={() => setShowOfflineOrders(false)} />}
       </aside>
     </>
   );

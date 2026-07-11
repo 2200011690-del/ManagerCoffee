@@ -32,7 +32,7 @@ export function AuthProvider({ children }) {
         return null;
       }
       if (user && user.storeId) {
-        joinStore(user.storeId);
+        joinStore(user.storeId, user.token);
       }
       return user;
     } catch { return null; }
@@ -51,7 +51,7 @@ export function AuthProvider({ children }) {
       sessionStorage.setItem(AUTH_KEY, JSON.stringify(user));
       
       if (user.storeId) {
-        joinStore(user.storeId);
+        joinStore(user.storeId, user.token);
       }
       
       return true;
@@ -75,7 +75,7 @@ export function AuthProvider({ children }) {
       sessionStorage.setItem(AUTH_KEY, JSON.stringify(user));
       
       if (user.storeId) {
-        joinStore(user.storeId);
+        joinStore(user.storeId, user.token);
       }
       
       return true;
@@ -105,6 +105,24 @@ export function AuthProvider({ children }) {
     }
   };
 
+  const switchBranch = async (branchId) => {
+    setIsLoading(true);
+    try {
+      const user = await api.post(`/branches/${branchId}/switch`);
+      user.allowedViews = getAllowedViews(user);
+      leaveStore();
+      setCurrentUser(user);
+      sessionStorage.setItem(AUTH_KEY, JSON.stringify(user));
+      joinStore(user.storeId, user.token);
+      return true;
+    } catch (err) {
+      setPinError(err.response?.data?.error || 'Không thể chuyển chi nhánh.');
+      return false;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const logout = () => {
     setCurrentUser(null);
     setPinError('');
@@ -126,6 +144,7 @@ export function AuthProvider({ children }) {
       login,
       loginAdmin,
       loginPlatform,
+      switchBranch,
       logout,
       isAdmin,
       canAccess,

@@ -31,6 +31,24 @@ npm run restore:catalog -- --file backups/ten-file-backup.json --store-code espr
 
 Restore catalog sẽ thay menu, công thức, bàn, tồn kho, nhà cung cấp, voucher, khuyến mãi và cấu hình cửa hàng. Nó không khôi phục lại mật khẩu/PIN nhân viên, lịch sử doanh thu hoặc sổ tài chính. Với production thật, phần lịch sử tài chính nên khôi phục bằng snapshot/PITR của database.
 
+## Migration database
+
+Database mới hoặc CI phải áp dụng schema bằng migration có phiên bản:
+
+```bash
+npm run migrate:deploy --prefix server
+```
+
+Không dùng `prisma db push` trên production. Với database Manager Coffee đã tồn tại trước migration baseline, kiểm tra schema khớp trước, tạo snapshot/PITR rồi đánh dấu baseline đúng một lần:
+
+```bash
+cd server
+npx prisma migrate diff --from-url "$DATABASE_URL" --to-schema-datamodel prisma/schema.prisma --exit-code
+npx prisma migrate resolve --applied 20260710000000_baseline
+```
+
+Sau khi baseline đã được ghi nhận, mọi lần deploy tiếp theo chỉ chạy `prisma migrate deploy`.
+
 ## Biến môi trường nên có ở production
 
 ```env
@@ -42,7 +60,12 @@ PLATFORM_ADMIN_PASSWORD_HASH=bcrypt-hash-cua-mat-khau-platform
 CORS_ORIGIN=https://domain-web-app-cua-ban.vn
 DATABASE_URL=postgresql://...
 DIRECT_URL=postgresql://...
+REALTIME_ADAPTER=postgres
+REALTIME_DATABASE_URL=postgresql://... # session/direct connection, không dùng transaction pooler
+REALTIME_POOL_SIZE=4
+TRUST_PROXY_HOPS=1
 JSON_BODY_LIMIT=5mb
+PUBLIC_ORDER_RATE_LIMIT=30
 ```
 
 API key/secret của payOS, HĐĐT, GrabFood, ShopeeFood và Web Order được nhập trong Cấu hình cửa hàng -> Tích hợp ngoài cho từng store. Không đặt chung các khóa này trong `.env` nếu đang chạy mô hình SaaS nhiều quán.
@@ -75,5 +98,7 @@ Không đưa tài khoản platform admin cho chủ quán. Chủ quán chỉ dùn
 - Admin tạo store thật riêng; store demo `espresso-lab` chỉ dùng test.
 - Webhook thanh toán dùng nội dung chuyển khoản có prefix mã store.
 - Mỗi quầy lưu IP máy in riêng và in thử ít nhất một bill.
+- In QR gọi món riêng cho từng bàn; đổi mã ngay nếu ảnh QR bị phát tán sai nơi.
+- Chạy thử một lịch đặt bàn trùng giờ để xác nhận production đang áp dụng migration mới.
 - Nhân viên dùng PIN đã hash, không dùng PIN demo.
 - CORS chỉ mở domain thật, không mở wildcard trong production.

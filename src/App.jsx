@@ -20,6 +20,13 @@ const PromotionManagementPage = lazy(() => import('./pages/PromotionManagementPa
 const StoreSettingsPage = lazy(() => import('./pages/StoreSettingsPage'));
 const KitchenPage = lazy(() => import('./pages/KitchenPage'));
 const PlatformAdminPage = lazy(() => import('./pages/PlatformAdminPage'));
+const GuestOrderPage = lazy(() => import('./pages/GuestOrderPage'));
+
+function getGuestOrderToken() {
+  const hash = window.location.hash.startsWith('#') ? window.location.hash.slice(1) : window.location.hash;
+  const hashParams = new URLSearchParams(hash);
+  return hashParams.get('order') || new URLSearchParams(window.location.search).get('order');
+}
 
 function PageFallback() {
   return (
@@ -128,6 +135,14 @@ function AuthenticatedApp() {
 
 function AppRoot() {
   const { currentUser } = useAuth();
+  const guestOrderToken = getGuestOrderToken();
+  if (guestOrderToken) {
+    return (
+      <Suspense fallback={<PageFallback />}>
+        <GuestOrderPage token={guestOrderToken} />
+      </Suspense>
+    );
+  }
   if (!currentUser) return <LockScreen />;
   if (currentUser.role === 'platform_admin') {
     return (

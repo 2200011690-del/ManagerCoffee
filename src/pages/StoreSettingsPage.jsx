@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Settings, Save, Globe, Receipt, Gift, Percent, RefreshCw, AlertTriangle, CreditCard, Image as ImageIcon, Plug, CheckCircle } from 'lucide-react';
+import { Settings, Save, Globe, Receipt, Gift, Percent, RefreshCw, AlertTriangle, CreditCard, Image as ImageIcon, Plug, CheckCircle, Building2, Plus, ArrowRightLeft } from 'lucide-react';
 import { api } from '../api';
 import { useUI } from '../context/UIContext';
+import { useAuth } from '../context/AuthContext';
 
 const INTEGRATION_FIELDS = {
   payos: {
@@ -73,6 +74,7 @@ const INTEGRATION_FIELDS = {
 
 export default function StoreSettingsPage() {
   const { showNotification } = useUI();
+  const { currentUser, switchBranch } = useAuth();
   const [activeTab, setActiveTab] = useState('general'); // 'general', 'receipt', 'loyalty'
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -82,6 +84,10 @@ export default function StoreSettingsPage() {
   const [integrationSettings, setIntegrationSettings] = useState({});
   const [integrationSecrets, setIntegrationSecrets] = useState({});
   const [integrationSaving, setIntegrationSaving] = useState(null);
+  const [branches, setBranches] = useState([]);
+  const [branchOverview, setBranchOverview] = useState(null);
+  const [branchSaving, setBranchSaving] = useState(false);
+  const [branchForm, setBranchForm] = useState({ name: '', code: '', address: '', phone: '', copyCatalog: true });
   const [settings, setSettings] = useState({
     name: '',
     code: '',
@@ -124,9 +130,17 @@ export default function StoreSettingsPage() {
         setIntegrationSettings(settingsData?.integrations || {});
         const status = await api.get('/integrations/status');
         setIntegrationStatus(status);
+        const [branchList, overview] = await Promise.all([
+          api.get('/branches'),
+          api.get('/branches/overview')
+        ]);
+        setBranches(Array.isArray(branchList) ? branchList : []);
+        setBranchOverview(overview || null);
       } catch {
         setIntegrationSettings({});
         setIntegrationStatus(null);
+        setBranches([]);
+        setBranchOverview(null);
       }
     } catch {
       showNotification('Không thể tải cấu hình cửa hàng', 'error');
@@ -228,6 +242,29 @@ export default function StoreSettingsPage() {
     } finally {
       setIntegrationSaving(null);
     }
+  };
+
+  const handleCreateBranch = async () => {
+    setBranchSaving(true);
+    try {
+      await api.post('/branches', branchForm);
+      const [branchList, overview] = await Promise.all([api.get('/branches'), api.get('/branches/overview')]);
+      setBranches(branchList);
+      setBranchOverview(overview);
+      setBranchForm({ name: '', code: '', address: '', phone: '', copyCatalog: true });
+      showNotification('Đã tạo chi nhánh mới', 'success');
+    } catch (err) {
+      showNotification(err.response?.data?.error || 'Không thể tạo chi nhánh', 'error');
+    } finally {
+      setBranchSaving(false);
+    }
+  };
+
+  const handleSwitchBranch = async (branchId) => {
+    if (branchId === currentUser?.storeId) return;
+    const switched = await switchBranch(branchId);
+    if (switched) window.location.reload();
+    else showNotification('Không thể chuyển chi nhánh', 'error');
   };
 
   const handleTestPrint = async (e) => {
@@ -371,6 +408,19 @@ export default function StoreSettingsPage() {
           >
             <Receipt size={18} />
             <span>Thiết bị in LAN</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('branches')}
+            className={`w-full min-h-[44px] flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-semibold transition-all ${
+              activeTab === 'branches'
+                ? 'bg-coffee-accent text-white shadow-sm'
+                : 'text-coffee-medium hover:bg-cream-light/80 hover:text-coffee-dark'
+            }`}
+          >
+            <Building2 size={18} />
+            <span>Chi nhánh</span>
           </button>
 
           <button
@@ -667,6 +717,114 @@ export default function StoreSettingsPage() {
                     Máy in phải kết nối chung mạng LAN với thiết bị này. Nếu bỏ trống, hệ thống sẽ tự động in bằng hộp thoại in của trình duyệt làm phương án dự phòng.
                   </p>
                 </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'branches' && (
+            <div className="space-y-6 animate-fade-in">
+              <div className="border-b border-coffee-light/10 pb-4">
+                <h2 className="text-lg font-bold text-coffee-dark">Quản lý chi nhánh</h2>
+                <p className="text-xs text-coffee-medium/70">Doanh thu và tồn kho vẫn tách riêng theo từng điểm bán.</p>
+              </div>
+
+              {branchOverview && (
+                <div className="grid grid-cols-3 divide-x divide-coffee-light/10 rounded-lg border border-coffee-light/10 bg-white">
+                  <div className="p-4">
+                    <p className="text-[11px] font-semibold text-coffee-medium">Doanh thu hôm nay</p>
+                    <p className="mt-1 font-mono text-base font-bold text-coffee-dark">{branchOverview.totals.revenueToday.toLocaleString('vi-VN')}đ</p>
+                  </div>
+                  <div className="p-4">
+                    <p className="text-[11px] font-semibold text-coffee-medium">Hóa đơn</p>
+                    <p className="mt-1 font-mono text-base font-bold text-coffee-dark">{branchOverview.totals.ordersToday}</p>
+                  </div>
+                  <div className="p-4">
+                    <p className="text-[11px] font-semibold text-coffee-medium">Cảnh báo kho</p>
+                    <p className="mt-1 font-mono text-base font-bold text-red-600">{branchOverview.totals.lowStockItems}</p>
+                  </div>
+                </div>
+              )}
+
+              <div className="divide-y divide-coffee-light/10 overflow-hidden rounded-lg border border-coffee-light/10 bg-white">
+                {branches.map((branch) => {
+                  const summary = branchOverview?.branches?.find((item) => item.id === branch.id);
+                  return (
+                    <div key={branch.id} className="flex flex-wrap items-center gap-4 p-4">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50 text-blue-700">
+                        <Building2 size={18} />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="text-sm font-bold text-coffee-dark">{branch.name}</p>
+                          {branch.isCurrent && <span className="rounded-md bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700">Hiện tại</span>}
+                        </div>
+                        <p className="mt-0.5 text-xs text-coffee-medium">{branch.code} · {summary?.ordersToday || 0} hóa đơn hôm nay</p>
+                      </div>
+                      {!branch.isCurrent && (
+                        <button
+                          type="button"
+                          onClick={() => handleSwitchBranch(branch.id)}
+                          className="flex min-h-[38px] items-center gap-2 rounded-lg border border-coffee-light/20 px-3 text-xs font-bold text-coffee-dark hover:bg-cream-light"
+                        >
+                          <ArrowRightLeft size={14} />
+                          Chuyển sang
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="space-y-4 border-t border-coffee-light/10 pt-5">
+                <h3 className="text-sm font-bold text-coffee-dark">Thêm chi nhánh</h3>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <input
+                    type="text"
+                    value={branchForm.name}
+                    onChange={(e) => setBranchForm((prev) => ({ ...prev, name: e.target.value }))}
+                    placeholder="Tên chi nhánh"
+                    className="min-h-[40px] rounded-lg border border-coffee-light/20 px-3.5 text-sm focus:border-coffee-accent focus:outline-none"
+                  />
+                  <input
+                    type="text"
+                    value={branchForm.code}
+                    onChange={(e) => setBranchForm((prev) => ({ ...prev, code: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') }))}
+                    placeholder="Mã chi nhánh"
+                    className="min-h-[40px] rounded-lg border border-coffee-light/20 px-3.5 text-sm focus:border-coffee-accent focus:outline-none"
+                  />
+                  <input
+                    type="text"
+                    value={branchForm.address}
+                    onChange={(e) => setBranchForm((prev) => ({ ...prev, address: e.target.value }))}
+                    placeholder="Địa chỉ"
+                    className="min-h-[40px] rounded-lg border border-coffee-light/20 px-3.5 text-sm focus:border-coffee-accent focus:outline-none"
+                  />
+                  <input
+                    type="text"
+                    value={branchForm.phone}
+                    onChange={(e) => setBranchForm((prev) => ({ ...prev, phone: e.target.value }))}
+                    placeholder="Số điện thoại"
+                    className="min-h-[40px] rounded-lg border border-coffee-light/20 px-3.5 text-sm focus:border-coffee-accent focus:outline-none"
+                  />
+                </div>
+                <label className="flex items-center gap-2 text-xs font-semibold text-coffee-medium">
+                  <input
+                    type="checkbox"
+                    checked={branchForm.copyCatalog}
+                    onChange={(e) => setBranchForm((prev) => ({ ...prev, copyCatalog: e.target.checked }))}
+                    className="h-4 w-4 accent-coffee-accent"
+                  />
+                  Sao chép menu, công thức, bàn và danh mục kho; tồn đầu chi nhánh bằng 0
+                </label>
+                <button
+                  type="button"
+                  onClick={handleCreateBranch}
+                  disabled={branchSaving || !branchForm.name || !branchForm.code}
+                  className="flex min-h-[40px] items-center gap-2 rounded-lg bg-coffee-accent px-4 text-xs font-bold text-white disabled:opacity-50"
+                >
+                  {branchSaving ? <RefreshCw size={15} className="animate-spin" /> : <Plus size={15} />}
+                  Tạo chi nhánh
+                </button>
               </div>
             </div>
           )}

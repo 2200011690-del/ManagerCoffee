@@ -1,8 +1,11 @@
 import { useState, useCallback, useMemo } from 'react';
-import { Users, Coffee, Sparkles, Clock, MapPin, RefreshCw, ShoppingBag, Utensils, ChevronRight, Plus, Edit, Trash2, X } from 'lucide-react';
+import { Users, Coffee, Sparkles, Clock, MapPin, RefreshCw, ShoppingBag, Utensils, ChevronRight, Plus, Edit, Trash2, X, CalendarDays, LayoutGrid, QrCode, Copy, Printer } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
 import { useTable } from '../context/TableContext';
 import { useCart } from '../context/CartContext';
 import { useUI } from '../context/UIContext';
+import GuestOrderInbox from '../components/tables/GuestOrderInbox';
+import ReservationsPanel from '../components/tables/ReservationsPanel';
 
 // Hàm tính total từ giỏ hàng của bàn
 function calcTableTotal(cartItems = []) {
@@ -13,7 +16,7 @@ function calcTableItemCount(cartItems = []) {
   return cartItems.reduce((s, i) => s + i.qty, 0);
 }
 
-function TableCard({ table, onGoToPOS, onMarkClean, tableCarts, isEditMode, onEdit, onDelete }) {
+function TableCard({ table, onGoToPOS, onMarkClean, tableCarts, isEditMode, onEdit, onDelete, onShowQR }) {
   const cartItems = tableCarts[table.id] ?? [];
   const total = calcTableTotal(cartItems);
   const itemCount = calcTableItemCount(cartItems);
@@ -78,10 +81,13 @@ function TableCard({ table, onGoToPOS, onMarkClean, tableCarts, isEditMode, onEd
               <span className="text-xs text-coffee-light">{table.capacity} chỗ • {table.zone}</span>
             </div>
           </div>
-          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${s.badge}`}>
-            {s.icon}
-            {s.label}
-          </span>
+          <div className="flex items-center gap-1.5">
+            {!isEditMode && <button type="button" title="Mã QR gọi món" onClick={(event) => { event.stopPropagation(); onShowQR(table); }} className="w-8 h-8 rounded-lg border border-slate-200 bg-white text-slate-500 hover:text-primary-700 hover:border-primary-300 flex items-center justify-center"><QrCode size={15} /></button>}
+            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${s.badge}`}>
+              {s.icon}
+              {s.label}
+            </span>
+          </div>
         </div>
 
         {/* Occupied: show order info */}
@@ -157,10 +163,12 @@ function TableCard({ table, onGoToPOS, onMarkClean, tableCarts, isEditMode, onEd
 }
 
 export default function TablePage() {
-  const { tables, updateTableStatus, createTable, updateTable, deleteTable } = useTable();
+  const { tables, updateTableStatus, createTable, updateTable, deleteTable, rotateOrderToken } = useTable();
   const { setSelectedTable, tableCarts } = useCart();
   const { setView } = useUI();
   const [activeZone, setActiveZone] = useState('Tất cả');
+  const [viewMode, setViewMode] = useState('floor');
+  const [qrTable, setQrTable] = useState(null);
   
   // States cho quản lý bàn
   const [isEditMode, setIsEditMode] = useState(false);
@@ -187,6 +195,27 @@ export default function TablePage() {
     available: tables.filter(t => t.status === 'available').length,
     occupied:  tables.filter(t => t.status === 'occupied').length,
     dirty:     tables.filter(t => t.status === 'dirty').length,
+  };
+
+  const qrUrl = qrTable?.orderToken
+    ? `${window.location.origin}${window.location.pathname}#order=${encodeURIComponent(qrTable.orderToken)}`
+    : '';
+
+  const copyQrUrl = async () => {
+    try {
+      await navigator.clipboard.writeText(qrUrl);
+    } catch {
+      window.prompt('Sao chép đường dẫn gọi món:', qrUrl);
+    }
+  };
+
+  const rotateQr = async () => {
+    if (!window.confirm('Mã QR cũ sẽ ngừng hoạt động. Bạn có chắc muốn đổi mã?')) return;
+    try {
+      setQrTable(await rotateOrderToken(qrTable.id));
+    } catch (err) {
+      alert(err.response?.data?.error || 'Không thể đổi mã QR.');
+    }
   };
 
   const handleGoToPOS = useCallback((table) => {
@@ -252,13 +281,18 @@ export default function TablePage() {
     <div className="h-full flex flex-col bg-cream-warm overflow-hidden">
       {/* Header */}
       <div className="px-6 py-4 bg-white/80 backdrop-blur-sm border-b border-cream-medium/60 flex-shrink-0">
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 mb-4">
           <div>
-            <h1 className="font-display font-bold text-2xl text-coffee-dark">Sơ đồ bàn</h1>
-            <p className="text-coffee-light text-sm mt-0.5">Theo dõi trạng thái bàn và đơn đang phục vụ</p>
+            <h1 className="font-display font-bold text-2xl text-coffee-dark">Quản lý bàn</h1>
+            <p className="text-coffee-light text-sm mt-0.5">Theo dõi bàn, yêu cầu gọi món và lịch đặt chỗ</p>
           </div>
-          <div className="flex items-center gap-3">
-            <button
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="tab-strip">
+              <button type="button" onClick={() => { setViewMode('floor'); setIsEditMode(false); }} className={`tab-button flex items-center gap-1.5 ${viewMode === 'floor' ? 'tab-button-active' : 'tab-button-inactive'}`}><LayoutGrid size={14} /> Sơ đồ</button>
+              <button type="button" onClick={() => { setViewMode('reservations'); setIsEditMode(false); }} className={`tab-button flex items-center gap-1.5 ${viewMode === 'reservations' ? 'tab-button-active' : 'tab-button-inactive'}`}><CalendarDays size={14} /> Đặt bàn</button>
+            </div>
+            <GuestOrderInbox />
+            {viewMode === 'floor' && <button
               type="button"
               onClick={() => setIsEditMode(!isEditMode)}
               className={`min-h-[36px] px-4 py-1.5 rounded-lg text-xs font-bold transition-all border ${
@@ -268,16 +302,12 @@ export default function TablePage() {
               }`}
             >
               {isEditMode ? 'Thoát chỉnh sửa' : 'Chỉnh sửa sơ đồ'}
-            </button>
-            <div className="flex items-center gap-1.5 bg-cream-light px-3 py-1.5 rounded-lg text-xs text-coffee-medium">
-              <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse-soft" />
-              Đang đồng bộ
-            </div>
+            </button>}
           </div>
         </div>
 
-        {/* Stats */}
-        <div className="grid grid-cols-3 gap-3 mb-4">
+        {viewMode === 'floor' && <>
+        <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-4">
           {[
             { count: stats.available, label: 'Bàn trống',  color: 'bg-status-available text-status-availableText border-status-availableBorder', icon: <Sparkles size={18} /> },
             { count: stats.occupied,  label: 'Có khách',   color: 'bg-status-occupied text-status-occupiedText border-status-occupiedBorder', icon: <Users size={18} /> },
@@ -323,10 +353,10 @@ export default function TablePage() {
             </button>
           )}
         </div>
+        </>}
       </div>
 
-      {/* Table Grid */}
-      <div className="flex-1 overflow-y-auto p-6">
+      {viewMode === 'reservations' ? <ReservationsPanel tables={tables} /> : <div className="flex-1 overflow-y-auto p-4 md:p-6">
         {/* Takeaway quick-access */}
         {!isEditMode && (
           <div className="mb-6">
@@ -388,13 +418,14 @@ export default function TablePage() {
                     isEditMode={isEditMode}
                     onEdit={handleEditClick}
                     onDelete={handleDeleteClick}
+                    onShowQR={setQrTable}
                   />
                 ))}
               </div>
             </div>
           );
         })}
-      </div>
+      </div>}
 
       {/* Add / Edit Table Modal */}
       {showModal && (
@@ -469,6 +500,29 @@ export default function TablePage() {
               </div>
             </form>
           </div>
+        </div>
+      )}
+
+      {qrTable && (
+        <div className="fixed inset-0 z-[90] bg-slate-950/50 flex items-center justify-center p-4" onMouseDown={(event) => event.target === event.currentTarget && setQrTable(null)}>
+          <section className="modal-surface w-full max-w-sm overflow-hidden">
+            <header className="px-5 py-4 border-b border-surface-border flex items-center">
+              <div><h3 className="font-bold text-ink-dark">QR gọi món · {qrTable.name}</h3><p className="text-xs text-ink-medium">In và đặt mã này đúng tại bàn</p></div>
+              <button type="button" onClick={() => setQrTable(null)} title="Đóng" className="ml-auto w-9 h-9 rounded-lg hover:bg-surface-muted flex items-center justify-center text-ink-medium"><X size={18} /></button>
+            </header>
+            <div id="table-order-qr" className="p-6 text-center bg-white">
+              <div className="inline-flex p-4 border border-slate-200 rounded-lg bg-white">
+                <QRCodeSVG value={qrUrl} size={220} level="H" includeMargin={false} />
+              </div>
+              <h4 className="font-bold text-xl text-slate-900 mt-4">{qrTable.name}</h4>
+              <p className="text-sm text-slate-600 mt-1">Quét mã để xem thực đơn và gọi món</p>
+            </div>
+            <footer className="px-5 py-4 border-t border-surface-border flex gap-2">
+              <button type="button" onClick={rotateQr} title="Đổi mã QR" className="w-11 h-11 rounded-lg border border-surface-border bg-white text-ink-medium hover:bg-surface-muted flex items-center justify-center"><RefreshCw size={16} /></button>
+              <button type="button" onClick={copyQrUrl} className="btn-secondary flex-1 flex items-center justify-center gap-2"><Copy size={16} /> Sao chép</button>
+              <button type="button" onClick={() => window.print()} className="btn-primary flex-1 flex items-center justify-center gap-2"><Printer size={16} /> In mã</button>
+            </footer>
+          </section>
         </div>
       )}
     </div>

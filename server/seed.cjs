@@ -74,11 +74,18 @@ async function main() {
   const hashedDemoAdminPin = await bcrypt.hash('1111', 10);
   const hashedDemoStaffPin = await bcrypt.hash('2222', 10);
 
+  const organization = await prisma.organization.upsert({
+    where: { code: 'espresso-lab' },
+    update: {},
+    create: { name: 'Espresso Lab', code: 'espresso-lab' }
+  });
+
   // 1. Create a default Store
   const store = await prisma.store.upsert({
     where: { code: 'espresso-lab' },
-    update: {},
+    update: { organizationId: organization.id },
     create: {
+      organizationId: organization.id,
       name: 'Espresso Lab',
       code: 'espresso-lab',
       address: '123 Nguyen Hue, Dist 1, HCMC',

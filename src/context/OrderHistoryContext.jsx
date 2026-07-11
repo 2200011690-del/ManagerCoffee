@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { api } from '../api';
 import { socket } from '../socket';
-import { saveOfflineOrder, getOfflineOrders, deleteOfflineOrder, createClientRequestId } from '../utils/db';
+import { saveOfflineOrder, getOfflineOrders, updateOfflineOrder, deleteOfflineOrder, createClientRequestId } from '../utils/db';
 import { useAuth } from './AuthContext';
 
 const OrderHistoryContext = createContext(null);
@@ -22,7 +22,18 @@ export function OrderHistoryProvider({ children }) {
   const { currentUser } = useAuth();
   const storeId = currentUser?.storeId;
   const [orderHistory, setOrderHistory] = useState([]);
+  const [offlineQueue, setOfflineQueue] = useState([]);
   const [loading, setLoading] = useState(false);
+
+  const refreshOfflineQueue = useCallback(async () => {
+    if (!storeId) {
+      setOfflineQueue([]);
+      return [];
+    }
+    const orders = await getOfflineOrders(storeId);
+    setOfflineQueue(orders);
+    return orders;
+  }, [storeId]);
 
   const fetchOrders = useCallback(async () => {
     if (!storeId) {
@@ -49,6 +60,7 @@ export function OrderHistoryProvider({ children }) {
 
     try {
       const offlineOrders = await getOfflineOrders(storeId);
+      setOfflineQueue(offlineOrders);
       const onlineRequestIds = new Set(onlineOrders.map(order => order.clientRequestId).filter(Boolean));
       const pendingOfflineOrders = offlineOrders.filter(order => !onlineRequestIds.has(order.clientRequestId));
       const merged = [...pendingOfflineOrders, ...onlineOrders];
@@ -68,6 +80,7 @@ export function OrderHistoryProvider({ children }) {
     if (!navigator.onLine) {
       try {
         const offlineOrder = await saveOfflineOrder(orderPayload, storeId);
+        await refreshOfflineQueue();
         setOrderHistory(prev => [offlineOrder, ...prev]);
         return offlineOrder;
       } catch (dbErr) {
@@ -88,6 +101,7 @@ export function OrderHistoryProvider({ children }) {
       if (isNetworkError) {
         try {
           const offlineOrder = await saveOfflineOrder(orderPayload, storeId);
+          await refreshOfflineQueue();
           setOrderHistory(prev => [offlineOrder, ...prev]);
           return offlineOrder;
         } catch (dbErr) {
@@ -96,7 +110,7 @@ export function OrderHistoryProvider({ children }) {
       }
       throw err;
     }
-  }, [storeId]);
+  }, [refreshOfflineQueue, storeId]);
 
   // Luồng chạy ngầm đồng bộ hóa đơn offline lên server
   const syncOfflineOrders = useCallback(async () => {
@@ -104,11 +118,15 @@ export function OrderHistoryProvider({ children }) {
 
     try {
       const offlineOrders = await getOfflineOrders(storeId);
-      if (offlineOrders.length === 0) return;
+      const pendingOrders = offlineOrders.filter((order) => order.syncStatus !== 'conflict');
+      if (pendingOrders.length === 0) {
+        setOfflineQueue(offlineOrders);
+        return;
+      }
 
-      console.log(`Phát hiện ${offlineOrders.length} đơn hàng ngoại tuyến cần đồng bộ...`);
+      console.log(`Phát hiện ${pendingOrders.length} đơn hàng ngoại tuyến cần đồng bộ...`);
 
-      for (const order of offlineOrders) {
+      for (const order of pendingOrders) {
         try {
           // Loại bỏ thông tin ID tạm offline để server sinh ID thật
           const {
@@ -120,6 +138,10 @@ export function OrderHistoryProvider({ children }) {
             time: _time,
             orderNumber: _orderNumber,
             storeId: _storeId,
+            syncAttempts: _syncAttempts,
+            syncStatus: _syncStatus,
+            syncError: _syncError,
+            updatedAt: _updatedAt,
             ...serverData
           } = order;
           const newOrder = await api.post('/orders/checkout', serverData, {
@@ -132,20 +154,45 @@ export function OrderHistoryProvider({ children }) {
           // Cập nhật lại danh sách lịch sử trong RAM
           setOrderHistory(prev => prev.map(o => o.tempId === tempId ? newOrder : o));
 
-          // Báo cho bếp qua socket
-          socket.emit('orderCreated', newOrder);
-
           console.log(`Đã đồng bộ đơn hàng offline ${tempId} thành công lên server.`);
         } catch (syncErr) {
           console.error(`Không thể đồng bộ đơn ${order.tempId}:`, syncErr);
-          // Dừng vòng lặp đồng bộ nếu có lỗi mạng tiếp theo
+          const status = syncErr.response?.status;
+          const message = syncErr.response?.data?.error || syncErr.message || 'Không thể đồng bộ đơn';
+          const attempts = (order.syncAttempts || 0) + 1;
+          if (status >= 400 && status < 500) {
+            await updateOfflineOrder(order.tempId, {
+              syncStatus: 'conflict',
+              syncError: message,
+              syncAttempts: attempts
+            });
+            continue;
+          }
+          await updateOfflineOrder(order.tempId, {
+            syncStatus: 'pending',
+            syncError: message,
+            syncAttempts: attempts
+          });
           break;
         }
       }
+      await refreshOfflineQueue();
     } catch (err) {
       console.error('Lỗi trong tiến trình chạy ngầm đồng bộ đơn:', err);
     }
-  }, [storeId]);
+  }, [refreshOfflineQueue, storeId]);
+
+  const retryOfflineOrder = useCallback(async (tempId) => {
+    await updateOfflineOrder(tempId, { syncStatus: 'pending', syncError: null });
+    await refreshOfflineQueue();
+    await syncOfflineOrders();
+  }, [refreshOfflineQueue, syncOfflineOrders]);
+
+  const discardOfflineOrder = useCallback(async (tempId) => {
+    await deleteOfflineOrder(tempId);
+    setOrderHistory((prev) => prev.filter((order) => order.tempId !== tempId));
+    await refreshOfflineQueue();
+  }, [refreshOfflineQueue]);
 
   useEffect(() => {
     setOrderHistory([]);
@@ -184,7 +231,20 @@ export function OrderHistoryProvider({ children }) {
     // logic tùy chọn
   }, []);
 
-  const value = { orderHistory, fetchOrders, addOrder, clearHistory, loading };
+  const conflictedOfflineOrders = offlineQueue.filter((order) => order.syncStatus === 'conflict');
+  const pendingOfflineCount = offlineQueue.length - conflictedOfflineOrders.length;
+  const value = {
+    orderHistory,
+    fetchOrders,
+    addOrder,
+    clearHistory,
+    loading,
+    offlineQueue,
+    conflictedOfflineOrders,
+    pendingOfflineCount,
+    retryOfflineOrder,
+    discardOfflineOrder
+  };
 
   return (
     <OrderHistoryContext.Provider value={value}>

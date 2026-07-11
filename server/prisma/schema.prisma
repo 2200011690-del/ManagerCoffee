@@ -9,26 +9,28 @@ generator client {
 }
 
 model Store {
-  id                    String    @id @default(cuid())
+  id                    String       @id @default(cuid())
+  organizationId        String
+  organization          Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   name                  String
-  code                  String    @unique // e.g. espresso-lab
+  code                  String       @unique // e.g. espresso-lab
   address               String?
   phone                 String?
   logo                  String?
-  vatRate               Float     @default(0.08) // 8% VAT
-  pointsRate            Float     @default(0.1) // 10% of total = points
-  currency              String    @default("VNĐ")
+  vatRate               Float        @default(0.08) // 8% VAT
+  pointsRate            Float        @default(0.1) // 10% of total = points
+  currency              String       @default("VNĐ")
   printHeader           String? // Custom header text for receipts
   printFooter           String? // Custom footer text for receipts
-  bankId                String?   @default("MB")
-  bankAccountNo         String?   @default("")
-  bankAccountName       String?   @default("")
-  isActive              Boolean   @default(true)
-  plan                  String    @default("trial")
-  subscriptionStatus    String    @default("trial")
+  bankId                String?      @default("MB")
+  bankAccountNo         String?      @default("")
+  bankAccountName       String?      @default("")
+  isActive              Boolean      @default(true)
+  plan                  String       @default("trial")
+  subscriptionStatus    String       @default("trial")
   subscriptionExpiresAt DateTime?
   platformNotes         String?
-  createdAt             DateTime  @default(now())
+  createdAt             DateTime     @default(now())
 
   users        User[]
   products     Product[]
@@ -46,25 +48,41 @@ model Store {
   promotions   Promotion[]
   auditLogs    AuditLog[]
   integrations StoreIntegration[]
+  activeCarts  ActiveCart[]
+  guestOrders  GuestOrder[]
+  reservations Reservation[]
+
+  @@index([organizationId])
+}
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  code      String   @unique
+  createdAt DateTime @default(now())
+  stores    Store[]
 }
 
 model User {
-  id               String       @id @default(cuid())
-  storeId          String
-  store            Store        @relation(fields: [storeId], references: [id], onDelete: Cascade)
-  pin              String?
-  pinHash          String?
-  email            String?      @unique
-  password         String?
-  name             String
-  role             String // "admin" or "staff"
-  canApplyDiscount Boolean      @default(true)
-  canRefund        Boolean      @default(true)
-  canViewReports   Boolean      @default(false)
-  maxDiscountPct   Float        @default(100.0)
-  orders           Order[]
-  attendances      Attendance[]
-  cashShifts       CashShift[]
+  id                  String        @id @default(cuid())
+  storeId             String
+  store               Store         @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  pin                 String?
+  pinHash             String?
+  email               String?
+  password            String?
+  name                String
+  role                String // "admin" or "staff"
+  canApplyDiscount    Boolean       @default(true)
+  canRefund           Boolean       @default(true)
+  canViewReports      Boolean       @default(false)
+  maxDiscountPct      Float         @default(100.0)
+  authVersion         Int           @default(0)
+  orders              Order[]
+  attendances         Attendance[]
+  cashShifts          CashShift[]
+  reviewedGuestOrders GuestOrder[]
+  createdReservations Reservation[]
 
   // Profiles
   phone       String?
@@ -75,36 +93,42 @@ model User {
   hourlyRate  Float   @default(25000)
 
   @@unique([storeId, pin])
+  @@unique([storeId, email])
   @@index([storeId])
 }
 
 model Product {
-  id          String       @id @default(cuid())
-  storeId     String
-  store       Store        @relation(fields: [storeId], references: [id], onDelete: Cascade)
-  name        String
-  price       Float
-  category    String
-  description String?
-  image       String?
-  popular     Boolean      @default(false)
-  prepTime    String?      @default("5 phút")
-  hidden      Boolean      @default(false)
-  recipes     RecipeItem[]
-  orderItems  OrderItem[]
+  id              String           @id @default(cuid())
+  storeId         String
+  store           Store            @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  name            String
+  price           Float
+  category        String
+  description     String?
+  image           String?
+  popular         Boolean          @default(false)
+  prepTime        String?          @default("5 phút")
+  hidden          Boolean          @default(false)
+  recipes         RecipeItem[]
+  orderItems      OrderItem[]
+  returnItems     ReturnItem[]
+  guestOrderItems GuestOrderItem[]
 
   @@index([storeId])
 }
 
 model Table {
-  id            String  @id @default(cuid())
+  id            String        @id @default(cuid())
   storeId       String
-  store         Store   @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  store         Store         @relation(fields: [storeId], references: [id], onDelete: Cascade)
   name          String
   zone          String
   capacity      Int
-  status        String  @default("available") // "available", "occupied", "dirty"
+  status        String        @default("available") // "available", "occupied", "dirty"
   occupiedSince String?
+  orderToken    String        @unique @default(cuid())
+  guestOrders   GuestOrder[]
+  reservations  Reservation[]
 
   @@index([storeId])
 }
@@ -139,11 +163,13 @@ model Order {
   orderDiscount     Float?  @default(0) // Discount value on entire order
   orderDiscountType String? // "PERCENT" or "FIXED"
   discountReason    String? // Reason for discount (anti-fraud)
+  note              String?
   usedPoints        Int?    @default(0)
 
   // Relations
   returnOrders ReturnOrder[]
   payments     OrderPayment[]
+  guestOrder   GuestOrder?
 
   @@unique([storeId, orderNumber])
   @@unique([storeId, clientRequestId])
@@ -154,21 +180,25 @@ model Order {
 }
 
 model OrderItem {
-  id           String   @id @default(cuid())
-  orderId      String
-  order        Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  productId    String?
-  product      Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
-  name         String
-  price        Float
-  qty          Int
-  sugar        String?
-  ice          String?
-  note         String?
+  id            String                  @id @default(cuid())
+  orderId       String
+  order         Order                   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId     String?
+  product       Product?                @relation(fields: [productId], references: [id], onDelete: SetNull)
+  name          String
+  price         Float
+  qty           Int
+  sugar         String?
+  ice           String?
+  note          String?
   // Phase 1: Per-item discount
-  discount     Float?   @default(0) // Discount amount on this item
-  discountType String? // "PERCENT" or "FIXED"
-  returnedQty  Int      @default(0) // Quantity returned
+  discount      Float?                  @default(0) // Discount amount on this item
+  discountType  String? // "PERCENT" or "FIXED"
+  returnedQty   Int                     @default(0) // Quantity returned
+  cogsAmount    Float?
+  cogsComplete  Boolean                 @default(false)
+  costSnapshots OrderItemCostSnapshot[]
+  returnItems   ReturnItem[]
 
   @@index([orderId])
   @@index([productId])
@@ -182,10 +212,12 @@ model Inventory {
   unit    String
   qty     Float
   minQty  Float
+  avgCost Float?
   icon    String?
 
-  recipes      RecipeItem[]
-  transactions StockTransaction[]
+  recipes       RecipeItem[]
+  transactions  StockTransaction[]
+  costSnapshots OrderItemCostSnapshot[]
 
   @@index([storeId])
 }
@@ -199,6 +231,23 @@ model RecipeItem {
   qty         Float
 
   @@unique([productId, inventoryId])
+  @@index([inventoryId])
+}
+
+model OrderItemCostSnapshot {
+  id            String     @id @default(cuid())
+  orderItemId   String
+  orderItem     OrderItem  @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  inventoryId   String?
+  inventory     Inventory? @relation(fields: [inventoryId], references: [id], onDelete: SetNull)
+  inventoryName String
+  unit          String
+  quantity      Float
+  unitCost      Float?
+  totalCost     Float?
+  complete      Boolean    @default(false)
+
+  @@index([orderItemId])
   @@index([inventoryId])
 }
 
@@ -327,12 +376,97 @@ model ReturnItem {
   id            String      @id @default(cuid())
   returnOrderId String
   returnOrder   ReturnOrder @relation(fields: [returnOrderId], references: [id], onDelete: Cascade)
+  orderItemId   String?
+  orderItem     OrderItem?  @relation(fields: [orderItemId], references: [id], onDelete: SetNull)
+  productId     String?
+  product       Product?    @relation(fields: [productId], references: [id], onDelete: SetNull)
   orderItemName String
   price         Float
   qty           Int
+  refundAmount  Float       @default(0)
+  cogsAmount    Float?
   reason        String?
 
   @@index([returnOrderId])
+  @@index([orderItemId])
+  @@index([productId])
+}
+
+model ActiveCart {
+  id        String   @id @default(cuid())
+  storeId   String
+  store     Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  cartKey   String
+  data      Json
+  updatedAt DateTime @updatedAt
+
+  @@unique([storeId, cartKey])
+  @@index([storeId, updatedAt])
+}
+
+model GuestOrder {
+  id              String           @id @default(cuid())
+  storeId         String
+  store           Store            @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  tableId         String
+  table           Table            @relation(fields: [tableId], references: [id], onDelete: Cascade)
+  clientRequestId String?
+  orderId         String?          @unique
+  order           Order?           @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  guestName       String?
+  note            String?
+  status          String           @default("pending")
+  reviewedById    String?
+  reviewedBy      User?            @relation(fields: [reviewedById], references: [id], onDelete: SetNull)
+  reviewNote      String?
+  reviewedAt      DateTime?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  items           GuestOrderItem[]
+
+  @@unique([tableId, clientRequestId])
+  @@index([storeId, status, createdAt])
+  @@index([tableId, createdAt])
+}
+
+model GuestOrderItem {
+  id           String     @id @default(cuid())
+  guestOrderId String
+  guestOrder   GuestOrder @relation(fields: [guestOrderId], references: [id], onDelete: Cascade)
+  productId    String
+  product      Product    @relation(fields: [productId], references: [id], onDelete: Restrict)
+  name         String
+  price        Float
+  qty          Int
+  note         String?
+
+  @@index([guestOrderId])
+  @@index([productId])
+}
+
+model Reservation {
+  id            String   @id @default(cuid())
+  storeId       String
+  store         Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  tableId       String?
+  table         Table?   @relation(fields: [tableId], references: [id], onDelete: SetNull)
+  customerName  String
+  phone         String
+  guestCount    Int
+  startAt       DateTime
+  endAt         DateTime
+  status        String   @default("confirmed")
+  depositAmount Float    @default(0)
+  depositStatus String   @default("unpaid")
+  note          String?
+  createdById   String?
+  createdBy     User?    @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([storeId, startAt])
+  @@index([tableId, startAt, endAt])
+  @@index([storeId, status])
 }
 
 // Phase 1: Hold Order (Pending)

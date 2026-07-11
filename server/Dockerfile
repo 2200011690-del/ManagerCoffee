@@ -1,24 +1,18 @@
-FROM node:18-alpine
+FROM node:22-alpine AS build
 
-# Cài đặt thư viện cần thiết cho prisma
 RUN apk add --no-cache openssl
-
 WORKDIR /app
-
-# Sao chép file cấu hình
 COPY package*.json ./
-
-# Cài đặt dependencies (chỉ production)
-RUN npm ci --only=production
-
-# Sao chép mã nguồn và prisma
+RUN npm ci
 COPY . .
-
-# Generate Prisma Client
 RUN npx prisma generate
+RUN npm prune --omit=dev
 
-# Port mà ứng dụng lắng nghe
+FROM node:22-alpine AS runtime
+RUN apk add --no-cache openssl
+WORKDIR /app
+ENV NODE_ENV=production
+COPY --from=build /app /app
+
 EXPOSE 10000
-
-# Khởi chạy server
 CMD ["npm", "start"]

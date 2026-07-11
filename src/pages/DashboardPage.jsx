@@ -849,10 +849,14 @@ export default function DashboardPage() {
       filename = `bao_cao_lai_lo_${start}_to_${end}.csv`;
       csvContent += `Doanh thu thuần (đ),Giá vốn hàng bán (COGS đ),Lợi nhuận gộp (đ),Biên lợi nhuận (%)\n`;
       if (profitLossReport) {
-        csvContent += `"${profitLossReport.revenue}","${profitLossReport.cogs}","${profitLossReport.grossProfit}","${profitLossReport.profitMargin.toFixed(1)}%"\n\n`;
+        const margin = profitLossReport.profitMargin === null ? '' : `${profitLossReport.profitMargin.toFixed(1)}%`;
+        csvContent += `"${profitLossReport.revenue}","${profitLossReport.cogs ?? ''}","${profitLossReport.grossProfit ?? ''}","${margin}"\n`;
+        csvContent += `"Doanh thu trước hoàn","${profitLossReport.grossRevenue}"\n`;
+        csvContent += `"Tiền hoàn trả","${profitLossReport.refunds}"\n`;
+        csvContent += `"Độ phủ giá vốn","${profitLossReport.costCoveragePct.toFixed(1)}%"\n\n`;
         csvContent += `Nguyên liệu tiêu hao,Đơn vị,Số lượng tiêu hao,Chi phí hàng bán (đ)\n`;
         profitLossReport.ingredients.forEach(i => {
-          csvContent += `"${i.name}","${i.unit}","${i.qty.toFixed(2)}","${i.cost.toFixed(0)}"\n`;
+          csvContent += `"${i.name}","${i.unit}","${i.qty.toFixed(2)}","${i.cost === null ? '' : i.cost.toFixed(0)}"\n`;
         });
       }
     }
@@ -2948,23 +2952,41 @@ export default function DashboardPage() {
                   {/* 3.3 Profit & Loss Report */}
                   {reportsTab === 'profit' && profitLossReport && (
                     <div className="space-y-6">
+                      {!profitLossReport.costComplete && (
+                        <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-amber-900">
+                          <AlertTriangle size={18} className="mt-0.5 shrink-0" />
+                          <div>
+                            <p className="text-sm font-bold">Chưa đủ dữ liệu giá vốn</p>
+                            <p className="text-xs mt-0.5">
+                              Đã xác định {profitLossReport.costCoveragePct.toFixed(1)}% dòng bán. Hãy nhập đơn giá nguyên liệu và bảo đảm mỗi món có công thức trước khi dùng số liệu lợi nhuận.
+                            </p>
+                          </div>
+                        </div>
+                      )}
                       {/* Financial KPI Summary Cards */}
                       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                         <div className="bg-cream-light/30 border border-cream-medium/40 p-4 rounded-lg">
-                          <p className="text-xs font-bold text-coffee-medium uppercase tracking-wider mb-1">Tổng doanh thu</p>
+                          <p className="text-xs font-bold text-coffee-medium uppercase tracking-wider mb-1">Doanh thu thuần</p>
                           <p className="text-xl font-mono font-bold text-coffee-dark">{profitLossReport.revenue.toLocaleString('vi-VN')}đ</p>
+                          <p className="text-[11px] text-coffee-light mt-1">Bán {profitLossReport.grossRevenue.toLocaleString('vi-VN')}đ · Hoàn {profitLossReport.refunds.toLocaleString('vi-VN')}đ</p>
                         </div>
                         <div className="bg-red-50/40 border border-red-100 p-4 rounded-lg">
                           <p className="text-xs font-bold text-red-600 uppercase tracking-wider mb-1">Giá vốn (COGS)</p>
-                          <p className="text-xl font-mono font-bold text-red-700">-{profitLossReport.cogs.toLocaleString('vi-VN')}đ</p>
+                          <p className="text-xl font-mono font-bold text-red-700">
+                            {profitLossReport.cogs === null ? 'Chưa đủ dữ liệu' : `-${profitLossReport.cogs.toLocaleString('vi-VN')}đ`}
+                          </p>
                         </div>
                         <div className="bg-green-50/40 border border-green-100 p-4 rounded-lg">
                           <p className="text-xs font-bold text-green-700 uppercase tracking-wider mb-1">Lợi nhuận gộp</p>
-                          <p className="text-xl font-mono font-bold text-green-800">{profitLossReport.grossProfit.toLocaleString('vi-VN')}đ</p>
+                          <p className="text-xl font-mono font-bold text-green-800">
+                            {profitLossReport.grossProfit === null ? 'Chưa đủ dữ liệu' : `${profitLossReport.grossProfit.toLocaleString('vi-VN')}đ`}
+                          </p>
                         </div>
                         <div className="bg-blue-50/40 border border-blue-100 p-4 rounded-lg">
                           <p className="text-xs font-bold text-blue-600 uppercase tracking-wider mb-1">Tỷ suất lãi gộp</p>
-                          <p className="text-xl font-mono font-bold text-blue-800">{profitLossReport.profitMargin.toFixed(1)}%</p>
+                          <p className="text-xl font-mono font-bold text-blue-800">
+                            {profitLossReport.profitMargin === null ? 'Chưa đủ dữ liệu' : `${profitLossReport.profitMargin.toFixed(1)}%`}
+                          </p>
                         </div>
                       </div>
 
@@ -3000,7 +3022,9 @@ export default function DashboardPage() {
                                   <tr key={ing.name} className="border-b border-cream-medium/20 hover:bg-cream-light/20 transition-colors">
                                     <td className="px-4 py-3.5 font-semibold text-coffee-dark">{ing.name}</td>
                                     <td className="px-4 py-3.5 text-right font-mono font-semibold text-coffee-medium">{ing.qty.toFixed(2)} {ing.unit}</td>
-                                    <td className="px-4 py-3.5 text-right font-mono font-bold text-red-600">-{ing.cost.toLocaleString('vi-VN')}đ</td>
+                                    <td className="px-4 py-3.5 text-right font-mono font-bold text-red-600">
+                                      {ing.cost === null ? 'Thiếu đơn giá' : `-${ing.cost.toLocaleString('vi-VN')}đ`}
+                                    </td>
                                   </tr>
                                 ))}
                               {profitLossReport.ingredients.length === 0 && (

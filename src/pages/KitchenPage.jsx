@@ -306,9 +306,9 @@ export default function KitchenPage() {
                   ))}
                   
                   {/* Order level note */}
-                  {order.discountReason && (
+                  {order.note && (
                     <div className="p-2.5 rounded-lg bg-slate-950/80 border border-slate-800 text-xs text-slate-400">
-                      <strong>Ghi chú:</strong> {order.discountReason}
+                      <strong>Ghi chú:</strong> {order.note}
                     </div>
                   )}
                 </div>

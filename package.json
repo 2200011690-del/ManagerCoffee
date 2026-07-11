@@ -10,6 +10,7 @@
     "test:smoke": "node scripts/smoke-auth.cjs",
     "test:smoke:sales": "node scripts/smoke-sales.cjs",
     "test:smoke:shifts": "node scripts/smoke-shifts.cjs",
+    "test:smoke:operations": "node scripts/smoke-operations.cjs",
     "test:smoke:load": "node scripts/smoke-load.cjs",
     "backup:store": "node scripts/backup-store.cjs",
     "restore:catalog": "node scripts/restore-store-catalog.cjs",
@@ -22,6 +23,7 @@
   "dependencies": {
     "axios": "^1.18.1",
     "lucide-react": "^1.21.0",
+    "qrcode.react": "^4.2.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "socket.io-client": "^4.8.3"
@@ -34,7 +36,6 @@
     "concurrently": "^10.0.3",
     "oxlint": "^1.69.0",
     "postcss": "^8.5.15",
-    "prisma": "^7.8.0",
     "tailwindcss": "^3.4.19",
     "vite": "^8.1.0"
   }

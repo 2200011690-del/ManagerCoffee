@@ -190,10 +190,11 @@ async function main() {
       headers: auth(staffToken),
     });
     assert(activeAfterSale.status === 200 && activeAfterSale.body?.id === opened.body.id, 'Phai lay duoc ca dang mo sau ban hang', activeAfterSale);
+    const authoritativeTotal = checkout.body.total;
     assert(
-      activeAfterSale.body.cashSales === total && activeAfterSale.body.expectedCash === openingCash + total,
+      activeAfterSale.body.cashSales === authoritativeTotal && activeAfterSale.body.expectedCash === openingCash + authoritativeTotal,
       'Doanh thu tien mat va tien ky vong phai tang dung sau checkout cash',
-      { total, shift: activeAfterSale.body }
+      { authoritativeTotal, shift: activeAfterSale.body }
     );
 
     const closed = await request('/api/shifts/close', {
@@ -201,7 +202,7 @@ async function main() {
       headers: auth(staffToken),
       body: JSON.stringify({
         shiftId: opened.body.id,
-        actualCash: openingCash + total,
+        actualCash: openingCash + authoritativeTotal,
         notes: 'Smoke close',
       }),
     });
