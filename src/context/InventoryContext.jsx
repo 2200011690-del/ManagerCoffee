@@ -1,56 +1,93 @@
-import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { api } from '../api';
 import { socket } from '../socket';
+import { useAuth } from './AuthContext';
 
 const InventoryContext = createContext(null);
 
 export function InventoryProvider({ children }) {
+  const { currentUser } = useAuth();
+  const storeId = currentUser?.storeId;
+  const activeStoreIdRef = useRef(storeId);
+  activeStoreIdRef.current = storeId;
   const [inventory, setInventory] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const fetchInventory = useCallback(async () => {
-    try {
-      const data = await api.get('/inventory');
-      setInventory(Array.isArray(data) ? data : []);
-    } catch (err) {
-      console.error(err);
-    } finally {
+    if (!storeId) {
+      setInventory([]);
       setLoading(false);
-    }
-  }, []);
-
-  const fetchSuppliers = useCallback(async () => {
-    try {
-      const data = await api.get('/suppliers');
-      setSuppliers(Array.isArray(data) ? data : []);
-    } catch (err) {
-      console.error(err);
-    }
-  }, []);
-
-  const fetchTransactions = useCallback(async () => {
-    try {
-      const data = await api.get('/inventory/transactions');
-      setTransactions(Array.isArray(data) ? data : []);
-      return data;
-    } catch (err) {
-      console.error(err);
       return [];
     }
-  }, []);
+    const requestedStoreId = storeId;
+    try {
+      const data = await api.get('/inventory');
+      const list = Array.isArray(data) ? data : [];
+      if (activeStoreIdRef.current === requestedStoreId) setInventory(list);
+      return list;
+    } catch (err) {
+      console.error(err);
+      if (activeStoreIdRef.current === requestedStoreId) setInventory([]);
+      return [];
+    } finally {
+      if (activeStoreIdRef.current === requestedStoreId) setLoading(false);
+    }
+  }, [storeId]);
+
+  const fetchSuppliers = useCallback(async () => {
+    if (!storeId) {
+      setSuppliers([]);
+      return [];
+    }
+    const requestedStoreId = storeId;
+    try {
+      const data = await api.get('/suppliers');
+      const list = Array.isArray(data) ? data : [];
+      if (activeStoreIdRef.current === requestedStoreId) setSuppliers(list);
+      return list;
+    } catch (err) {
+      console.error(err);
+      if (activeStoreIdRef.current === requestedStoreId) setSuppliers([]);
+      return [];
+    }
+  }, [storeId]);
+
+  const fetchTransactions = useCallback(async () => {
+    if (!storeId) {
+      setTransactions([]);
+      return [];
+    }
+    const requestedStoreId = storeId;
+    try {
+      const data = await api.get('/inventory/transactions');
+      const list = Array.isArray(data) ? data : [];
+      if (activeStoreIdRef.current === requestedStoreId) setTransactions(list);
+      return list;
+    } catch (err) {
+      console.error(err);
+      if (activeStoreIdRef.current === requestedStoreId) setTransactions([]);
+      return [];
+    }
+  }, [storeId]);
 
   useEffect(() => {
+    setInventory([]);
+    setSuppliers([]);
+    setTransactions([]);
+    setLoading(Boolean(storeId));
     fetchInventory();
 
     const handleInventoryUpdated = (updatedInventory) => {
-      setInventory(updatedInventory);
+      const list = Array.isArray(updatedInventory) ? updatedInventory : [];
+      if (list.some((item) => item.storeId && item.storeId !== storeId)) return;
+      setInventory(list);
     };
 
     socket.on('inventoryUpdated', handleInventoryUpdated);
     return () => socket.off('inventoryUpdated', handleInventoryUpdated);
-  }, [fetchInventory]);
+  }, [fetchInventory, storeId]);
 
   const createIngredient = useCallback(async (data) => {
     try {

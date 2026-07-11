@@ -69,6 +69,21 @@ async function main() {
     assert(login.status === 200 && login.body?.token, 'Dang nhap admin that bai', login);
     const token = login.body.token;
 
+    const ingredient = await request('/api/inventory', {
+      method: 'POST',
+      headers: auth(token),
+      body: JSON.stringify({ name: `Nguyen lieu smoke ${Date.now()}`, unit: 'kg', qty: 5, minQty: 1, icon: 'T' }),
+    });
+    assert(ingredient.status === 200 && ingredient.body?.qty === 5, 'Tao nguyen lieu test that bai', ingredient);
+    const adjustedIngredient = await request('/api/inventory/adjust', {
+      method: 'POST',
+      headers: auth(token),
+      body: JSON.stringify({ inventoryId: ingredient.body.id, actualQty: 3, note: 'Smoke kiem kho' }),
+    });
+    assert(adjustedIngredient.status === 200 && adjustedIngredient.body?.balance === 3, 'Kiem kho cap nhat xong nhung API tra loi', adjustedIngredient);
+    const ingredientDelete = await request(`/api/inventory/${ingredient.body.id}`, { method: 'DELETE', headers: auth(token) });
+    assert(ingredientDelete.status === 200, 'Khong xoa duoc nguyen lieu smoke', ingredientDelete);
+
     const customerPhone = `09${String(Date.now()).slice(-8)}`;
     const customer = await request('/api/customers', {
       method: 'POST',

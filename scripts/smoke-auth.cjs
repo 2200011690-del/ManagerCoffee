@@ -364,6 +364,22 @@ async function main() {
       headers: { Authorization: `Bearer ${switchedBranch.body.token}` },
     });
     assert(emptyBranchProducts.status === 200 && emptyBranchProducts.body.length === 0, 'Chi nhanh moi khong sao chep catalog phai rong', emptyBranchProducts);
+    const emptyBranchInventory = await request('/api/inventory', {
+      headers: { Authorization: `Bearer ${switchedBranch.body.token}` },
+    });
+    assert(emptyBranchInventory.status === 200 && emptyBranchInventory.body.length === 0, 'Chi nhanh moi khong duoc thay nguyen lieu store cu', emptyBranchInventory);
+    const emptyBranchTransactions = await request('/api/inventory/transactions', {
+      headers: { Authorization: `Bearer ${switchedBranch.body.token}` },
+    });
+    assert(emptyBranchTransactions.status === 200 && emptyBranchTransactions.body.length === 0, 'Chi nhanh moi khong duoc thay giao dich kho store cu', emptyBranchTransactions);
+    const emptyBranchProfit = await request('/api/reports/profit-loss', {
+      headers: { Authorization: `Bearer ${switchedBranch.body.token}` },
+    });
+    assert(
+      emptyBranchProfit.status === 200 && emptyBranchProfit.body?.revenue === 0 && emptyBranchProfit.body?.ingredients?.length === 0,
+      'Bao cao nguyen lieu chi nhanh moi phai rong',
+      emptyBranchProfit
+    );
     const deletedBranch = await request(`/api/branches/${createdBranch.body.id}`, {
       method: 'DELETE',
       headers: { Authorization: `Bearer ${adminToken}` },

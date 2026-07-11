@@ -151,7 +151,7 @@ function AppRoot() {
       </Suspense>
     );
   }
-  return <AuthenticatedApp />;
+  return <AuthenticatedApp key={currentUser.storeId} />;
 }
 
 export default function App() {

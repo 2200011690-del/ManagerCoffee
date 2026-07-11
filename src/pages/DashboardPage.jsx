@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import {
   TrendingUp, TrendingDown, Minus as MinusIcon, ShoppingBag, Users, DollarSign,
   Target, Clock, Award, ChevronRight, FileText, Search, Download, Trash2,
@@ -10,6 +10,7 @@ import { useOrderHistory } from '../context/OrderHistoryContext';
 import { useInventory } from '../context/InventoryContext';
 import { useMenu } from '../context/MenuContext';
 import { useTable } from '../context/TableContext';
+import { useAuth } from '../context/AuthContext';
 import { api } from '../api';
 
 // ---- Mini Bar Chart ----
@@ -386,6 +387,10 @@ function InventoryRow({ item, pct, isLow, isCritical, onRestock }) {
 
 // ---- Main Dashboard ----
 export default function DashboardPage() {
+  const { currentUser } = useAuth();
+  const storeId = currentUser?.storeId;
+  const activeStoreIdRef = useRef(storeId);
+  activeStoreIdRef.current = storeId;
   const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'history' | 'inventory' | 'customers' | 'vouchers' | 'tables'
   const [liveDashboardData, setLiveDashboardData] = useState(null);
 
@@ -464,28 +469,52 @@ export default function DashboardPage() {
   const [importForm, setImportForm] = useState({ inventoryId: '', qty: '', cost: '', supplierId: '', note: '' });
   const [adjustForm, setAdjustForm] = useState({ inventoryId: '', actualQty: '', note: '' });
 
+  useEffect(() => {
+    setLiveDashboardData(null);
+    setCustomersList([]);
+    setStaffReports([]);
+    setTimeReports(null);
+    setProfitLossReport(null);
+    setLoadingReports(false);
+    setSelectedCust(null);
+    setSelectedIng(null);
+    setSelectedSupplier(null);
+  }, [storeId]);
 
   // Fetch handlers
   const fetchDashboardData = useCallback(async () => {
+    if (!storeId) {
+      setLiveDashboardData(null);
+      return;
+    }
+    const requestedStoreId = storeId;
     try {
       const data = await api.get('/dashboard');
-      setLiveDashboardData(data);
+      if (activeStoreIdRef.current === requestedStoreId) setLiveDashboardData(data);
     } catch (err) {
       console.error(err);
+      if (activeStoreIdRef.current === requestedStoreId) setLiveDashboardData(null);
     }
-  }, []);
+  }, [storeId]);
 
 
 
   const fetchCustomers = useCallback(async () => {
+    if (!storeId) {
+      setCustomersList([]);
+      return;
+    }
+    const requestedStoreId = storeId;
     try {
       const data = await api.get('/customers');
-      setCustomersList(Array.isArray(data) ? data : []);
+      if (activeStoreIdRef.current === requestedStoreId) {
+        setCustomersList(Array.isArray(data) ? data : []);
+      }
     } catch (err) {
       console.error(err);
-      setCustomersList([]);
+      if (activeStoreIdRef.current === requestedStoreId) setCustomersList([]);
     }
-  }, []);
+  }, [storeId]);
 
   const getReportDates = useCallback(() => {
     let start = '';
@@ -514,7 +543,8 @@ export default function DashboardPage() {
   }, [reportFilter, reportStartDate, reportEndDate]);
 
   const fetchDetailedReport = useCallback(async () => {
-    if (activeTab !== 'detailed_reports') return;
+    if (activeTab !== 'detailed_reports' || !storeId) return;
+    const requestedStoreId = storeId;
     setLoadingReports(true);
     const { start, end } = getReportDates();
     const query = `?startDate=${start}&endDate=${end}`;
@@ -522,20 +552,20 @@ export default function DashboardPage() {
     try {
       if (reportsTab === 'staff') {
         const data = await api.get(`/reports/employees${query}`);
-        setStaffReports(data);
+        if (activeStoreIdRef.current === requestedStoreId) setStaffReports(data);
       } else if (reportsTab === 'time') {
         const data = await api.get(`/reports/time-analysis${query}`);
-        setTimeReports(data);
+        if (activeStoreIdRef.current === requestedStoreId) setTimeReports(data);
       } else if (reportsTab === 'profit') {
         const data = await api.get(`/reports/profit-loss${query}`);
-        setProfitLossReport(data);
+        if (activeStoreIdRef.current === requestedStoreId) setProfitLossReport(data);
       }
     } catch (err) {
       console.error('Failed to fetch report:', err);
     } finally {
-      setLoadingReports(false);
+      if (activeStoreIdRef.current === requestedStoreId) setLoadingReports(false);
     }
-  }, [activeTab, reportsTab, getReportDates]);
+  }, [activeTab, reportsTab, getReportDates, storeId]);
 
   useEffect(() => {
     fetchDetailedReport();

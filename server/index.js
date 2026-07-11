@@ -4496,14 +4496,14 @@ app.post('/api/inventory/adjust', async (req, res) => {
       return res.status(400).json({ error: 'Tồn kho thực tế phải là số không âm' });
     }
 
-    const transaction = await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx) => {
       await lockStoreCounter(tx, storeId, `inventory:${inventoryId}`);
       const ingredient = await tx.inventory.findFirst({ where: { id: inventoryId, storeId } });
       if (!ingredient) throw businessError('Nguyên liệu không tồn tại', 404);
 
       const diff = cleanActualQty - ingredient.qty;
       await tx.inventory.update({ where: { id: inventoryId }, data: { qty: cleanActualQty } });
-      return tx.stockTransaction.create({
+      const transaction = await tx.stockTransaction.create({
         data: {
           storeId,
           inventoryId,
@@ -4514,16 +4514,17 @@ app.post('/api/inventory/adjust', async (req, res) => {
         },
         include: { inventory: true }
       });
+      return { transaction, oldQty: ingredient.qty, diff };
     }, { maxWait: 10000, timeout: 20000 });
 
     await writeAuditLog(req, 'adjust', 'inventory', inventoryId, {
-      oldQty,
-      actualQty: Number(actualQty),
-      diff,
-      transactionId: transaction.id
+      oldQty: result.oldQty,
+      actualQty: cleanActualQty,
+      diff: result.diff,
+      transactionId: result.transaction.id
     });
     broadcast('inventoryUpdated', await prisma.inventory.findMany({ where: { storeId }, orderBy: { name: 'asc' } }), storeId);
-    res.json(transaction);
+    res.json(result.transaction);
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
