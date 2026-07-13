@@ -14,7 +14,16 @@ function getCategoryStyle(category) {
   return CATEGORY_COLORS[category] ?? { bg: 'bg-slate-50', border: 'border-slate-200', text: 'text-slate-600', dot: 'bg-slate-400' };
 }
 
-const ProductGrid = React.memo(function ProductGrid({ items, onAddToCart, onSelectItem }) {
+const ProductGrid = React.memo(function ProductGrid({ items, loading = false, onAddToCart, onSelectItem }) {
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 text-ink-light" role="status">
+        <div className="w-6 h-6 mb-3 rounded-full border-2 border-surface-border border-t-primary-600 animate-spin" />
+        <p className="text-sm font-medium">Đang tải thực đơn...</p>
+      </div>
+    );
+  }
+
   if (items.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-ink-light">

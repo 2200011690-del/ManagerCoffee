@@ -459,6 +459,85 @@ async function main() {
       successfulReturn
     );
 
+    const voucherQty = Math.max(1, Math.ceil(50000 / product.price));
+    const voucherDiscount = 10000;
+    const voucherCheckout = await request('/api/orders/checkout', {
+      method: 'POST',
+      headers: auth(staffToken),
+      body: JSON.stringify({
+        tableId: null,
+        tableName: 'Mang về',
+        cart: [{
+          id: product.id,
+          name: product.name,
+          price: product.price,
+          qty: voucherQty,
+          sugar: '100%',
+          ice: 'Nhiều đá',
+          note: '',
+        }],
+        voucherCode: 'GIAM10K',
+        paymentMethod: 'cash',
+        employeeId: staffUser.id,
+      }),
+    });
+    assert(voucherCheckout.status === 200, 'Checkout co voucher that bai', voucherCheckout);
+    const authoritativeVoucherSubtotal = voucherCheckout.body?.subtotal;
+    const voucherVat = Math.round((authoritativeVoucherSubtotal - voucherDiscount) * 0.08);
+    assert(
+      authoritativeVoucherSubtotal > voucherDiscount
+        && voucherCheckout.body?.discountAmount === voucherDiscount
+        && voucherCheckout.body?.vatAmount === voucherVat
+        && voucherCheckout.body?.total === authoritativeVoucherSubtotal - voucherDiscount + voucherVat,
+      'VAT phai tinh tren gia sau chiet khau',
+      voucherCheckout
+    );
+
+    const tables = await request('/api/tables', { headers: auth(adminToken) });
+    const splitTable = tables.body?.[0];
+    assert(tables.status === 200 && splitTable, 'Khong co ban de kiem thu tach don', tables);
+    const splitCartItemId = `split-${Date.now()}`;
+    const splitPayload = {
+      tableId: splitTable.id,
+      tableName: splitTable.name,
+      cart: [{
+        id: product.id,
+        cartItemId: splitCartItemId,
+        name: product.name,
+        price: product.price,
+        qty: 1,
+        sugar: '100%',
+        ice: 'Nhiều đá',
+        note: '',
+      }],
+      paymentMethod: 'cash',
+      employeeId: staffUser.id,
+    };
+    const partialSplit = await request('/api/orders/checkout', {
+      method: 'POST',
+      headers: auth(staffToken),
+      body: JSON.stringify({ ...splitPayload, keepTableOpen: true }),
+    });
+    assert(partialSplit.status === 200, 'Thanh toan mot phan cua don tach that bai', partialSplit);
+    const tableAfterPartial = await request('/api/tables', { headers: auth(adminToken) });
+    assert(
+      tableAfterPartial.body?.find((table) => table.id === splitTable.id)?.status === 'occupied',
+      'Ban phai con dang phuc vu sau khi moi thanh toan mot phan',
+      tableAfterPartial
+    );
+    const finalSplit = await request('/api/orders/checkout', {
+      method: 'POST',
+      headers: auth(staffToken),
+      body: JSON.stringify(splitPayload),
+    });
+    assert(finalSplit.status === 200, 'Thanh toan phan cuoi cua don tach that bai', finalSplit);
+    const tableAfterFinal = await request('/api/tables', { headers: auth(adminToken) });
+    assert(
+      tableAfterFinal.body?.find((table) => table.id === splitTable.id)?.status === 'dirty',
+      'Ban phai chuyen sang cho don sau khi thanh toan phan cuoi',
+      tableAfterFinal
+    );
+
     console.log('Smoke sales test passed.');
   } finally {
     server.kill('SIGTERM');

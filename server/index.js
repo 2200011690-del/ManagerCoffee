@@ -991,16 +991,14 @@ async function buildAuthoritativeCheckout(tx, req, payload) {
 
   const subtotal = Math.max(0, roundMoney(subtotalBeforeGlobalDiscounts - autoPromotions.globalDiscount));
   const vatRate = Number.isFinite(Number(store.vatRate)) ? Number(store.vatRate) : 0.08;
-  const vatAmount = Math.max(0, roundMoney(subtotal * vatRate));
-  const totalBeforeManualDiscounts = subtotal + vatAmount;
 
   const voucher = await resolveVoucherDiscount(tx, storeId, payload.voucherCode, subtotal);
-  assertManualDiscountAllowed(req, voucher.amount, totalBeforeManualDiscounts, 'mã giảm giá');
-  const voucherDiscount = Math.min(voucher.amount, totalBeforeManualDiscounts);
+  assertManualDiscountAllowed(req, voucher.amount, subtotal, 'mã giảm giá');
+  const voucherDiscount = Math.min(voucher.amount, subtotal);
 
   const rawOrderDiscount = Math.max(0, roundMoney(payload.orderDiscount));
-  assertManualDiscountAllowed(req, rawOrderDiscount, totalBeforeManualDiscounts, 'giảm giá toàn đơn');
-  const availableForOrderDiscount = Math.max(0, totalBeforeManualDiscounts - voucherDiscount);
+  assertManualDiscountAllowed(req, rawOrderDiscount, subtotal, 'giảm giá toàn đơn');
+  const availableForOrderDiscount = Math.max(0, subtotal - voucherDiscount);
   const orderDiscountAmount = Math.min(rawOrderDiscount, availableForOrderDiscount);
   const cleanOrderDiscountType = orderDiscountAmount > 0 ? (payload.orderDiscountType || 'FIXED') : null;
 
@@ -1027,13 +1025,15 @@ async function buildAuthoritativeCheckout(tx, req, payload) {
     }
   }
 
-  const afterVoucherAndOrderDiscount = Math.max(0, totalBeforeManualDiscounts - voucherDiscount - orderDiscountAmount);
+  const afterVoucherAndOrderDiscount = Math.max(0, subtotal - voucherDiscount - orderDiscountAmount);
   const pointsDiscount = usedPoints * POINT_VALUE_VND;
   if (pointsDiscount > afterVoucherAndOrderDiscount) {
     throw new Error('Số điểm sử dụng vượt quá số tiền còn phải thanh toán');
   }
 
-  const total = Math.max(0, roundMoney(afterVoucherAndOrderDiscount - pointsDiscount));
+  const taxableSubtotal = Math.max(0, roundMoney(afterVoucherAndOrderDiscount - pointsDiscount));
+  const vatAmount = Math.max(0, roundMoney(taxableSubtotal * vatRate));
+  const total = roundMoney(taxableSubtotal + vatAmount);
   const discountAmount = roundMoney(voucherDiscount + orderDiscountAmount + pointsDiscount);
   const normalizedPayments = normalizePayments(payload.payments, total);
   const paymentMethod = normalizedPayments.length > 1
@@ -1208,7 +1208,9 @@ async function applyPaidOrderEffects(tx, storeId, order, options = {}) {
   if (order.tableId) {
     await tx.table.updateMany({
       where: { id: order.tableId, storeId },
-      data: { status: 'dirty', occupiedSince: null }
+      data: options.keepTableOpen
+        ? { status: 'occupied' }
+        : { status: 'dirty', occupiedSince: null }
     });
   }
 
@@ -3391,7 +3393,9 @@ app.get('/api/customers', async (req, res) => {
 
 app.post('/api/customers', async (req, res) => {
   try {
-    const customerData = normalizeCustomerPatch(req.body);
+    const customerData = normalizeCustomerPatch(req.body, {
+      allowLoyalty: isAdminUser(req.user)
+    });
     const customer = await prisma.customer.create({ data: { storeId: req.storeId, ...customerData } });
     await writeAuditLog(req, 'create', 'customer', customer.id, { phone: customer.phone });
     res.status(201).json(customer);
@@ -4104,6 +4108,7 @@ async function handleCheckout(req, res) {
     payments,
     status, // "pending" hoặc "paid"
     usedPoints,
+    keepTableOpen,
     clientRequestId: bodyClientRequestId
   } = req.body;
   const storeId = req.storeId;
@@ -4235,7 +4240,10 @@ async function handleCheckout(req, res) {
       });
 
       if (orderStatus === 'paid') {
-        await applyPaidOrderEffects(tx, storeId, createdOrder, { payments: checkout.payments });
+        await applyPaidOrderEffects(tx, storeId, createdOrder, {
+          payments: checkout.payments,
+          keepTableOpen: Boolean(tableId && keepTableOpen)
+        });
       }
 
       return createdOrder;
@@ -4535,6 +4543,10 @@ app.post('/api/inventory/reset', async (req, res) => {
   if (!requireAdmin(req, res)) return;
   const storeId = req.storeId;
   try {
+    const store = await prisma.store.findUnique({ where: { id: storeId }, select: { code: true } });
+    if (store?.code !== 'espresso-lab') {
+      return res.status(403).json({ error: 'Chức năng khôi phục kho mẫu chỉ dành cho cửa hàng demo espresso-lab.' });
+    }
     await prisma.stockTransaction.deleteMany({ where: { storeId } });
     await prisma.recipeItem.deleteMany({ where: { product: { storeId } } });
     await prisma.inventory.deleteMany({ where: { storeId } });
@@ -6203,7 +6215,7 @@ app.post('/api/print', (req, res) => {
         commands.push(Buffer.from(`Giam gia: ${discStr.padStart(22, ' ')}\n`));
       }
       const vatStr = '+' + order.vatAmount.toLocaleString('vi-VN') + 'd';
-      commands.push(Buffer.from(`VAT (8%): ${vatStr.padStart(22, ' ')}\n`));
+      commands.push(Buffer.from(`VAT: ${vatStr.padStart(27, ' ')}\n`));
       
       commands.push(Buffer.from('================================\n'));
       commands.push(Buffer.from([0x1B, 0x45, 0x01])); // Bold on

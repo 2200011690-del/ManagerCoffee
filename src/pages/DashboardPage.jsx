@@ -298,12 +298,12 @@ function OrderHistoryTab() {
                 </div>
                 {detailOrder.discountAmount > 0 && (
                   <div className="flex justify-between text-coffee-accent font-medium">
-                    <span>Giảm giá ({detailOrder.voucherCode}):</span>
+                    <span>Giảm giá{detailOrder.voucherCode ? ` (${detailOrder.voucherCode})` : ''}:</span>
                     <span>-{detailOrder.discountAmount.toLocaleString('vi-VN')}đ</span>
                   </div>
                 )}
                 <div className="flex justify-between text-coffee-medium">
-                  <span>VAT 8%</span><span>+{detailOrder.vatAmount.toLocaleString('vi-VN')}đ</span>
+                  <span>VAT</span><span>+{detailOrder.vatAmount.toLocaleString('vi-VN')}đ</span>
                 </div>
                 <div className="flex justify-between font-bold text-base text-coffee-dark pt-1 border-t border-cream-medium">
                   <span>Tổng cộng</span>
@@ -405,6 +405,7 @@ export default function DashboardPage() {
 
   // SaaS states
   const [customersList, setCustomersList] = useState([]);
+  const [customersLoading, setCustomersLoading] = useState(false);
 
   // Detailed Reports states
   const [reportFilter, setReportFilter] = useState('7days');
@@ -472,6 +473,7 @@ export default function DashboardPage() {
   useEffect(() => {
     setLiveDashboardData(null);
     setCustomersList([]);
+    setCustomersLoading(false);
     setStaffReports([]);
     setTimeReports(null);
     setProfitLossReport(null);
@@ -502,9 +504,11 @@ export default function DashboardPage() {
   const fetchCustomers = useCallback(async () => {
     if (!storeId) {
       setCustomersList([]);
+      setCustomersLoading(false);
       return;
     }
     const requestedStoreId = storeId;
+    setCustomersLoading(true);
     try {
       const data = await api.get('/customers');
       if (activeStoreIdRef.current === requestedStoreId) {
@@ -513,6 +517,8 @@ export default function DashboardPage() {
     } catch (err) {
       console.error(err);
       if (activeStoreIdRef.current === requestedStoreId) setCustomersList([]);
+    } finally {
+      if (activeStoreIdRef.current === requestedStoreId) setCustomersLoading(false);
     }
   }, [storeId]);
 
@@ -1060,7 +1066,7 @@ export default function DashboardPage() {
                   </div>
                   <span className="text-coffee-light text-xs">Tuần này</span>
                 </div>
-                {topItems.map((item, idx) => <TopItemRow key={item.id} item={item} rank={idx + 1} />)}
+                {topItems.map((item, idx) => <TopItemRow key={item.id || item.name} item={item} rank={idx + 1} />)}
               </div>
 
               <div className="bg-white rounded-lg p-6 shadow-card border border-cream-medium/30">
@@ -1153,13 +1159,13 @@ export default function DashboardPage() {
                   <Package size={22} className="text-blue-600" />
                   <h2 className="font-display font-bold text-coffee-dark text-xl">Quản lý kho</h2>
                 </div>
-                <div className="flex items-center gap-2">
+                {currentUser?.store?.code === 'espresso-lab' && <div className="flex items-center gap-2">
                   <button onClick={resetInventory}
                     className="min-h-[38px] px-3 text-xs bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors flex items-center gap-1.5 font-semibold">
                     <RefreshCw size={13} />
                     Reset kho mẫu
                   </button>
-                </div>
+                </div>}
               </div>
 
               {/* Sub-tab Switcher */}
@@ -2309,7 +2315,12 @@ export default function DashboardPage() {
                             </td>
                           </tr>
                         ))}
-                      {customersList.length === 0 && (
+                      {customersLoading && (
+                        <tr>
+                          <td colSpan="5" className="text-center py-12 text-gray-400">Đang tải dữ liệu khách hàng...</td>
+                        </tr>
+                      )}
+                      {!customersLoading && customersList.length === 0 && (
                         <tr>
                           <td colSpan="5" className="text-center py-12 text-gray-400">Chưa có khách hàng nào đăng ký</td>
                         </tr>

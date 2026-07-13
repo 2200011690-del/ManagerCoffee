@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Báo cáo kiểm thử hoàn tất Manager Coffee - 13/07/2026</title>
+  <style>
+    :root { color-scheme: light; --bg:#f5f7fa; --paper:#fff; --text:#172033; --muted:#5d687a; --line:#dfe4eb; --blue:#1457d9; --green:#087a4b; --amber:#9a5b00; }
+    * { box-sizing:border-box; }
+    body { margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif; line-height:1.58; color:var(--text); background:var(--bg); }
+    main { width:min(960px,100%); margin:auto; padding:14px 12px 48px; }
+    header { padding:24px 20px; color:#fff; background:#12304a; border-radius:8px; }
+    h1 { margin:0 0 8px; font-size:clamp(25px,6vw,38px); line-height:1.18; letter-spacing:0; }
+    h2 { margin:0 0 10px; font-size:21px; letter-spacing:0; }
+    h3 { margin:18px 0 6px; font-size:17px; letter-spacing:0; }
+    p { margin:7px 0; }
+    section { margin-top:12px; padding:17px; background:var(--paper); border:1px solid var(--line); border-radius:8px; }
+    ul { margin:8px 0; padding-left:22px; }
+    li { margin:6px 0; }
+    code { padding:1px 5px; background:#edf1f5; border-radius:4px; word-break:break-word; }
+    .meta { color:#cbd9e7; font-size:14px; }
+    .result { border-left:5px solid var(--green); }
+    .result strong { color:var(--green); }
+    .warn { border-left:5px solid var(--amber); }
+    .grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+    .metric { padding:12px; border:1px solid var(--line); border-radius:7px; background:#f9fbfd; }
+    .metric b { display:block; color:var(--blue); font-size:19px; }
+    .tag { display:inline-block; margin:7px 5px 0 0; padding:4px 9px; border-radius:999px; background:#e6efff; color:#174a9f; font-size:13px; font-weight:700; }
+    .small { color:var(--muted); font-size:14px; }
+    @media (max-width:640px) { main{padding:8px 8px 34px} header,section{padding:15px} .grid{grid-template-columns:1fr} }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>Báo cáo kiểm thử hoàn tất Manager Coffee</h1>
+      <p>Rà soát logic, kiểm thử hệ thống và xác nhận bản nâng cấp cuối.</p>
+      <p class="meta">Ngày chốt: 13/07/2026 · Mã nguồn: D:\ManagerCoffee · Nhánh: main</p>
+      <span class="tag">POS/F&amp;B</span><span class="tag">API + UI</span><span class="tag">Đa cửa hàng</span><span class="tag">Kho + báo cáo</span>
+    </header>
+
+    <section class="result">
+      <h2>Kết luận hiện tại</h2>
+      <p><strong>Những luồng cốt lõi đã kiểm đều hoạt động và toàn bộ bộ kiểm thử tự động đều đạt.</strong> Bản hiện tại đã đủ tốt để chạy pilot/beta có kiểm soát tại quán thật.</p>
+      <p>Không còn lỗi chức năng nghiêm trọng nào được phát hiện trong phạm vi code, API, trình duyệt và dữ liệu test đã kiểm. Tuy vậy, không nên tuyên bố “không thể còn lỗi” hoặc “ngang 100%” với KiotViet, Sapo, iPOS365 khi chưa chạy tải production dài ngày và chưa kiểm thiết bị/tích hợp thật.</p>
+    </section>
+
+    <section>
+      <h2>1. Kết quả xác minh cuối</h2>
+      <div class="grid">
+        <div class="metric"><b>5/5 đạt</b>Bộ smoke auth, sales, shifts, operations và load.</div>
+        <div class="metric"><b>Build đạt</b>Vite build thành công, 241 module được đóng gói.</div>
+        <div class="metric"><b>Lint đạt</b>Không có lỗi lint; còn cảnh báo kỹ thuật không chặn vận hành.</div>
+        <div class="metric"><b>403 đúng</b>Reset kho bị chặn trên cửa hàng không phải demo.</div>
+      </div>
+      <ul>
+        <li><code>npm run test:smoke</code>: đạt.</li>
+        <li><code>npm run test:smoke:sales</code>: đạt, gồm checkout, kho, trả hàng, voucher và VAT sau giảm giá.</li>
+        <li><code>npm run test:smoke:shifts</code>: đạt, gồm mở/đóng ca và đối soát tiền.</li>
+        <li><code>npm run test:smoke:operations</code>: đạt, gồm kho, khách hàng, phân quyền và đặt bàn.</li>
+        <li><code>npm run test:smoke:load</code>: đạt, gồm giao dịch đồng thời.</li>
+        <li><code>npm run lint</code>, <code>npm run build</code> và kiểm tra cú pháp Node: đạt.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>2. Luồng trình duyệt đã kiểm</h2>
+      <ul>
+        <li>Đăng ký cửa hàng mới, đăng nhập admin và xác nhận dữ liệu giữa các cửa hàng được cô lập.</li>
+        <li>Tạo bàn, nguyên liệu, nhà cung cấp, phiếu nhập, món, công thức, voucher, nhân viên và khách hàng.</li>
+        <li>POS: giữ giỏ theo bàn sau tải lại, áp khách/voucher, thanh toán, in hóa đơn và cập nhật bàn.</li>
+        <li>KDS: nhận món, chuyển đang làm, hoàn tất và loại khỏi danh sách đang xử lý.</li>
+        <li>QR tại bàn: khách gọi món, quán nhận đơn theo thời gian thực, duyệt và thanh toán.</li>
+        <li>Đặt bàn: nhận cọc, xếp bàn, hoàn tất và chặn trùng lịch.</li>
+        <li>Nhân viên: bắt buộc mở ca, giới hạn giảm giá/hoàn tiền, đóng ca và đăng xuất.</li>
+        <li>Báo cáo: doanh thu, số đơn, món bán chạy, giá vốn, tiêu hao và tồn kho đúng cửa hàng.</li>
+        <li>Responsive 390x844 và 768x1024: không tràn ngang, không chồng nội dung.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>3. Những lỗi đã sửa trong vòng cuối</h2>
+      <ul>
+        <li>Admin tạo khách hàng nay giữ đúng điểm/hạng ban đầu; nhân viên không thể tự gán điểm, hạng hoặc cửa hàng khác.</li>
+        <li>VAT được tính trên giá trị sau voucher, giảm toàn đơn và điểm; server là nguồn tính tiền cuối cùng.</li>
+        <li>VAT trên POS, tách đơn, sơ đồ bàn, hóa đơn nhiệt và bản in thử đồng bộ theo cấu hình cửa hàng.</li>
+        <li>Chặn tách đơn khi đang áp voucher, giảm giá hoặc điểm để tránh nhân đôi ưu đãi.</li>
+        <li>Tách đơn nay trừ đúng món đã thanh toán; bàn vẫn “có khách” khi còn món và chỉ chuyển “chưa dọn” sau phần thanh toán cuối.</li>
+        <li>Chặn nhân viên áp mức giảm vượt quyền ngay trên giao diện và vẫn kiểm tra lại tại server.</li>
+        <li>Reset kho mẫu chỉ tồn tại với store demo <code>espresso-lab</code>; cửa hàng thật không thấy nút và API trả <code>403</code>.</li>
+        <li>Đã xác minh kho E2E giữ nguyên 1 nguyên liệu và 14,94 kg sau yêu cầu reset bị từ chối.</li>
+        <li>Sửa trạng thái tải menu/khách hàng để không hiện dữ liệu rỗng giả trong lúc chờ API.</li>
+        <li>Sửa khóa danh sách món bán chạy gây cảnh báo React và thêm đường đăng xuất ở modal bắt buộc mở ca.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>4. Trạng thái so với các ứng dụng lớn</h2>
+      <p>Về phạm vi nghiệp vụ cốt lõi, Manager Coffee đã có nền tảng khá đầy đủ: POS, bàn, KDS, QR order, đặt bàn, kho/công thức, khách hàng, khuyến mãi, ca làm, báo cáo, phân quyền và đa cửa hàng.</p>
+      <p>Khoảng cách còn lại chủ yếu không còn là “thiếu màn hình”, mà là độ trưởng thành vận hành: lịch sử chạy production, hỗ trợ phần cứng đa dạng, hệ sinh thái đối tác, SLA, đội hỗ trợ và quy mô hạ tầng. Đây là những lợi thế mà sản phẩm lớn tích lũy qua nhiều năm, không thể chứng minh chỉ bằng test local.</p>
+    </section>
+
+    <section class="warn">
+      <h2>5. Việc chỉ làm được ở môi trường thật</h2>
+      <ul>
+        <li>Kiểm máy in LAN, máy in bếp/bar/tem và ngăn kéo tiền thật.</li>
+        <li>Tích hợp cổng thanh toán/ngân hàng thật, chữ ký webhook và đối soát thất bại.</li>
+        <li>Hóa đơn điện tử và quy trình thuế theo nhà cung cấp chính thức.</li>
+        <li>Kiểm mạng yếu/mất mạng, nhiều thiết bị POS và vận hành liên tục nhiều ngày.</li>
+        <li>Thiết lập production: domain, HTTPS, secret riêng, backup tự động, giám sát, cảnh báo và phục hồi sự cố.</li>
+      </ul>
+      <p class="small">Các mục này được chủ động để lại cho giai đoạn tích hợp thật theo yêu cầu, không phải chức năng đang hỏng trong code hiện tại.</p>
+    </section>
+
+    <section>
+      <h2>6. Khuyến nghị đưa vào sử dụng</h2>
+      <ol>
+        <li>Chạy pilot tại một quán với dữ liệu thật nhưng có người theo dõi trong 2-4 tuần.</li>
+        <li>Đối soát doanh thu, tiền ca, tồn kho và báo cáo mỗi ngày trong giai đoạn pilot.</li>
+        <li>Thiết lập backup/monitoring production trước khi mở rộng nhiều quán.</li>
+        <li>Sau pilot mới tích hợp thanh toán, hóa đơn điện tử và thiết bị in thật.</li>
+      </ol>
+      <p><strong>Đánh giá chốt:</strong> code hiện tại đạt điều kiện bước vào pilot nghiêm túc; chưa có cơ sở trung thực để gọi là ngang 100% sản phẩm dẫn đầu cho đến khi hoàn thành kiểm chứng production và tích hợp thật.</p>
+    </section>
+  </main>
+</body>
+</html>

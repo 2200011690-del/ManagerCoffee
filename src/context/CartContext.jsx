@@ -29,6 +29,7 @@ export function CartProvider({ children }) {
   const [activeTableId, setActiveTableId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [promotions, setPromotions] = useState([]);
+  const [vatRate, setVatRate] = useState(0.08);
 
   const syncTimeoutRef = useRef({});
 
@@ -48,9 +49,20 @@ export function CartProvider({ children }) {
     }
   };
 
+  const fetchStoreSettings = async () => {
+    try {
+      const data = await api.get('/store/settings');
+      const nextVatRate = Number(data?.vatRate);
+      setVatRate(Number.isFinite(nextVatRate) && nextVatRate >= 0 ? nextVatRate : 0.08);
+    } catch (err) {
+      console.error('Failed to fetch store VAT settings:', err);
+    }
+  };
+
   useEffect(() => {
     setTableCarts({});
     setActiveTableId(loadActiveTable(storeId));
+    setVatRate(0.08);
   }, [storeId]);
 
   // Load carts & promotions from backend
@@ -74,6 +86,7 @@ export function CartProvider({ children }) {
     };
     fetchCarts();
     fetchPromotions();
+    fetchStoreSettings();
 
     const handleCartSync = (carts) => {
       setTableCarts(prev => {
@@ -249,7 +262,6 @@ export function CartProvider({ children }) {
 
   const promoDetails = getPromoDetails();
 
-  const VAT_RATE = 0.08;
   const subtotalBeforeGlobalDiscounts = cart.reduce((sum, item) => {
     const itemTotal = item.price * item.qty;
     const manualDiscount = item.discount || 0;
@@ -260,7 +272,7 @@ export function CartProvider({ children }) {
 
   const globalPromoDiscount = promoDetails.comboDiscount + promoDetails.buyXGetYDiscount;
   const subtotal = Math.max(0, subtotalBeforeGlobalDiscounts - globalPromoDiscount);
-  const vatAmount = Math.round(subtotal * VAT_RATE);
+  const vatAmount = Math.round(subtotal * vatRate);
   const total = subtotal + vatAmount;
   const cartCount = cart.reduce((sum, item) => sum + item.qty, 0);
 
@@ -397,7 +409,7 @@ export function CartProvider({ children }) {
   }, [activeTableId, syncCartToBackend]);
 
   const value = {
-    cart, subtotal, vatAmount, total, cartCount,
+    cart, subtotal, vatAmount, total, vatRate, cartCount,
     tableCarts, activeTableId, setSelectedTable, setTakeaway, tableHasCart,
     addToCart, removeFromCart, updateQty, clearCart, clearCurrentCart,
     applyItemDiscount,

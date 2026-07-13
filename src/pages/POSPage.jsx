@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 import {
   Search, ShoppingCart, Trash2, CreditCard, Banknote, Receipt, Tag,
   LayoutGrid, X, ArrowLeftRight, User, Gift,
-  Lock, Unlock, Clock, AlertTriangle, Pause, RotateCcw, Percent, Layers
+  Lock, Unlock, Clock, AlertTriangle, Pause, RotateCcw, Percent, Layers, LogOut
 } from 'lucide-react';
 import { categories } from '../data/coffeeData';
 import { useMenu } from '../context/MenuContext';
@@ -149,7 +149,7 @@ function DebouncedSearchInput({ value, onChange, placeholder, className, icon: I
 // ---- Main POS Page ----
 export default function POSPage() {
   const {
-    cart, subtotal, vatAmount, total, cartCount,
+    cart, subtotal, vatRate, cartCount,
     addToCart, removeFromCart, updateQty, clearCart, clearCurrentCart,
     activeTableId, setSelectedTable, setTakeaway, tableHasCart,
     applyItemDiscount
@@ -157,8 +157,8 @@ export default function POSPage() {
   const { tables, updateTableStatus } = useTable();
   const { showNotification } = useUI();
   const { addOrder } = useOrderHistory();
-  const { visibleMenu } = useMenu();
-  const { currentUser } = useAuth();
+  const { visibleMenu, loading: menuLoading } = useMenu();
+  const { currentUser, logout } = useAuth();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState('Tất cả');
@@ -330,6 +330,13 @@ export default function POSPage() {
         code: voucherInput.toUpperCase(),
         orderValue: subtotal
       });
+      const discountPct = subtotal > 0 ? (data.discountAmount / subtotal) * 100 : 0;
+      if (currentUser?.role === 'staff' && discountPct > currentUser.maxDiscountPct) {
+        showNotification(`Voucher vượt hạn mức giảm giá tối đa (${currentUser.maxDiscountPct}%)`, 'error');
+        setAppliedVoucher(null);
+        setDiscountAmount(0);
+        return;
+      }
       setAppliedVoucher(data.voucher);
       setDiscountAmount(data.discountAmount);
       showNotification('Áp dụng mã giảm giá thành công!', 'success');
@@ -341,19 +348,21 @@ export default function POSPage() {
   };
 
   const totalDiscount = discountAmount + orderDiscountAmount;
-  const tempTotal = total - totalDiscount > 0 ? total - totalDiscount : 0;
-  const maxPointsNeeded = Math.floor(tempTotal);
+  const subtotalAfterDiscount = Math.max(0, subtotal - totalDiscount);
+  const maxPointsNeeded = Math.floor(subtotalAfterDiscount);
   const pointsToDeduct = usePoints && customer ? Math.min(customer.points, maxPointsNeeded) : 0;
   const pointsDiscount = pointsToDeduct;
-  const finalTotal = tempTotal - pointsDiscount > 0 ? tempTotal - pointsDiscount : 0;
+  const taxableSubtotal = Math.max(0, subtotalAfterDiscount - pointsDiscount);
+  const vatAmount = Math.round(taxableSubtotal * vatRate);
+  const finalTotal = taxableSubtotal + vatAmount;
 
   const finalizePaidCart = (order) => {
     if (activeTableId) {
-      updateTableStatus(activeTableId, 'dirty');
+      updateTableStatus(activeTableId, order?.keepTableOpen ? 'occupied' : 'dirty');
     }
 
     if (order?.isSplit) {
-      order.items.forEach(splitItem => {
+      (order.splitItems || order.items || []).forEach(splitItem => {
         updateQty(splitItem.cartItemId, -splitItem.qty);
       });
     } else {
@@ -504,11 +513,16 @@ export default function POSPage() {
     }
     let amount = 0;
     if (orderDiscountType === 'PERCENT') {
-      amount = Math.round(total * (val / 100));
+      amount = Math.round(subtotal * (val / 100));
     } else {
       amount = val;
     }
-    if (amount > total) amount = total;
+    if (amount > subtotal) amount = subtotal;
+    const discountPct = subtotal > 0 ? (amount / subtotal) * 100 : 0;
+    if (currentUser?.role === 'staff' && discountPct > currentUser.maxDiscountPct) {
+      showNotification(`Vượt quá hạn mức giảm giá tối đa cho phép (${currentUser.maxDiscountPct}%)`, 'error');
+      return;
+    }
     setOrderDiscountAmount(amount);
     setShowOrderDiscount(false);
   };
@@ -598,23 +612,37 @@ export default function POSPage() {
     };
   }, []);
 
+  const handleOpenSplitBill = () => {
+    if (appliedVoucher || orderDiscountAmount > 0 || usePoints) {
+      showNotification('Vui lòng bỏ voucher, giảm giá và điểm trước khi tách đơn', 'error');
+      return;
+    }
+    setShowSplitBill(true);
+  };
+
   const handleConfirmSplit = async (selectedItems, splitSubtotal, splitVatAmount, splitTotal) => {
-    const splitFinalTotal = splitTotal - discountAmount > 0 ? splitTotal - discountAmount : 0;
     const tableName = activeTableId ? (activeTable?.name || 'Bàn chưa xác định') : 'Mang về';
+    const keepTableOpen = Boolean(activeTableId) && cart.some((cartItem) => {
+      const paidQty = selectedItems
+        .filter((item) => item.cartItemId === cartItem.cartItemId)
+        .reduce((sum, item) => sum + item.qty, 0);
+      return paidQty < cartItem.qty;
+    });
     const newOrder = await addOrder({
       tableId: activeTableId,
       tableName,
       cart: selectedItems,
       subtotal: splitSubtotal,
       vatAmount: splitVatAmount,
-      total: splitFinalTotal,
+      total: splitTotal,
       paymentMethod,
       customerId: customer?.id,
-      voucherCode: appliedVoucher?.code,
-      discountAmount,
+      keepTableOpen,
       employeeId: currentUser?.id
     });
     newOrder.isSplit = true;
+    newOrder.splitItems = selectedItems;
+    newOrder.keepTableOpen = keepTableOpen;
     setPendingOrder(newOrder);
     finalizePaidCart(newOrder);
     setShowSplitBill(false);
@@ -705,7 +733,7 @@ export default function POSPage() {
 
         {/* Menu Grid */}
         <div className="flex-1 overflow-y-auto px-6 pb-6">
-          <ProductGrid items={filteredItems} onAddToCart={handleAddItem} onSelectItem={setSelectedItem} />
+          <ProductGrid items={filteredItems} loading={menuLoading} onAddToCart={handleAddItem} onSelectItem={setSelectedItem} />
         </div>
 
       </div>
@@ -923,7 +951,7 @@ export default function POSPage() {
                 </div>
               )}
               <div className="flex justify-between text-sm text-coffee-medium">
-                <span>VAT (8%)</span>
+                <span>VAT ({Math.round(vatRate * 100)}%)</span>
                 <span>+{vatAmount.toLocaleString('vi-VN')}đ</span>
               </div>
               <div className="divider" />
@@ -993,7 +1021,7 @@ export default function POSPage() {
             {/* Action buttons row 2: Split Bill + Return + Checkout */}
             <div className="flex gap-2">
               <button
-                onClick={() => setShowSplitBill(true)}
+                onClick={handleOpenSplitBill}
                 className="flex-1 min-h-[44px] btn-secondary flex items-center justify-center gap-1.5 text-xs"
               >
                 Tách đơn
@@ -1044,7 +1072,7 @@ export default function POSPage() {
               </div>
               <span className="font-semibold text-sm">Xem giỏ hàng</span>
             </div>
-            <span className="font-bold text-sm">{(total || subtotal).toLocaleString('vi-VN')}đ</span>
+            <span className="font-bold text-sm">{finalTotal.toLocaleString('vi-VN')}đ</span>
           </button>
         </div>
       )}
@@ -1100,7 +1128,7 @@ export default function POSPage() {
                 </div>
               )}
               <div className="flex justify-between text-sm text-coffee-medium">
-                <span>VAT 8%</span>
+                <span>VAT {Math.round(vatRate * 100)}%</span>
                 <span>+{vatAmount.toLocaleString('vi-VN')}đ</span>
               </div>
               <div className="border-t border-cream-dark pt-2 flex justify-between font-bold text-coffee-dark text-lg">
@@ -1149,6 +1177,7 @@ export default function POSPage() {
       {showSplitBill && (
         <SplitBillModal 
           cart={cart}
+          vatRate={vatRate}
           onClose={() => setShowSplitBill(false)}
           onConfirmSplit={handleConfirmSplit}
         />
@@ -1192,6 +1221,14 @@ export default function POSPage() {
               >
                 <Unlock size={18} />
                 Mở ca bán hàng
+              </button>
+              <button
+                type="button"
+                onClick={logout}
+                className="w-full min-h-[44px] btn-secondary flex items-center justify-center gap-2"
+              >
+                <LogOut size={17} />
+                Đăng xuất
               </button>
             </div>
           </div>
@@ -1392,7 +1429,7 @@ export default function POSPage() {
                   <p className="text-xs text-green-700">Giảm giá dự kiến:</p>
                   <p className="text-lg font-bold text-green-700 font-mono">
                     -{(orderDiscountType === 'PERCENT'
-                      ? Math.round(total * (Number(orderDiscountValue) / 100))
+                      ? Math.round(subtotal * (Number(orderDiscountValue) / 100))
                       : Number(orderDiscountValue)
                     ).toLocaleString('vi-VN')}đ
                   </p>

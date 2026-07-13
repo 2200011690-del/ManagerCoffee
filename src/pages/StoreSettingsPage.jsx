@@ -290,8 +290,8 @@ export default function StoreSettingsPage() {
           tableName: 'Ban Test',
           subtotal: 50000,
           discountAmount: 10000,
-          vatAmount: 3200,
-          total: 43200,
+          vatAmount: Math.round(40000 * settings.vatRate),
+          total: 40000 + Math.round(40000 * settings.vatRate),
           paymentMethod: 'cash',
           items: [
             { name: 'Ca phe Sua da', qty: 2, price: 20000, sugar: '50%', ice: 'It da' },

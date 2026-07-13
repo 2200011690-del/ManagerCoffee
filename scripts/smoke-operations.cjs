@@ -68,6 +68,12 @@ async function main() {
     });
     assert(login.status === 200 && login.body?.token, 'Dang nhap admin that bai', login);
     const token = login.body.token;
+    const staffLogin = await request('/api/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ storeCode: 'espresso-lab', pin: '2222' }),
+    });
+    assert(staffLogin.status === 200 && staffLogin.body?.token, 'Dang nhap nhan vien that bai', staffLogin);
+    const staffToken = staffLogin.body.token;
 
     const ingredient = await request('/api/inventory', {
       method: 'POST',
@@ -91,7 +97,15 @@ async function main() {
       body: JSON.stringify({ name: 'Khach allowlist', phone: customerPhone, points: 999999, tier: 'DIAMOND', storeId: 'store-khac' }),
     });
     assert(customer.status === 201, 'Tao khach hang that bai', customer);
-    assert(customer.body.storeId === login.body.storeId && customer.body.points === 0 && customer.body.tier === 'SILVER', 'Customer API cho phep mass assignment', customer.body);
+    assert(customer.body.storeId === login.body.storeId && customer.body.points === 999999 && customer.body.tier === 'DIAMOND', 'Admin khong tao duoc diem va hang ban dau', customer.body);
+    const staffCustomerPhone = `08${String(Date.now()).slice(-8)}`;
+    const staffCustomer = await request('/api/customers', {
+      method: 'POST',
+      headers: auth(staffToken),
+      body: JSON.stringify({ name: 'Khach tu POS', phone: staffCustomerPhone, points: 999999, tier: 'DIAMOND', storeId: 'store-khac' }),
+    });
+    assert(staffCustomer.status === 201, 'Nhan vien tao khach hang that bai', staffCustomer);
+    assert(staffCustomer.body.storeId === login.body.storeId && staffCustomer.body.points === 0 && staffCustomer.body.tier === 'SILVER', 'Nhan vien co the tu gan diem hoac hang khach hang', staffCustomer.body);
     const loyaltyUpdate = await request(`/api/customers/${customer.body.id}`, {
       method: 'PUT', headers: auth(token), body: JSON.stringify({ points: 25, tier: 'GOLD' }),
     });
@@ -102,6 +116,8 @@ async function main() {
     assert(nameOnlyUpdate.status === 200 && nameOnlyUpdate.body.points === 25, 'Cap nhat thieu truong da reset diem ve 0', nameOnlyUpdate);
     const customerDelete = await request(`/api/customers/${customer.body.id}`, { method: 'DELETE', headers: auth(token) });
     assert(customerDelete.status === 200, 'Khong xoa duoc khach test chua co giao dich', customerDelete);
+    const staffCustomerDelete = await request(`/api/customers/${staffCustomer.body.id}`, { method: 'DELETE', headers: auth(token) });
+    assert(staffCustomerDelete.status === 200, 'Khong xoa duoc khach test do nhan vien tao', staffCustomerDelete);
 
     const [tablesResponse, productsResponse] = await Promise.all([
       request('/api/tables', { headers: auth(token) }),

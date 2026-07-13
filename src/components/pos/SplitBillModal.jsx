@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { X, CheckCircle, SplitSquareVertical } from 'lucide-react';
 
-export default function SplitBillModal({ cart, onClose, onConfirmSplit }) {
+export default function SplitBillModal({ cart, vatRate = 0.08, onClose, onConfirmSplit }) {
   // state to track how many of each item is selected to be split
   const [splitCounts, setSplitCounts] = useState({});
 
@@ -30,9 +30,8 @@ export default function SplitBillModal({ cart, onClose, onConfirmSplit }) {
     qty: splitCounts[item.cartItemId]
   }));
 
-  const VAT_RATE = 0.08;
   const splitSubtotal = selectedItems.reduce((sum, item) => sum + item.price * item.qty, 0);
-  const splitVatAmount = Math.round(splitSubtotal * VAT_RATE);
+  const splitVatAmount = Math.round(splitSubtotal * vatRate);
   const splitTotal = splitSubtotal + splitVatAmount;
   const splitCount = selectedItems.reduce((sum, item) => sum + item.qty, 0);
 
@@ -93,7 +92,7 @@ export default function SplitBillModal({ cart, onClose, onConfirmSplit }) {
           <div className="flex justify-between items-end mb-4">
             <div>
               <p className="text-coffee-medium text-sm mb-1">Tạm tính ({splitCount} món): {splitSubtotal.toLocaleString('vi-VN')}đ</p>
-              <p className="text-coffee-medium text-sm">VAT (8%): {splitVatAmount.toLocaleString('vi-VN')}đ</p>
+              <p className="text-coffee-medium text-sm">VAT ({Math.round(vatRate * 100)}%): {splitVatAmount.toLocaleString('vi-VN')}đ</p>
             </div>
             <div className="text-right">
               <p className="text-coffee-medium text-xs mb-1">Thành tiền</p>

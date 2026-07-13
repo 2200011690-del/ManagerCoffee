@@ -8,17 +8,17 @@ import GuestOrderInbox from '../components/tables/GuestOrderInbox';
 import ReservationsPanel from '../components/tables/ReservationsPanel';
 
 // Hàm tính total từ giỏ hàng của bàn
-function calcTableTotal(cartItems = []) {
+function calcTableTotal(cartItems = [], vatRate = 0.08) {
   const subtotal = cartItems.reduce((s, i) => s + i.price * i.qty, 0);
-  return Math.round(subtotal * 1.08); // đã gồm VAT
+  return subtotal + Math.round(subtotal * vatRate);
 }
 function calcTableItemCount(cartItems = []) {
   return cartItems.reduce((s, i) => s + i.qty, 0);
 }
 
-function TableCard({ table, onGoToPOS, onMarkClean, tableCarts, isEditMode, onEdit, onDelete, onShowQR }) {
+function TableCard({ table, onGoToPOS, onMarkClean, tableCarts, vatRate, isEditMode, onEdit, onDelete, onShowQR }) {
   const cartItems = tableCarts[table.id] ?? [];
-  const total = calcTableTotal(cartItems);
+  const total = calcTableTotal(cartItems, vatRate);
   const itemCount = calcTableItemCount(cartItems);
   const hasCart = cartItems.length > 0;
 
@@ -164,7 +164,7 @@ function TableCard({ table, onGoToPOS, onMarkClean, tableCarts, isEditMode, onEd
 
 export default function TablePage() {
   const { tables, updateTableStatus, createTable, updateTable, deleteTable, rotateOrderToken } = useTable();
-  const { setSelectedTable, tableCarts } = useCart();
+  const { setSelectedTable, tableCarts, vatRate } = useCart();
   const { setView } = useUI();
   const [activeZone, setActiveZone] = useState('Tất cả');
   const [viewMode, setViewMode] = useState('floor');
@@ -415,6 +415,7 @@ export default function TablePage() {
                     onGoToPOS={handleGoToPOS}
                     onMarkClean={handleMarkClean}
                     tableCarts={tableCarts}
+                    vatRate={vatRate}
                     isEditMode={isEditMode}
                     onEdit={handleEditClick}
                     onDelete={handleDeleteClick}
