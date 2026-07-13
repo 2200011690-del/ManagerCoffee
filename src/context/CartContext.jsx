@@ -35,8 +35,9 @@ export function CartProvider({ children }) {
 
   // Cleanup timeouts on unmount
   useEffect(() => {
+    const syncTimeouts = syncTimeoutRef.current;
     return () => {
-      Object.values(syncTimeoutRef.current).forEach(clearTimeout);
+      Object.values(syncTimeouts).forEach(clearTimeout);
     };
   }, []);
 

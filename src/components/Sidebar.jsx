@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Coffee, LayoutGrid, BarChart3, ChefHat, Wifi, WifiOff, LogOut, Shield, Users, ShoppingBag, Clock, Settings, Gift, AlertTriangle } from 'lucide-react';
+import { Coffee, LayoutGrid, BarChart3, ChefHat, Wifi, WifiOff, LogOut, Shield, Users, ShoppingBag, Clock, Settings, Gift, AlertTriangle, Truck } from 'lucide-react';
 import { useUI } from '../context/UIContext';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
@@ -13,6 +13,7 @@ const ALL_NAV_ITEMS = [
   { id: 'tables',    label: 'Sơ đồ bàn',  icon: LayoutGrid,  subtitle: 'Khu vực bàn',   roles: ['admin', 'staff'] },
   { id: 'kitchen',   label: 'Nhà bếp',    icon: ChefHat,     subtitle: 'Bếp/Pha chế',   roles: ['admin', 'staff'] },
   { id: 'dashboard', label: 'Báo cáo',    icon: BarChart3,   subtitle: 'Doanh thu',     roles: ['admin'] },
+  { id: 'supply-chain', label: 'Cung ứng', icon: Truck,      subtitle: 'Mua & điều chuyển', roles: ['admin'] },
   { id: 'menu',      label: 'Thực đơn',   icon: ChefHat,     subtitle: 'Món & giá',     roles: ['admin'] },
   { id: 'promotions', label: 'Khuyến mãi', icon: Gift,        subtitle: 'Ưu đãi',        roles: ['admin'] },
   { id: 'employees', label: 'Nhân sự',    icon: Users,       subtitle: 'Ca làm',        roles: ['admin'] },

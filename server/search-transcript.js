@@ -15,7 +15,7 @@ async function findUserInputs() {
       if (obj.type === 'USER_INPUT') {
         output.push(`=== Step ${obj.step_index} (${obj.created_at}) ===\n${obj.content}\n`);
       }
-    } catch (e) {}
+    } catch {}
   }
   fs.writeFileSync('C:/Users/dangk/.gemini/antigravity-ide/brain/cc56f88e-cd1c-4c6f-866a-0b1d22ce4e58/scratch/user_inputs.txt', output.join('\n'));
   console.log('Done!');

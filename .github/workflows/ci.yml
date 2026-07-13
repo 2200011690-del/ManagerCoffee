@@ -81,5 +81,14 @@ jobs:
       - name: Smoke QR and reservations
         run: npm run test:smoke:operations
 
+      - name: Smoke supply chain
+        run: npm run test:smoke:supply-chain
+
       - name: Smoke load
         run: npm run test:smoke:load
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Browser E2E
+        run: npm run test:e2e

@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import {
   Search, ShoppingCart, Trash2, CreditCard, Banknote, Receipt, Tag,
   LayoutGrid, X, ArrowLeftRight, User, Gift,
@@ -194,7 +194,7 @@ export default function POSPage() {
   const [actualCashInput, setActualCashInput] = useState('');
   const [shiftNotes, setShiftNotes] = useState('');
 
-  const loadActiveShift = async () => {
+  const loadActiveShift = useCallback(async () => {
     if (!currentUser) return;
     if (currentUser.role === 'admin') {
       setIsLoadingShift(false);
@@ -211,11 +211,11 @@ export default function POSPage() {
     } finally {
       setIsLoadingShift(false);
     }
-  };
+  }, [currentUser]);
 
   useEffect(() => {
     loadActiveShift();
-  }, [currentUser]);
+  }, [loadActiveShift]);
 
   const handleOpenShift = async (openingCash) => {
     try {
@@ -315,7 +315,7 @@ export default function POSPage() {
           }
         }
       }
-    } catch (err) {
+    } catch {
       showNotification('Lỗi khi tìm khách hàng', 'error');
     } finally {
       setIsSearchingCustomer(false);
@@ -328,7 +328,8 @@ export default function POSPage() {
     try {
       const data = await api.post('/vouchers/validate', {
         code: voucherInput.toUpperCase(),
-        orderValue: subtotal
+        orderValue: subtotal,
+        customerId: customer?.id || null
       });
       const discountPct = subtotal > 0 ? (data.discountAmount / subtotal) * 100 : 0;
       if (currentUser?.role === 'staff' && discountPct > currentUser.maxDiscountPct) {
@@ -358,7 +359,7 @@ export default function POSPage() {
 
   const finalizePaidCart = (order) => {
     if (activeTableId) {
-      updateTableStatus(activeTableId, order?.keepTableOpen ? 'occupied' : 'dirty');
+      updateTableStatus(activeTableId, order?.keptTableOpen ? 'occupied' : 'dirty');
     }
 
     if (order?.isSplit) {
@@ -451,7 +452,7 @@ export default function POSPage() {
       const paidOrder = await api.put(`/orders/${pendingOrder.id}/pay`);
       setPendingOrder(paidOrder);
       finalizePaidCart(paidOrder);
-    } catch (err) {
+    } catch {
       // Fallback nếu webhook đã xử lý xong trước và API trả về 404
       console.log('Order already paid via webhook.');
       finalizePaidCart(pendingOrder);
@@ -481,7 +482,7 @@ export default function POSPage() {
       });
       clearCurrentCart(activeTableId);
       showNotification('Đã lưu đơn tạm giữ!', 'success');
-    } catch (err) {
+    } catch {
       showNotification('Lỗi khi giữ đơn', 'error');
     }
   };
@@ -543,7 +544,7 @@ export default function POSPage() {
     try {
       const data = await api.get(`/customers/${customerId}/history`);
       setCustomerHistory(data);
-    } catch (err) {
+    } catch {
       showNotification('Không thể tải lịch sử mua hàng', 'error');
     } finally {
       setLoadingHistory(false);
@@ -622,31 +623,28 @@ export default function POSPage() {
 
   const handleConfirmSplit = async (selectedItems, splitSubtotal, splitVatAmount, splitTotal) => {
     const tableName = activeTableId ? (activeTable?.name || 'Bàn chưa xác định') : 'Mang về';
-    const keepTableOpen = Boolean(activeTableId) && cart.some((cartItem) => {
-      const paidQty = selectedItems
-        .filter((item) => item.cartItemId === cartItem.cartItemId)
-        .reduce((sum, item) => sum + item.qty, 0);
-      return paidQty < cartItem.qty;
-    });
-    const newOrder = await addOrder({
-      tableId: activeTableId,
-      tableName,
-      cart: selectedItems,
-      subtotal: splitSubtotal,
-      vatAmount: splitVatAmount,
-      total: splitTotal,
-      paymentMethod,
-      customerId: customer?.id,
-      keepTableOpen,
-      employeeId: currentUser?.id
-    });
-    newOrder.isSplit = true;
-    newOrder.splitItems = selectedItems;
-    newOrder.keepTableOpen = keepTableOpen;
-    setPendingOrder(newOrder);
-    finalizePaidCart(newOrder);
-    setShowSplitBill(false);
-    setShowThermal(true);
+    try {
+      const newOrder = await addOrder({
+        tableId: activeTableId,
+        tableName,
+        cart: selectedItems,
+        subtotal: splitSubtotal,
+        vatAmount: splitVatAmount,
+        total: splitTotal,
+        paymentMethod,
+        customerId: customer?.id,
+        splitCartKey: activeTableId || '__takeaway__',
+        employeeId: currentUser?.id
+      });
+      newOrder.isSplit = true;
+      newOrder.splitItems = selectedItems;
+      setPendingOrder(newOrder);
+      finalizePaidCart(newOrder);
+      setShowSplitBill(false);
+      setShowThermal(true);
+    } catch (err) {
+      showNotification(err.response?.data?.error || 'Không thể tách đơn. Vui lòng tải lại giỏ hàng.', 'error');
+    }
   };
 
 

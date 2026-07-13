@@ -32,25 +32,30 @@ model Store {
   platformNotes         String?
   createdAt             DateTime     @default(now())
 
-  users        User[]
-  products     Product[]
-  tables       Table[]
-  orders       Order[]
-  customers    Customer[]
-  vouchers     Voucher[]
-  inventories  Inventory[]
-  suppliers    Supplier[]
-  transactions StockTransaction[]
-  attendances  Attendance[]
-  cashShifts   CashShift[]
-  returnOrders ReturnOrder[]
-  heldOrders   HeldOrder[]
-  promotions   Promotion[]
-  auditLogs    AuditLog[]
-  integrations StoreIntegration[]
-  activeCarts  ActiveCart[]
-  guestOrders  GuestOrder[]
-  reservations Reservation[]
+  users              User[]
+  products           Product[]
+  tables             Table[]
+  orders             Order[]
+  customers          Customer[]
+  vouchers           Voucher[]
+  inventories        Inventory[]
+  suppliers          Supplier[]
+  transactions       StockTransaction[]
+  attendances        Attendance[]
+  cashShifts         CashShift[]
+  returnOrders       ReturnOrder[]
+  heldOrders         HeldOrder[]
+  promotions         Promotion[]
+  auditLogs          AuditLog[]
+  integrations       StoreIntegration[]
+  activeCarts        ActiveCart[]
+  guestOrders        GuestOrder[]
+  reservations       Reservation[]
+  voucherRedemptions VoucherRedemption[]
+  purchaseOrders     PurchaseOrder[]
+  stocktakes         Stocktake[]
+  outgoingTransfers  InventoryTransfer[] @relation("TransferSourceStore")
+  incomingTransfers  InventoryTransfer[] @relation("TransferDestinationStore")
 
   @@index([organizationId])
 }
@@ -142,6 +147,7 @@ model Order {
   tableId         String?
   tableName       String
   subtotal        Float
+  vatRate         Float       @default(0.08)
   vatAmount       Float
   total           Float
   paymentMethod   String // "cash", "card", "mixed"
@@ -165,11 +171,14 @@ model Order {
   discountReason    String? // Reason for discount (anti-fraud)
   note              String?
   usedPoints        Int?    @default(0)
+  splitCheckout     Boolean @default(false)
+  keptTableOpen     Boolean @default(false)
 
   // Relations
-  returnOrders ReturnOrder[]
-  payments     OrderPayment[]
-  guestOrder   GuestOrder?
+  returnOrders      ReturnOrder[]
+  payments          OrderPayment[]
+  guestOrder        GuestOrder?
+  voucherRedemption VoucherRedemption?
 
   @@unique([storeId, orderNumber])
   @@unique([storeId, clientRequestId])
@@ -215,9 +224,12 @@ model Inventory {
   avgCost Float?
   icon    String?
 
-  recipes       RecipeItem[]
-  transactions  StockTransaction[]
-  costSnapshots OrderItemCostSnapshot[]
+  recipes            RecipeItem[]
+  transactions       StockTransaction[]
+  costSnapshots      OrderItemCostSnapshot[]
+  purchaseOrderItems PurchaseOrderItem[]
+  stocktakeItems     StocktakeItem[]
+  transferItems      InventoryTransferItem[]
 
   @@index([storeId])
 }
@@ -261,7 +273,8 @@ model Supplier {
   address   String?
   createdAt DateTime @default(now())
 
-  transactions StockTransaction[]
+  transactions   StockTransaction[]
+  purchaseOrders PurchaseOrder[]
 
   @@index([storeId])
 }
@@ -287,32 +300,55 @@ model StockTransaction {
 }
 
 model Customer {
-  id        String   @id @default(cuid())
-  storeId   String
-  store     Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
-  name      String
-  phone     String
-  points    Int      @default(0)
-  tier      String   @default("SILVER") // SILVER, GOLD, DIAMOND
-  createdAt DateTime @default(now())
-  orders    Order[]
+  id                 String              @id @default(cuid())
+  storeId            String
+  store              Store               @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  name               String
+  phone              String
+  points             Int                 @default(0)
+  tier               String              @default("SILVER") // SILVER, GOLD, DIAMOND
+  createdAt          DateTime            @default(now())
+  orders             Order[]
+  voucherRedemptions VoucherRedemption[]
 
   @@unique([storeId, phone])
 }
 
 model Voucher {
-  id            String    @id @default(cuid())
-  storeId       String
-  store         Store     @relation(fields: [storeId], references: [id], onDelete: Cascade)
-  code          String
-  type          String // PERCENT, FIXED
-  value         Float
-  minOrderValue Float     @default(0)
-  maxDiscount   Float?
-  expiryDate    DateTime?
-  isActive      Boolean   @default(true)
+  id                 String              @id @default(cuid())
+  storeId            String
+  store              Store               @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  code               String
+  type               String // PERCENT, FIXED
+  value              Float
+  minOrderValue      Float               @default(0)
+  maxDiscount        Float?
+  expiryDate         DateTime?
+  isActive           Boolean             @default(true)
+  maxUses            Int?
+  maxUsesPerCustomer Int?
+  usedCount          Int                 @default(0)
+  redemptions        VoucherRedemption[]
 
   @@unique([storeId, code])
+}
+
+model VoucherRedemption {
+  id          String    @id @default(cuid())
+  storeId     String
+  store       Store     @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  voucherId   String?
+  voucher     Voucher?  @relation(fields: [voucherId], references: [id], onDelete: SetNull)
+  voucherCode String
+  orderId     String    @unique
+  order       Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  customerId  String?
+  customer    Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  createdAt   DateTime  @default(now())
+
+  @@index([storeId, voucherCode, createdAt])
+  @@index([storeId, voucherCode, customerId])
+  @@index([voucherId, customerId])
 }
 
 model Attendance {
@@ -564,4 +600,107 @@ model StoreIntegration {
 
   @@unique([storeId, provider])
   @@index([storeId, category])
+}
+
+model PurchaseOrder {
+  id          String              @id @default(cuid())
+  storeId     String
+  store       Store               @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  supplierId  String?
+  supplier    Supplier?           @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  number      String
+  status      String              @default("draft")
+  expectedAt  DateTime?
+  receivedAt  DateTime?
+  note        String?
+  totalAmount Float               @default(0)
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+  items       PurchaseOrderItem[]
+
+  @@unique([storeId, number])
+  @@index([storeId, status, createdAt])
+  @@index([supplierId])
+}
+
+model PurchaseOrderItem {
+  id              String        @id @default(cuid())
+  purchaseOrderId String
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  inventoryId     String?
+  inventory       Inventory?    @relation(fields: [inventoryId], references: [id], onDelete: SetNull)
+  inventoryName   String
+  unit            String
+  orderedQty      Float
+  receivedQty     Float         @default(0)
+  unitCost        Float
+
+  @@index([purchaseOrderId])
+  @@index([inventoryId])
+}
+
+model Stocktake {
+  id        String          @id @default(cuid())
+  storeId   String
+  store     Store           @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  number    String
+  status    String          @default("draft")
+  note      String?
+  postedAt  DateTime?
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+  items     StocktakeItem[]
+
+  @@unique([storeId, number])
+  @@index([storeId, status, createdAt])
+}
+
+model StocktakeItem {
+  id            String     @id @default(cuid())
+  stocktakeId   String
+  stocktake     Stocktake  @relation(fields: [stocktakeId], references: [id], onDelete: Cascade)
+  inventoryId   String?
+  inventory     Inventory? @relation(fields: [inventoryId], references: [id], onDelete: SetNull)
+  inventoryName String
+  unit          String
+  expectedQty   Float
+  countedQty    Float
+  variance      Float
+
+  @@index([stocktakeId])
+  @@index([inventoryId])
+}
+
+model InventoryTransfer {
+  id                 String                  @id @default(cuid())
+  sourceStoreId      String
+  sourceStore        Store                   @relation("TransferSourceStore", fields: [sourceStoreId], references: [id], onDelete: Cascade)
+  destinationStoreId String
+  destinationStore   Store                   @relation("TransferDestinationStore", fields: [destinationStoreId], references: [id], onDelete: Cascade)
+  number             String
+  status             String                  @default("pending")
+  note               String?
+  receivedAt         DateTime?
+  createdAt          DateTime                @default(now())
+  updatedAt          DateTime                @updatedAt
+  items              InventoryTransferItem[]
+
+  @@unique([sourceStoreId, number])
+  @@index([sourceStoreId, status, createdAt])
+  @@index([destinationStoreId, status, createdAt])
+}
+
+model InventoryTransferItem {
+  id                String            @id @default(cuid())
+  transferId        String
+  transfer          InventoryTransfer @relation(fields: [transferId], references: [id], onDelete: Cascade)
+  sourceInventoryId String?
+  sourceInventory   Inventory?        @relation(fields: [sourceInventoryId], references: [id], onDelete: SetNull)
+  inventoryName     String
+  unit              String
+  qty               Float
+  unitCost          Float?
+
+  @@index([transferId])
+  @@index([sourceInventoryId])
 }

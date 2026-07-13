@@ -99,7 +99,7 @@ function OrderHistoryTab() {
 
   useEffect(() => {
     fetchOrders();
-  }, []);
+  }, [fetchOrders]);
 
   const filtered = useMemo(() => {
     if (!searchQuery.trim()) return orderHistory;
@@ -303,7 +303,7 @@ function OrderHistoryTab() {
                   </div>
                 )}
                 <div className="flex justify-between text-coffee-medium">
-                  <span>VAT</span><span>+{detailOrder.vatAmount.toLocaleString('vi-VN')}đ</span>
+                  <span>VAT ({Math.round(Number(detailOrder.vatRate ?? 0.08) * 100)}%)</span><span>+{detailOrder.vatAmount.toLocaleString('vi-VN')}đ</span>
                 </div>
                 <div className="flex justify-between font-bold text-base text-coffee-dark pt-1 border-t border-cream-medium">
                   <span>Tổng cộng</span>
@@ -315,73 +315,6 @@ function OrderHistoryTab() {
         </div>
       )}
     </div>
-  );
-}
-
-// ---- Inventory Row (interactive restock) ----
-function InventoryRow({ item, pct, isLow, isCritical, onRestock }) {
-  const [restockAmount, setRestockAmount] = useState('');
-
-  const handleRestock = () => {
-    const amount = Number(restockAmount);
-    if (!amount || amount <= 0) return;
-    onRestock(item.id, amount);
-    setRestockAmount('');
-  };
-
-  return (
-    <tr className={`border-b border-cream-medium/30 transition-colors ${isCritical ? 'bg-red-50' : isLow ? 'bg-yellow-50' : 'hover:bg-cream-light/30'}`}>
-      <td className="px-4 py-3">
-        <div className="flex items-center gap-2">
-          <span className="w-7 h-7 rounded-lg bg-primary-50 text-primary-700 flex items-center justify-center">
-            <Package size={15} />
-          </span>
-          <span className="font-semibold text-coffee-dark">{item.name}</span>
-        </div>
-      </td>
-      <td className="px-4 py-3 text-right">
-        <p className={`font-bold ${isCritical ? 'text-red-600' : isLow ? 'text-yellow-700' : 'text-coffee-dark'}`}>
-          {item.qty.toLocaleString('vi-VN')} {item.unit}
-        </p>
-        <div className="w-20 h-1.5 rounded-full bg-gray-200 ml-auto mt-1">
-          <div className="h-full rounded-full transition-all duration-500"
-            style={{
-              width: `${Math.min(pct, 100)}%`,
-              background: isCritical ? '#ef4444' : isLow ? '#eab308' : 'linear-gradient(90deg,#2563EB,#0EA5E9)',
-            }}
-          />
-        </div>
-      </td>
-      <td className="px-4 py-3 text-right text-coffee-medium hidden sm:table-cell">
-        {item.minQty.toLocaleString('vi-VN')} {item.unit}
-      </td>
-      <td className="px-4 py-3 text-center">
-        {isCritical
-          ? <span className="text-xs bg-red-100 text-red-700 border border-red-300 px-2 py-1 rounded-full font-bold">Cạn kiệt</span>
-          : isLow
-          ? <span className="text-xs bg-yellow-100 text-yellow-700 border border-yellow-300 px-2 py-1 rounded-full font-bold">Sắp hết</span>
-          : <span className="text-xs bg-green-50 text-green-700 border border-green-200 px-2 py-1 rounded-full font-semibold">Ổn</span>
-        }
-      </td>
-      <td className="px-4 py-3">
-        <div className="flex items-center gap-1.5 justify-center">
-          <input
-            type="number"
-            value={restockAmount}
-            onChange={e => setRestockAmount(e.target.value)}
-            placeholder="Số lượng"
-            className="w-24 input-field min-h-[36px] text-xs px-2"
-            min="1"
-          />
-          <button onClick={handleRestock}
-            disabled={!restockAmount}
-            className="min-h-[36px] px-3 rounded-lg text-xs font-bold text-white transition-all disabled:opacity-40"
-            style={{ background: 'linear-gradient(135deg, #2563EB, #0EA5E9)' }}>
-            Nhập
-          </button>
-        </div>
-      </td>
-    </tr>
   );
 }
 
@@ -2910,7 +2843,7 @@ export default function DashboardPage() {
                       {/* 24-Hour Custom Chart */}
                       <div className="bg-cream-light/20 rounded-lg p-5 border border-cream-medium/30">
                         <div className="flex items-end justify-between h-48 gap-1 pt-6 px-2 overflow-x-auto">
-                          {timeReports.hourlySales.map((h, i) => {
+                          {timeReports.hourlySales.map((h) => {
                             const maxRev = Math.max(...timeReports.hourlySales.map(hs => hs.revenue || 0)) || 1;
                             const heightPct = Math.max(3, (h.revenue / maxRev) * 100);
                             const isPeak = h.revenue > 0 && h.revenue === maxRev;

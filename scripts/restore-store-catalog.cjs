@@ -142,6 +142,7 @@ async function main() {
           unit: item.unit || 'unit',
           qty: Number(item.qty) || 0,
           minQty: Number(item.minQty) || 0,
+          avgCost: item.avgCost === null || item.avgCost === undefined ? null : Number(item.avgCost),
           icon: item.icon || null,
         })),
       });
@@ -190,6 +191,9 @@ async function main() {
           maxDiscount: voucher.maxDiscount === null || voucher.maxDiscount === undefined ? null : Number(voucher.maxDiscount),
           expiryDate: nullableDate(voucher.expiryDate),
           isActive: voucher.isActive !== false,
+          maxUses: Number.isInteger(Number(voucher.maxUses)) && Number(voucher.maxUses) > 0 ? Number(voucher.maxUses) : null,
+          maxUsesPerCustomer: Number.isInteger(Number(voucher.maxUsesPerCustomer)) && Number(voucher.maxUsesPerCustomer) > 0 ? Number(voucher.maxUsesPerCustomer) : null,
+          usedCount: Number.isInteger(Number(voucher.usedCount)) && Number(voucher.usedCount) >= 0 ? Number(voucher.usedCount) : 0,
         })).filter((voucher) => voucher.code),
       });
     }

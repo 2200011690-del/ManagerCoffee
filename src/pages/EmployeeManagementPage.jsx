@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Users, Plus, Shield, User, Trash2, Edit2, X, Clock, Calendar, Camera, Phone } from 'lucide-react';
 import { api } from '../api';
 
@@ -62,7 +62,7 @@ export default function EmployeeManagementPage() {
     try {
       const data = await api.get('/users');
       setUsers(data);
-    } catch (err) {
+    } catch {
       setError('Không thể tải danh sách nhân viên');
     } finally {
       setLoading(false);
@@ -74,7 +74,7 @@ export default function EmployeeManagementPage() {
     try {
       const data = await api.get('/attendance/logs');
       setAttendanceLogs(data);
-    } catch (err) {
+    } catch {
       setError('Không thể tải lịch sử chấm công');
     } finally {
       setLoadingAttendance(false);
@@ -86,14 +86,14 @@ export default function EmployeeManagementPage() {
     try {
       const data = await api.get('/shifts/logs');
       setShiftLogs(data);
-    } catch (err) {
+    } catch {
       setError('Không thể tải lịch sử bàn giao ca');
     } finally {
       setLoadingShifts(false);
     }
   };
 
-  const fetchSalaryReport = async () => {
+  const fetchSalaryReport = useCallback(async () => {
     setLoadingSalary(true);
     try {
       const data = await api.get('/users/salary-report', {
@@ -103,12 +103,12 @@ export default function EmployeeManagementPage() {
         }
       });
       setSalaryReport(data);
-    } catch (err) {
+    } catch {
       setError('Không thể tải báo cáo tính lương');
     } finally {
       setLoadingSalary(false);
     }
-  };
+  }, [salaryEndDate, salaryStartDate]);
 
   const handleUpdateHourlyRate = async (userId, rate) => {
     try {
@@ -120,7 +120,7 @@ export default function EmployeeManagementPage() {
         }
         return u;
       }));
-    } catch (err) {
+    } catch {
       setError('Không thể cập nhật mức lương');
     }
   };
@@ -187,7 +187,7 @@ export default function EmployeeManagementPage() {
     try {
       await api.delete(`/attendance/${id}`);
       fetchAttendanceLogs();
-    } catch (err) {
+    } catch {
       setError('Lỗi khi xóa ngày công');
     }
   };
@@ -202,7 +202,7 @@ export default function EmployeeManagementPage() {
     } else if (activeTab === 'salary') {
       fetchSalaryReport();
     }
-  }, [activeTab, salaryStartDate, salaryEndDate]);
+  }, [activeTab, salaryStartDate, salaryEndDate, fetchSalaryReport]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -225,7 +225,7 @@ export default function EmployeeManagementPage() {
     try {
       await api.delete(`/users/${id}`);
       fetchUsers();
-    } catch (err) {
+    } catch {
       setError('Lỗi khi xóa nhân viên');
     }
   };

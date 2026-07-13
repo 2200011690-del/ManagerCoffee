@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Settings, Save, Globe, Receipt, Gift, Percent, RefreshCw, AlertTriangle, CreditCard, Image as ImageIcon, Plug, CheckCircle, Building2, Plus, ArrowRightLeft } from 'lucide-react';
 import { api } from '../api';
 import { useUI } from '../context/UIContext';
@@ -104,7 +104,7 @@ export default function StoreSettingsPage() {
     bankAccountName: ''
   });
 
-  const fetchSettings = async () => {
+  const fetchSettings = useCallback(async () => {
     setLoading(true);
     try {
       const data = await api.get('/store/settings');
@@ -147,7 +147,7 @@ export default function StoreSettingsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [showNotification]);
 
   const statusBadge = (ready, pendingText = 'Cần cấu hình') => (
     <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold ${
@@ -160,7 +160,7 @@ export default function StoreSettingsPage() {
 
   useEffect(() => {
     fetchSettings();
-  }, []);
+  }, [fetchSettings]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;

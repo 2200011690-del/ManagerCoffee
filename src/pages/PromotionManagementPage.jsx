@@ -39,14 +39,14 @@ export default function PromotionManagementPage() {
   const [showAddVouch, setShowAddVouch] = useState(false);
   const [showEditVouch, setShowEditVouch] = useState(false);
   const [selectedVouch, setSelectedVouch] = useState(null);
-  const [vouchForm, setVouchForm] = useState({ code: '', type: 'FIXED', value: '', minOrderValue: '', maxDiscount: '', expiryDate: '', isActive: true });
+  const [vouchForm, setVouchForm] = useState({ code: '', type: 'FIXED', value: '', minOrderValue: '', maxDiscount: '', expiryDate: '', maxUses: '', maxUsesPerCustomer: '', isActive: true });
 
   const fetchPromotions = async () => {
     setLoading(true);
     try {
       const data = await api.get('/promotions');
       setPromotions(Array.isArray(data) ? data : []);
-    } catch (err) {
+    } catch {
       setError('Không thể tải danh sách khuyến mãi');
     } finally {
       setLoading(false);
@@ -58,7 +58,7 @@ export default function PromotionManagementPage() {
     try {
       const data = await api.get('/vouchers');
       setVouchersList(Array.isArray(data) ? data : []);
-    } catch (err) {
+    } catch {
       setError('Không thể tải danh sách mã giảm giá');
     } finally {
       setLoading(false);
@@ -84,10 +84,12 @@ export default function PromotionManagementPage() {
         minOrderValue: Number(vouchForm.minOrderValue) || 0,
         maxDiscount: vouchForm.maxDiscount ? Number(vouchForm.maxDiscount) : null,
         expiryDate: vouchForm.expiryDate || null,
+        maxUses: vouchForm.maxUses ? Number(vouchForm.maxUses) : null,
+        maxUsesPerCustomer: vouchForm.maxUsesPerCustomer ? Number(vouchForm.maxUsesPerCustomer) : null,
         isActive: vouchForm.isActive
       });
       setShowAddVouch(false);
-      setVouchForm({ code: '', type: 'FIXED', value: '', minOrderValue: '', maxDiscount: '', expiryDate: '', isActive: true });
+      setVouchForm({ code: '', type: 'FIXED', value: '', minOrderValue: '', maxDiscount: '', expiryDate: '', maxUses: '', maxUsesPerCustomer: '', isActive: true });
       fetchVouchers();
     } catch (err) {
       alert('Không thể tạo mã giảm giá: ' + (err.response?.data?.error || err.message));
@@ -104,6 +106,8 @@ export default function PromotionManagementPage() {
         minOrderValue: Number(vouchForm.minOrderValue) || 0,
         maxDiscount: vouchForm.maxDiscount ? Number(vouchForm.maxDiscount) : null,
         expiryDate: vouchForm.expiryDate || null,
+        maxUses: vouchForm.maxUses ? Number(vouchForm.maxUses) : null,
+        maxUsesPerCustomer: vouchForm.maxUsesPerCustomer ? Number(vouchForm.maxUsesPerCustomer) : null,
         isActive: vouchForm.isActive
       });
       setShowEditVouch(false);
@@ -128,7 +132,7 @@ export default function PromotionManagementPage() {
     try {
       await api.put(`/promotions/${promo.id}`, { isActive: !promo.isActive });
       fetchPromotions();
-    } catch (err) {
+    } catch {
       setError('Lỗi khi cập nhật trạng thái khuyến mãi');
     }
   };
@@ -138,7 +142,7 @@ export default function PromotionManagementPage() {
     try {
       await api.delete(`/promotions/${id}`);
       fetchPromotions();
-    } catch (err) {
+    } catch {
       setError('Lỗi khi xóa khuyến mãi');
     }
   };
@@ -451,6 +455,7 @@ export default function PromotionManagementPage() {
                     <th className="px-4 py-3 font-semibold text-gray-700 text-right">Đơn hàng tối thiểu</th>
                     <th className="px-4 py-3 font-semibold text-gray-700 text-right">Mức giảm tối đa</th>
                     <th className="px-4 py-3 font-semibold text-gray-700 text-center">Hạn sử dụng</th>
+                    <th className="px-4 py-3 font-semibold text-gray-700 text-center">Lượt sử dụng</th>
                     <th className="px-4 py-3 font-semibold text-gray-700 text-center">Trạng thái</th>
                     <th className="px-4 py-3 font-semibold text-gray-700 text-center">Thao tác</th>
                   </tr>
@@ -482,6 +487,10 @@ export default function PromotionManagementPage() {
                           <td className="px-4 py-3.5 text-center text-gray-500 text-xs">
                             {v.expiryDate ? new Date(v.expiryDate).toLocaleDateString('vi-VN') : 'Vĩnh viễn'}
                           </td>
+                          <td className="px-4 py-3.5 text-center text-gray-600 text-xs">
+                            <span className="font-bold text-gray-900">{v.usedCount || 0}</span>/{v.maxUses || '∞'}
+                            <span className="block text-[10px] text-gray-400">Mỗi khách: {v.maxUsesPerCustomer || '∞'}</span>
+                          </td>
                           <td className="px-4 py-3.5 text-center">
                             {isExpired ? (
                               <span className="text-xs bg-red-100 text-red-750 px-2 py-0.5 rounded font-bold border border-red-200">Hết hạn</span>
@@ -503,6 +512,8 @@ export default function PromotionManagementPage() {
                                     minOrderValue: v.minOrderValue,
                                     maxDiscount: v.maxDiscount || '',
                                     expiryDate: v.expiryDate ? v.expiryDate.split('T')[0] : '',
+                                    maxUses: v.maxUses || '',
+                                    maxUsesPerCustomer: v.maxUsesPerCustomer || '',
                                     isActive: v.isActive
                                   });
                                   setShowEditVouch(true);
@@ -526,7 +537,7 @@ export default function PromotionManagementPage() {
                     })}
                   {vouchersList.length === 0 && (
                     <tr>
-                      <td colSpan="8" className="text-center py-12 text-gray-400">Chưa tạo mã giảm giá nào</td>
+                      <td colSpan="9" className="text-center py-12 text-gray-400">Chưa tạo mã giảm giá nào</td>
                     </tr>
                   )}
                 </tbody>
@@ -839,6 +850,16 @@ export default function PromotionManagementPage() {
                   />
                 </div>
               </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">Tổng lượt sử dụng</label>
+                  <input type="number" min="1" value={vouchForm.maxUses} onChange={e => setVouchForm(prev => ({ ...prev, maxUses: e.target.value }))} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-blue-500" placeholder="Không giới hạn" />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">Lượt dùng mỗi khách</label>
+                  <input type="number" min="1" value={vouchForm.maxUsesPerCustomer} onChange={e => setVouchForm(prev => ({ ...prev, maxUsesPerCustomer: e.target.value }))} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-blue-500" placeholder="Không giới hạn" />
+                </div>
+              </div>
               <div className="flex gap-2 justify-end pt-3 border-t border-gray-100">
                 <button
                   type="button"
@@ -933,6 +954,16 @@ export default function PromotionManagementPage() {
                     onChange={e => setVouchForm(prev => ({ ...prev, expiryDate: e.target.value }))}
                     className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
                   />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">Tổng lượt sử dụng</label>
+                  <input type="number" min={Math.max(1, selectedVouch?.usedCount || 1)} value={vouchForm.maxUses} onChange={e => setVouchForm(prev => ({ ...prev, maxUses: e.target.value }))} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-blue-500" placeholder="Không giới hạn" />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">Lượt dùng mỗi khách</label>
+                  <input type="number" min="1" value={vouchForm.maxUsesPerCustomer} onChange={e => setVouchForm(prev => ({ ...prev, maxUsesPerCustomer: e.target.value }))} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-blue-500" placeholder="Không giới hạn" />
                 </div>
               </div>
               <div className="flex items-center gap-2">

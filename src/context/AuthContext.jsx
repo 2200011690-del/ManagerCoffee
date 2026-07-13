@@ -4,7 +4,7 @@ import { joinStore, leaveStore } from '../socket';
 
 const AuthContext = createContext(null);
 const AUTH_KEY = 'manager_coffee_auth_session';
-const ADMIN_VIEWS = ['pos', 'tables', 'kitchen', 'dashboard', 'menu', 'promotions', 'employees', 'settings'];
+const ADMIN_VIEWS = ['pos', 'tables', 'kitchen', 'dashboard', 'supply-chain', 'menu', 'promotions', 'employees', 'settings'];
 const STAFF_BASE_VIEWS = ['pos', 'tables', 'kitchen'];
 
 function getAllowedViews(user) {

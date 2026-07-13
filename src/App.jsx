@@ -14,6 +14,7 @@ import { Menu } from 'lucide-react';
 const POSPage = lazy(() => import('./pages/POSPage'));
 const TablePage = lazy(() => import('./pages/TablePage'));
 const DashboardPage = lazy(() => import('./pages/DashboardPage'));
+const SupplyChainPage = lazy(() => import('./pages/SupplyChainPage'));
 const MenuManagementPage = lazy(() => import('./pages/MenuManagementPage'));
 const EmployeeManagementPage = lazy(() => import('./pages/EmployeeManagementPage'));
 const PromotionManagementPage = lazy(() => import('./pages/PromotionManagementPage'));
@@ -54,6 +55,8 @@ function AppContent() {
         return canAccess('tables') ? <TablePage /> : <div className="p-8">Không có quyền truy cập</div>;
       case 'dashboard': 
         return canAccess('dashboard') ? <DashboardPage /> : <div className="p-8">Không có quyền truy cập</div>;
+      case 'supply-chain':
+        return canAccess('supply-chain') ? <SupplyChainPage /> : <div className="p-8">Không có quyền truy cập</div>;
       case 'menu':
         return canAccess('menu') ? <MenuManagementPage /> : <div className="p-8">Không có quyền truy cập</div>;
       case 'promotions':
@@ -76,6 +79,7 @@ function AppContent() {
           <div className="lg:hidden flex items-center justify-between bg-sidebar-bg text-white px-4 py-3 border-b border-sidebar-border z-30">
             <button 
               onClick={() => setIsMobileMenuOpen(true)}
+              aria-label="Mở menu điều hướng"
               className="p-1.5 hover:bg-sidebar-hover rounded-lg text-white"
             >
               <Menu size={20} />
@@ -84,6 +88,7 @@ function AppContent() {
               {currentView === 'pos' ? 'Bán hàng' :
                currentView === 'tables' ? 'Sơ đồ bàn' :
                currentView === 'dashboard' ? 'Báo cáo' :
+               currentView === 'supply-chain' ? 'Cung ứng' :
                currentView === 'menu' ? 'Thực đơn' :
                currentView === 'promotions' ? 'Khuyến mãi' :
                currentView === 'employees' ? 'Nhân sự' : 'Cấu hình'}

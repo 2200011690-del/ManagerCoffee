@@ -358,6 +358,12 @@ async function nextReturnNumber(tx, storeId) {
   return `#TH${1001 + count}`;
 }
 
+async function nextDocumentNumber(tx, { storeId, lockKey, delegate, where, prefix }) {
+  await lockStoreCounter(tx, storeId, lockKey);
+  const count = await tx[delegate].count({ where });
+  return `${prefix}${String(count + 1).padStart(5, '0')}`;
+}
+
 function normalizeCartProductId(item) {
   return item.productId || item.id || null;
 }
@@ -666,6 +672,14 @@ function normalizeVoucherPayload(payload) {
   if (expiryDate && Number.isNaN(expiryDate.getTime())) {
     throw businessError('Ngày hết hạn voucher không hợp lệ');
   }
+  const parseOptionalLimit = (raw, label) => {
+    if (raw === null || raw === undefined || raw === '') return null;
+    const value = Number(raw);
+    if (!Number.isInteger(value) || value <= 0 || value > 1000000000) {
+      throw businessError(`${label} phải là số nguyên dương`);
+    }
+    return value;
+  };
 
   return {
     code,
@@ -674,7 +688,9 @@ function normalizeVoucherPayload(payload) {
     minOrderValue,
     maxDiscount,
     expiryDate,
-    isActive: payload?.isActive !== false
+    isActive: payload?.isActive !== false,
+    maxUses: parseOptionalLimit(payload?.maxUses, 'Tổng lượt sử dụng'),
+    maxUsesPerCustomer: parseOptionalLimit(payload?.maxUsesPerCustomer, 'Lượt sử dụng mỗi khách')
   };
 }
 
@@ -939,12 +955,13 @@ async function resolveCheckoutLine(tx, req, item, index) {
   };
 }
 
-async function resolveVoucherDiscount(tx, storeId, voucherCode, orderValue) {
+async function resolveVoucherDiscount(tx, storeId, voucherCode, orderValue, customerId = null, { lock = true } = {}) {
   if (!hasText(voucherCode)) {
-    return { voucherCode: null, amount: 0 };
+    return { voucherId: null, voucherCode: null, amount: 0, voucher: null };
   }
 
   const code = String(voucherCode).trim().toUpperCase();
+  if (lock) await lockStoreCounter(tx, storeId, `voucher:${code}`);
   const voucher = await tx.voucher.findUnique({ where: { storeId_code: { storeId, code } } });
   if (!voucher) throw new Error('Mã giảm giá không tồn tại');
   if (!voucher.isActive) throw new Error('Mã giảm giá đã bị vô hiệu hóa');
@@ -953,6 +970,16 @@ async function resolveVoucherDiscount(tx, storeId, voucherCode, orderValue) {
   }
   if (orderValue < voucher.minOrderValue) {
     throw new Error(`Đơn hàng tối thiểu ${voucher.minOrderValue.toLocaleString('vi-VN')}đ để áp dụng mã này`);
+  }
+  if (voucher.maxUses !== null && voucher.usedCount >= voucher.maxUses) {
+    throw businessError('Mã giảm giá đã hết lượt sử dụng', 409);
+  }
+  if (voucher.maxUsesPerCustomer !== null) {
+    if (!customerId) throw businessError('Mã giảm giá này yêu cầu chọn khách hàng', 400);
+    const customerUses = await tx.voucherRedemption.count({ where: { storeId, voucherCode: code, customerId } });
+    if (customerUses >= voucher.maxUsesPerCustomer) {
+      throw businessError('Khách hàng đã dùng hết lượt cho mã giảm giá này', 409);
+    }
   }
 
   let amount = 0;
@@ -965,7 +992,7 @@ async function resolveVoucherDiscount(tx, storeId, voucherCode, orderValue) {
     }
   }
 
-  return { voucherCode: code, amount: Math.max(0, roundMoney(amount)) };
+  return { voucherId: voucher.id, voucherCode: code, amount: Math.max(0, roundMoney(amount)), voucher };
 }
 
 async function buildAuthoritativeCheckout(tx, req, payload) {
@@ -992,16 +1019,6 @@ async function buildAuthoritativeCheckout(tx, req, payload) {
   const subtotal = Math.max(0, roundMoney(subtotalBeforeGlobalDiscounts - autoPromotions.globalDiscount));
   const vatRate = Number.isFinite(Number(store.vatRate)) ? Number(store.vatRate) : 0.08;
 
-  const voucher = await resolveVoucherDiscount(tx, storeId, payload.voucherCode, subtotal);
-  assertManualDiscountAllowed(req, voucher.amount, subtotal, 'mã giảm giá');
-  const voucherDiscount = Math.min(voucher.amount, subtotal);
-
-  const rawOrderDiscount = Math.max(0, roundMoney(payload.orderDiscount));
-  assertManualDiscountAllowed(req, rawOrderDiscount, subtotal, 'giảm giá toàn đơn');
-  const availableForOrderDiscount = Math.max(0, subtotal - voucherDiscount);
-  const orderDiscountAmount = Math.min(rawOrderDiscount, availableForOrderDiscount);
-  const cleanOrderDiscountType = orderDiscountAmount > 0 ? (payload.orderDiscountType || 'FIXED') : null;
-
   let customerId = payload.customerId || null;
   let customer = null;
   if (customerId) {
@@ -1010,6 +1027,16 @@ async function buildAuthoritativeCheckout(tx, req, payload) {
       throw new Error('Khách hàng không thuộc cửa hàng hiện tại');
     }
   }
+
+  const voucher = await resolveVoucherDiscount(tx, storeId, payload.voucherCode, subtotal, customerId);
+  assertManualDiscountAllowed(req, voucher.amount, subtotal, 'mã giảm giá');
+  const voucherDiscount = Math.min(voucher.amount, subtotal);
+
+  const rawOrderDiscount = Math.max(0, roundMoney(payload.orderDiscount));
+  assertManualDiscountAllowed(req, rawOrderDiscount, subtotal, 'giảm giá toàn đơn');
+  const availableForOrderDiscount = Math.max(0, subtotal - voucherDiscount);
+  const orderDiscountAmount = Math.min(rawOrderDiscount, availableForOrderDiscount);
+  const cleanOrderDiscountType = orderDiscountAmount > 0 ? (payload.orderDiscountType || 'FIXED') : null;
 
   const rawUsedPoints = Number(payload.usedPoints || 0);
   if (!Number.isInteger(rawUsedPoints) || rawUsedPoints < 0) {
@@ -1042,10 +1069,12 @@ async function buildAuthoritativeCheckout(tx, req, payload) {
 
   return {
     subtotal,
+    vatRate,
     vatAmount,
     total,
     paymentMethod,
     customerId,
+    voucherId: voucher.voucherId,
     voucherCode: voucher.voucherCode,
     discountAmount,
     orderDiscount: orderDiscountAmount,
@@ -1208,13 +1237,63 @@ async function applyPaidOrderEffects(tx, storeId, order, options = {}) {
   if (order.tableId) {
     await tx.table.updateMany({
       where: { id: order.tableId, storeId },
-      data: options.keepTableOpen
+      data: order.keptTableOpen
         ? { status: 'occupied' }
         : { status: 'dirty', occupiedSince: null }
     });
   }
 
   await deductInventoryForItems(tx, storeId, order.items || [], order.orderNumber);
+}
+
+async function consumeActiveCartForSplit(tx, storeId, splitCartKey, tableId, selectedItems) {
+  const cartKey = String(splitCartKey || '').trim();
+  const expectedCartKey = tableId || '__takeaway__';
+  if (cartKey !== expectedCartKey) {
+    throw businessError('Giỏ nguồn của đơn tách không hợp lệ.', 400);
+  }
+
+  await lockStoreCounter(tx, storeId, `active-cart:${cartKey}`);
+  const activeCart = await tx.activeCart.findUnique({
+    where: { storeId_cartKey: { storeId, cartKey } }
+  });
+  const sourceItems = Array.isArray(activeCart?.data) ? activeCart.data : null;
+  if (!sourceItems) {
+    throw businessError('Giỏ hàng đã thay đổi. Vui lòng tải lại trước khi tách đơn.', 409);
+  }
+
+  const selectedQtyById = new Map();
+  for (const item of selectedItems) {
+    const cartItemId = hasText(item?.cartItemId) ? String(item.cartItemId).trim() : '';
+    if (!cartItemId || selectedQtyById.has(cartItemId)) {
+      throw businessError('Dòng món trong đơn tách không hợp lệ.', 400);
+    }
+    selectedQtyById.set(cartItemId, parsePositiveInt(item.qty, 'Số lượng món tách'));
+  }
+
+  const sourceById = new Map(sourceItems.map((item) => [String(item?.cartItemId || ''), item]));
+  for (const [cartItemId, selectedQty] of selectedQtyById) {
+    const sourceItem = sourceById.get(cartItemId);
+    const sourceQty = Number(sourceItem?.qty);
+    if (!sourceItem || !Number.isInteger(sourceQty) || sourceQty < selectedQty) {
+      throw businessError('Giỏ hàng đã thay đổi. Vui lòng tải lại trước khi tách đơn.', 409);
+    }
+  }
+
+  const remainingCart = sourceItems.flatMap((item) => {
+    const paidQty = selectedQtyById.get(String(item?.cartItemId || '')) || 0;
+    const remainingQty = Number(item.qty) - paidQty;
+    return remainingQty > 0 ? [{ ...item, qty: remainingQty }] : [];
+  });
+  await tx.activeCart.update({
+    where: { id: activeCart.id },
+    data: { data: remainingCart }
+  });
+
+  return {
+    keepTableOpen: Boolean(tableId && remainingCart.length > 0),
+    remainingLineCount: remainingCart.length
+  };
 }
 
 function parseJsonField(value, fieldName) {
@@ -1902,7 +1981,7 @@ app.put('/api/platform/stores/:id', async (req, res) => {
       }
     });
     res.json(store);
-  } catch (err) {
+  } catch {
     res.status(404).json({ error: 'Không tìm thấy store cần cập nhật' });
   }
 });
@@ -2170,7 +2249,10 @@ app.post('/api/branches', async (req, res) => {
               minOrderValue: voucher.minOrderValue,
               maxDiscount: voucher.maxDiscount,
               expiryDate: voucher.expiryDate,
-              isActive: false
+              isActive: false,
+              maxUses: voucher.maxUses,
+              maxUsesPerCustomer: voucher.maxUsesPerCustomer,
+              usedCount: 0
             }))
           });
         }
@@ -2579,6 +2661,7 @@ app.post('/api/backup/restore-catalog', async (req, res) => {
             unit: item.unit || 'đơn vị',
             qty: Number(item.qty) || 0,
             minQty: Number(item.minQty) || 0,
+            avgCost: item.avgCost === null || item.avgCost === undefined ? null : Number(item.avgCost),
             icon: item.icon || null
           }))
         });
@@ -2626,7 +2709,10 @@ app.post('/api/backup/restore-catalog', async (req, res) => {
             minOrderValue: Number(voucher.minOrderValue) || 0,
             maxDiscount: voucher.maxDiscount === null || voucher.maxDiscount === undefined ? null : Number(voucher.maxDiscount),
             expiryDate: nullableDate(voucher.expiryDate),
-            isActive: voucher.isActive !== false
+            isActive: voucher.isActive !== false,
+            maxUses: Number.isInteger(Number(voucher.maxUses)) && Number(voucher.maxUses) > 0 ? Number(voucher.maxUses) : null,
+            maxUsesPerCustomer: Number.isInteger(Number(voucher.maxUsesPerCustomer)) && Number(voucher.maxUsesPerCustomer) > 0 ? Number(voucher.maxUsesPerCustomer) : null,
+            usedCount: Number.isInteger(Number(voucher.usedCount)) && Number(voucher.usedCount) >= 0 ? Number(voucher.usedCount) : 0
           })).filter((voucher) => voucher.code)
         });
       }
@@ -3425,26 +3511,14 @@ app.post('/api/vouchers/validate', async (req, res) => {
     return res.status(err.status || 400).json({ error: err.message });
   }
   if (!code) return res.status(400).json({ error: 'Vui lòng nhập mã giảm giá.' });
-  const voucher = await prisma.voucher.findUnique({ where: { storeId_code: { storeId: req.storeId, code } } });
-  if (!voucher) return res.status(404).json({ error: 'Mã giảm giá không tồn tại' });
-  if (!voucher.isActive) return res.status(400).json({ error: 'Mã giảm giá đã bị vô hiệu hóa' });
-  if (voucher.expiryDate && new Date(voucher.expiryDate) < new Date()) {
-    return res.status(400).json({ error: 'Mã giảm giá đã hết hạn' });
+  try {
+    const result = await prisma.$transaction((tx) => resolveVoucherDiscount(
+      tx, req.storeId, code, orderValue, req.body?.customerId || null, { lock: false }
+    ));
+    res.json({ voucher: result.voucher, discountAmount: result.amount });
+  } catch (err) {
+    res.status(err.status || (err.message === 'Mã giảm giá không tồn tại' ? 404 : 400)).json({ error: err.message });
   }
-  if (orderValue < voucher.minOrderValue) {
-    return res.status(400).json({ error: `Đơn hàng tối thiểu ${voucher.minOrderValue.toLocaleString()}đ để áp dụng mã này` });
-  }
-
-  let discountAmount = 0;
-  if (voucher.type === 'FIXED') {
-    discountAmount = voucher.value;
-  } else {
-    discountAmount = (orderValue * voucher.value) / 100;
-    if (voucher.maxDiscount && discountAmount > voucher.maxDiscount) {
-      discountAmount = voucher.maxDiscount;
-    }
-  }
-  res.json({ voucher, discountAmount: Math.max(0, roundMoney(discountAmount)) });
 });
 
 // Yêu cầu gọi món từ QR tại bàn
@@ -3510,6 +3584,7 @@ app.post('/api/guest-orders/:id/accept', async (req, res) => {
           tableId: guestOrder.tableId,
           tableName: guestOrder.table.name,
           subtotal: checkout.subtotal,
+          vatRate: checkout.vatRate,
           vatAmount: checkout.vatAmount,
           total: checkout.total,
           paymentMethod: 'cash',
@@ -4108,7 +4183,7 @@ async function handleCheckout(req, res) {
     payments,
     status, // "pending" hoặc "paid"
     usedPoints,
-    keepTableOpen,
+    splitCartKey,
     clientRequestId: bodyClientRequestId
   } = req.body;
   const storeId = req.storeId;
@@ -4184,6 +4259,12 @@ async function handleCheckout(req, res) {
         payments,
         usedPoints
       });
+      const splitState = splitCartKey
+        ? await consumeActiveCartForSplit(tx, storeId, splitCartKey, tableId, cart)
+        : null;
+      if (splitState && orderStatus !== 'paid') {
+        throw businessError('Đơn tách chỉ được ghi nhận khi thanh toán ngay.', 400);
+      }
       const cogsSnapshots = await calculateCogsSnapshots(tx, storeId, checkout.items);
       const createdOrder = await tx.order.create({
         data: {
@@ -4193,6 +4274,7 @@ async function handleCheckout(req, res) {
           tableId,
           tableName: tableName || 'Mang về',
           subtotal: checkout.subtotal,
+          vatRate: checkout.vatRate,
           vatAmount: checkout.vatAmount,
           total: checkout.total,
           paymentMethod: checkout.paymentMethod,
@@ -4208,6 +4290,8 @@ async function handleCheckout(req, res) {
           discountReason: discountReason || null,
           note: hasText(note) ? String(note).trim().slice(0, 500) : null,
           usedPoints: checkout.usedPoints,
+          splitCheckout: Boolean(splitState),
+          keptTableOpen: Boolean(splitState?.keepTableOpen),
           items: {
             create: checkout.items.map((item, index) => ({
               productId: item.productId,
@@ -4239,10 +4323,22 @@ async function handleCheckout(req, res) {
         include: orderResponseInclude
       });
 
+      if (checkout.voucherId) {
+        await tx.voucherRedemption.create({
+          data: {
+            storeId,
+            voucherId: checkout.voucherId,
+            voucherCode: checkout.voucherCode,
+            orderId: createdOrder.id,
+            customerId: checkout.customerId
+          }
+        });
+        await tx.voucher.update({ where: { id: checkout.voucherId }, data: { usedCount: { increment: 1 } } });
+      }
+
       if (orderStatus === 'paid') {
         await applyPaidOrderEffects(tx, storeId, createdOrder, {
-          payments: checkout.payments,
-          keepTableOpen: Boolean(tableId && keepTableOpen)
+          payments: checkout.payments
         });
       }
 
@@ -4263,6 +4359,9 @@ async function handleCheckout(req, res) {
     }
     broadcast('orderCreated', order, storeId);
     broadcast('inventoryUpdated', await prisma.inventory.findMany({ where: { storeId } }), storeId);
+    if (splitCartKey) {
+      broadcast('cartSync', await loadStoreCarts(prisma, storeId), storeId);
+    }
   } else {
     broadcast('orderCreated', order, storeId);
   }
@@ -4723,6 +4822,388 @@ app.delete('/api/suppliers/:id', async (req, res) => {
   }
 });
 
+const purchaseOrderInclude = {
+  supplier: true,
+  items: { include: { inventory: { select: { id: true, qty: true, avgCost: true } } } }
+};
+
+app.get('/api/purchase-orders', async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const orders = await prisma.purchaseOrder.findMany({
+    where: { storeId: req.storeId },
+    orderBy: { createdAt: 'desc' },
+    take: parseListLimit(req.query.limit, 200, 500),
+    include: purchaseOrderInclude
+  });
+  res.json(orders);
+});
+
+app.post('/api/purchase-orders', async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const storeId = req.storeId;
+  try {
+    const rawItems = Array.isArray(req.body?.items) ? req.body.items : [];
+    if (rawItems.length === 0 || rawItems.length > 100) {
+      throw businessError('Phiếu mua hàng phải có từ 1 đến 100 nguyên liệu.');
+    }
+    const order = await prisma.$transaction(async (tx) => {
+      const supplierId = hasText(req.body?.supplierId) ? String(req.body.supplierId) : null;
+      if (supplierId) {
+        const supplier = await tx.supplier.findFirst({ where: { id: supplierId, storeId } });
+        if (!supplier) throw businessError('Nhà cung cấp không thuộc cửa hàng hiện tại.');
+      }
+      const inventoryIds = rawItems.map((item) => String(item.inventoryId || ''));
+      if (new Set(inventoryIds).size !== inventoryIds.length) throw businessError('Phiếu mua hàng có nguyên liệu bị lặp.');
+      const inventories = await tx.inventory.findMany({ where: { storeId, id: { in: inventoryIds } } });
+      if (inventories.length !== inventoryIds.length) throw businessError('Có nguyên liệu không thuộc cửa hàng hiện tại.');
+      const inventoryById = new Map(inventories.map((item) => [item.id, item]));
+      const items = rawItems.map((item) => {
+        const inventory = inventoryById.get(String(item.inventoryId));
+        return {
+          inventoryId: inventory.id,
+          inventoryName: inventory.name,
+          unit: inventory.unit,
+          orderedQty: parsePositiveNumber(item.orderedQty, `Số lượng ${inventory.name}`),
+          unitCost: parseWholeMoney(item.unitCost, `Đơn giá ${inventory.name}`)
+        };
+      });
+      const number = await nextDocumentNumber(tx, {
+        storeId, lockKey: 'purchase-order', delegate: 'purchaseOrder', where: { storeId }, prefix: '#MH'
+      });
+      return tx.purchaseOrder.create({
+        data: {
+          storeId,
+          supplierId,
+          number,
+          status: 'ordered',
+          expectedAt: req.body?.expectedAt ? new Date(req.body.expectedAt) : null,
+          note: hasText(req.body?.note) ? String(req.body.note).trim().slice(0, 500) : null,
+          totalAmount: roundMoney(items.reduce((sum, item) => sum + item.orderedQty * item.unitCost, 0)),
+          items: { create: items }
+        },
+        include: purchaseOrderInclude
+      });
+    }, { maxWait: 10000, timeout: 20000 });
+    await writeAuditLog(req, 'create', 'purchaseOrder', order.id, { number: order.number, totalAmount: order.totalAmount });
+    res.status(201).json(order);
+  } catch (err) {
+    res.status(err.status || 400).json({ error: err.message });
+  }
+});
+
+app.post('/api/purchase-orders/:id/receive', async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const storeId = req.storeId;
+  try {
+    const order = await prisma.$transaction(async (tx) => {
+      await lockStoreCounter(tx, storeId, `purchase-order:${req.params.id}`);
+      const current = await tx.purchaseOrder.findFirst({
+        where: { id: req.params.id, storeId }, include: purchaseOrderInclude
+      });
+      if (!current) throw businessError('Không tìm thấy phiếu mua hàng.', 404);
+      if (current.status !== 'ordered') throw businessError('Phiếu mua hàng không còn ở trạng thái chờ nhận.', 409);
+      if (current.items.some((item) => !item.inventoryId)) {
+        throw businessError('Phiếu có nguyên liệu đã bị xóa nên không thể nhận hàng.', 409);
+      }
+      for (const item of [...current.items].sort((a, b) => a.inventoryId.localeCompare(b.inventoryId))) {
+        await lockStoreCounter(tx, storeId, `inventory:${item.inventoryId}`);
+        const inventory = await tx.inventory.findFirst({ where: { id: item.inventoryId, storeId } });
+        if (!inventory) throw businessError(`Nguyên liệu ${item.inventoryName} không còn tồn tại.`, 409);
+        const newQty = inventory.qty + item.orderedQty;
+        const nextAvgCost = inventory.qty > 0 && inventory.avgCost !== null
+          ? roundMoney(((inventory.qty * inventory.avgCost) + (item.orderedQty * item.unitCost)) / newQty)
+          : item.unitCost;
+        await tx.inventory.update({ where: { id: inventory.id }, data: { qty: newQty, avgCost: nextAvgCost } });
+        await tx.purchaseOrderItem.update({ where: { id: item.id }, data: { receivedQty: item.orderedQty } });
+        await tx.stockTransaction.create({
+          data: {
+            storeId,
+            inventoryId: inventory.id,
+            type: 'IMPORT',
+            qtyChange: item.orderedQty,
+            balance: newQty,
+            cost: item.unitCost,
+            supplierId: current.supplierId,
+            note: `Nhận hàng ${current.number}`
+          }
+        });
+      }
+      return tx.purchaseOrder.update({
+        where: { id: current.id },
+        data: { status: 'received', receivedAt: new Date() },
+        include: purchaseOrderInclude
+      });
+    }, { maxWait: 10000, timeout: 30000 });
+    await writeAuditLog(req, 'receive', 'purchaseOrder', order.id, { number: order.number });
+    broadcast('inventoryUpdated', await prisma.inventory.findMany({ where: { storeId }, orderBy: { name: 'asc' } }), storeId);
+    res.json(order);
+  } catch (err) {
+    res.status(err.status || 400).json({ error: err.message });
+  }
+});
+
+app.post('/api/purchase-orders/:id/cancel', async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const updated = await prisma.purchaseOrder.updateMany({
+    where: { id: req.params.id, storeId: req.storeId, status: 'ordered' }, data: { status: 'cancelled' }
+  });
+  if (updated.count === 0) return res.status(409).json({ error: 'Phiếu không tồn tại hoặc không thể hủy.' });
+  await writeAuditLog(req, 'cancel', 'purchaseOrder', req.params.id);
+  res.json({ success: true });
+});
+
+const stocktakeInclude = { items: { orderBy: { inventoryName: 'asc' } } };
+
+app.get('/api/stocktakes', async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  res.json(await prisma.stocktake.findMany({
+    where: { storeId: req.storeId }, orderBy: { createdAt: 'desc' }, take: 200, include: stocktakeInclude
+  }));
+});
+
+app.post('/api/stocktakes', async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const storeId = req.storeId;
+  try {
+    const rawCounts = Array.isArray(req.body?.counts) ? req.body.counts : [];
+    if (rawCounts.length === 0 || rawCounts.length > 500) throw businessError('Phiếu kiểm kê không có dữ liệu hợp lệ.');
+    const stocktake = await prisma.$transaction(async (tx) => {
+      const inventoryIds = rawCounts.map((item) => String(item.inventoryId || ''));
+      if (new Set(inventoryIds).size !== inventoryIds.length) throw businessError('Phiếu kiểm kê có nguyên liệu bị lặp.');
+      const inventories = await tx.inventory.findMany({ where: { storeId, id: { in: inventoryIds } } });
+      if (inventories.length !== inventoryIds.length) throw businessError('Có nguyên liệu không thuộc cửa hàng hiện tại.');
+      const inventoryById = new Map(inventories.map((item) => [item.id, item]));
+      const items = rawCounts.map((count) => {
+        const inventory = inventoryById.get(String(count.inventoryId));
+        const countedQty = Number(count.countedQty);
+        if (!Number.isFinite(countedQty) || countedQty < 0) throw businessError(`Tồn thực tế ${inventory.name} không hợp lệ.`);
+        return {
+          inventoryId: inventory.id,
+          inventoryName: inventory.name,
+          unit: inventory.unit,
+          expectedQty: inventory.qty,
+          countedQty,
+          variance: countedQty - inventory.qty
+        };
+      });
+      const number = await nextDocumentNumber(tx, {
+        storeId, lockKey: 'stocktake', delegate: 'stocktake', where: { storeId }, prefix: '#KK'
+      });
+      return tx.stocktake.create({
+        data: {
+          storeId, number,
+          note: hasText(req.body?.note) ? String(req.body.note).trim().slice(0, 500) : null,
+          items: { create: items }
+        },
+        include: stocktakeInclude
+      });
+    }, { maxWait: 10000, timeout: 20000 });
+    await writeAuditLog(req, 'create', 'stocktake', stocktake.id, { number: stocktake.number });
+    res.status(201).json(stocktake);
+  } catch (err) {
+    res.status(err.status || 400).json({ error: err.message });
+  }
+});
+
+app.post('/api/stocktakes/:id/post', async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const storeId = req.storeId;
+  try {
+    const stocktake = await prisma.$transaction(async (tx) => {
+      await lockStoreCounter(tx, storeId, `stocktake:${req.params.id}`);
+      const current = await tx.stocktake.findFirst({ where: { id: req.params.id, storeId }, include: stocktakeInclude });
+      if (!current) throw businessError('Không tìm thấy phiếu kiểm kê.', 404);
+      if (current.status !== 'draft') throw businessError('Phiếu kiểm kê không còn ở trạng thái nháp.', 409);
+      if (current.items.some((item) => !item.inventoryId)) {
+        throw businessError('Phiếu có nguyên liệu đã bị xóa nên không thể ghi sổ.', 409);
+      }
+      for (const item of [...current.items].sort((a, b) => a.inventoryId.localeCompare(b.inventoryId))) {
+        await lockStoreCounter(tx, storeId, `inventory:${item.inventoryId}`);
+        const inventory = await tx.inventory.findFirst({ where: { id: item.inventoryId, storeId } });
+        if (!inventory || Math.abs(inventory.qty - item.expectedQty) > 0.000001) {
+          throw businessError(`Tồn ${item.inventoryName} đã thay đổi sau khi đếm. Hãy tạo phiếu kiểm kê mới.`, 409);
+        }
+        await tx.inventory.update({ where: { id: inventory.id }, data: { qty: item.countedQty } });
+        if (Math.abs(item.variance) > 0.000001) {
+          await tx.stockTransaction.create({
+            data: {
+              storeId, inventoryId: inventory.id, type: 'ADJUST', qtyChange: item.variance,
+              balance: item.countedQty, note: `Ghi sổ kiểm kê ${current.number}`
+            }
+          });
+        }
+      }
+      return tx.stocktake.update({
+        where: { id: current.id }, data: { status: 'posted', postedAt: new Date() }, include: stocktakeInclude
+      });
+    }, { maxWait: 10000, timeout: 30000 });
+    await writeAuditLog(req, 'post', 'stocktake', stocktake.id, { number: stocktake.number });
+    broadcast('inventoryUpdated', await prisma.inventory.findMany({ where: { storeId }, orderBy: { name: 'asc' } }), storeId);
+    res.json(stocktake);
+  } catch (err) {
+    res.status(err.status || 400).json({ error: err.message });
+  }
+});
+
+app.post('/api/stocktakes/:id/cancel', async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const updated = await prisma.stocktake.updateMany({
+    where: { id: req.params.id, storeId: req.storeId, status: 'draft' }, data: { status: 'cancelled' }
+  });
+  if (updated.count === 0) return res.status(409).json({ error: 'Phiếu không tồn tại hoặc không thể hủy.' });
+  await writeAuditLog(req, 'cancel', 'stocktake', req.params.id);
+  res.json({ success: true });
+});
+
+const transferInclude = {
+  sourceStore: { select: { id: true, name: true, code: true } },
+  destinationStore: { select: { id: true, name: true, code: true } },
+  items: true
+};
+
+app.get('/api/inventory/transfers', async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const currentStore = await prisma.store.findUnique({ where: { id: req.storeId }, select: { organizationId: true } });
+  if (!currentStore) return res.status(404).json({ error: 'Không tìm thấy cửa hàng hiện tại.' });
+  res.json(await prisma.inventoryTransfer.findMany({
+    where: { sourceStore: { organizationId: currentStore.organizationId } },
+    orderBy: { createdAt: 'desc' }, take: 200, include: transferInclude
+  }));
+});
+
+app.post('/api/inventory/transfers', async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const sourceStoreId = req.storeId;
+  try {
+    const rawItems = Array.isArray(req.body?.items) ? req.body.items : [];
+    if (rawItems.length === 0 || rawItems.length > 100) throw businessError('Phiếu điều chuyển không có nguyên liệu hợp lệ.');
+    const transfer = await prisma.$transaction(async (tx) => {
+      const sourceStore = await tx.store.findUnique({ where: { id: sourceStoreId }, select: { organizationId: true } });
+      const destinationStoreId = String(req.body?.destinationStoreId || '');
+      const destinationStore = await tx.store.findFirst({
+        where: { id: destinationStoreId, organizationId: sourceStore?.organizationId, isActive: true }
+      });
+      if (!destinationStore || destinationStore.id === sourceStoreId) throw businessError('Chi nhánh nhận không hợp lệ.');
+      const inventoryIds = rawItems.map((item) => String(item.inventoryId || ''));
+      if (new Set(inventoryIds).size !== inventoryIds.length) throw businessError('Phiếu điều chuyển có nguyên liệu bị lặp.');
+      const inventories = await tx.inventory.findMany({ where: { storeId: sourceStoreId, id: { in: inventoryIds } } });
+      if (inventories.length !== inventoryIds.length) throw businessError('Có nguyên liệu không thuộc kho nguồn.');
+      const inventoryById = new Map(inventories.map((item) => [item.id, item]));
+      const items = rawItems.map((item) => {
+        const inventory = inventoryById.get(String(item.inventoryId));
+        const qty = parsePositiveNumber(item.qty, `Số lượng ${inventory.name}`);
+        if (qty > inventory.qty) throw businessError(`Kho nguồn không đủ ${inventory.name}.`);
+        return {
+          sourceInventoryId: inventory.id,
+          inventoryName: inventory.name,
+          unit: inventory.unit,
+          qty,
+          unitCost: inventory.avgCost
+        };
+      });
+      const number = await nextDocumentNumber(tx, {
+        storeId: sourceStoreId, lockKey: 'inventory-transfer', delegate: 'inventoryTransfer',
+        where: { sourceStoreId }, prefix: '#DC'
+      });
+      return tx.inventoryTransfer.create({
+        data: {
+          sourceStoreId, destinationStoreId, number,
+          note: hasText(req.body?.note) ? String(req.body.note).trim().slice(0, 500) : null,
+          items: { create: items }
+        },
+        include: transferInclude
+      });
+    }, { maxWait: 10000, timeout: 20000 });
+    await writeAuditLog(req, 'create', 'inventoryTransfer', transfer.id, { number: transfer.number, destinationStoreId: transfer.destinationStoreId });
+    res.status(201).json(transfer);
+  } catch (err) {
+    res.status(err.status || 400).json({ error: err.message });
+  }
+});
+
+app.post('/api/inventory/transfers/:id/receive', async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  try {
+    const transfer = await prisma.$transaction(async (tx) => {
+      const preview = await tx.inventoryTransfer.findFirst({
+        where: { id: req.params.id, OR: [{ sourceStoreId: req.storeId }, { destinationStoreId: req.storeId }] },
+        select: { sourceStoreId: true }
+      });
+      if (!preview) throw businessError('Không tìm thấy phiếu điều chuyển trong tổ chức hiện tại.', 404);
+      await lockStoreCounter(tx, preview.sourceStoreId, `inventory-transfer:${req.params.id}`);
+      const current = await tx.inventoryTransfer.findFirst({
+        where: { id: req.params.id, OR: [{ sourceStoreId: req.storeId }, { destinationStoreId: req.storeId }] },
+        include: transferInclude
+      });
+      if (!current) throw businessError('Không tìm thấy phiếu điều chuyển trong tổ chức hiện tại.', 404);
+      if (current.status !== 'pending') throw businessError('Phiếu điều chuyển không còn chờ nhận.', 409);
+      if (current.items.some((item) => !item.sourceInventoryId)) {
+        throw businessError('Phiếu có nguyên liệu nguồn đã bị xóa nên không thể nhận.', 409);
+      }
+      for (const item of [...current.items].sort((a, b) => a.sourceInventoryId.localeCompare(b.sourceInventoryId))) {
+        await lockStoreCounter(tx, current.sourceStoreId, `inventory:${item.sourceInventoryId}`);
+        await lockStoreCounter(tx, current.destinationStoreId, `inventory-name:${item.inventoryName}:${item.unit}`);
+        const source = await tx.inventory.findFirst({ where: { id: item.sourceInventoryId, storeId: current.sourceStoreId } });
+        if (!source || source.qty < item.qty) throw businessError(`Kho nguồn không còn đủ ${item.inventoryName}.`, 409);
+        const sourceBalance = source.qty - item.qty;
+        await tx.inventory.update({ where: { id: source.id }, data: { qty: sourceBalance } });
+        let destination = await tx.inventory.findFirst({
+          where: { storeId: current.destinationStoreId, name: item.inventoryName, unit: item.unit }
+        });
+        const unitCost = item.unitCost ?? source.avgCost;
+        if (!destination) {
+          destination = await tx.inventory.create({
+            data: {
+              storeId: current.destinationStoreId, name: item.inventoryName, unit: item.unit,
+              qty: item.qty, minQty: 0, avgCost: unitCost, icon: source.icon
+            }
+          });
+        } else {
+          const newQty = destination.qty + item.qty;
+          const nextAvgCost = destination.qty > 0 && destination.avgCost !== null && unitCost !== null
+            ? roundMoney(((destination.qty * destination.avgCost) + (item.qty * unitCost)) / newQty)
+            : unitCost ?? destination.avgCost;
+          destination = await tx.inventory.update({
+            where: { id: destination.id }, data: { qty: newQty, avgCost: nextAvgCost }
+          });
+        }
+        await tx.stockTransaction.createMany({
+          data: [
+            {
+              storeId: current.sourceStoreId, inventoryId: source.id, type: 'TRANSFER_OUT',
+              qtyChange: -item.qty, balance: sourceBalance, cost: unitCost, note: `Xuất điều chuyển ${current.number}`
+            },
+            {
+              storeId: current.destinationStoreId, inventoryId: destination.id, type: 'TRANSFER_IN',
+              qtyChange: item.qty, balance: destination.qty, cost: unitCost, note: `Nhận điều chuyển ${current.number}`
+            }
+          ]
+        });
+      }
+      return tx.inventoryTransfer.update({
+        where: { id: current.id }, data: { status: 'received', receivedAt: new Date() }, include: transferInclude
+      });
+    }, { maxWait: 10000, timeout: 30000 });
+    await writeAuditLog(req, 'receive', 'inventoryTransfer', transfer.id, { number: transfer.number });
+    for (const storeId of [transfer.sourceStoreId, transfer.destinationStoreId]) {
+      broadcast('inventoryUpdated', await prisma.inventory.findMany({ where: { storeId }, orderBy: { name: 'asc' } }), storeId);
+    }
+    res.json(transfer);
+  } catch (err) {
+    res.status(err.status || 400).json({ error: err.message });
+  }
+});
+
+app.post('/api/inventory/transfers/:id/cancel', async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const updated = await prisma.inventoryTransfer.updateMany({
+    where: { id: req.params.id, sourceStoreId: req.storeId, status: 'pending' }, data: { status: 'cancelled' }
+  });
+  if (updated.count === 0) return res.status(409).json({ error: 'Phiếu không tồn tại hoặc không thể hủy.' });
+  await writeAuditLog(req, 'cancel', 'inventoryTransfer', req.params.id);
+  res.json({ success: true });
+});
+
 // Product Recipe APIs
 app.get('/api/products/:productId/recipe', async (req, res) => {
   if (!requireAdmin(req, res)) return;
@@ -5033,6 +5514,11 @@ app.put('/api/vouchers/:id', async (req, res) => {
   const { id } = req.params;
   try {
     const voucherData = normalizeVoucherPayload(req.body);
+    const current = await prisma.voucher.findFirst({ where: { id, storeId } });
+    if (!current) return res.status(404).json({ error: 'Không tìm thấy voucher cần cập nhật' });
+    if (voucherData.maxUses !== null && voucherData.maxUses < current.usedCount) {
+      return res.status(400).json({ error: `Tổng lượt sử dụng không thể nhỏ hơn ${current.usedCount} lượt đã dùng` });
+    }
     const updated = await prisma.voucher.updateMany({
       where: { id, storeId },
       data: voucherData
@@ -6215,7 +6701,8 @@ app.post('/api/print', (req, res) => {
         commands.push(Buffer.from(`Giam gia: ${discStr.padStart(22, ' ')}\n`));
       }
       const vatStr = '+' + order.vatAmount.toLocaleString('vi-VN') + 'd';
-      commands.push(Buffer.from(`VAT: ${vatStr.padStart(27, ' ')}\n`));
+      const vatLabel = `VAT (${Math.round(Number(order.vatRate ?? 0.08) * 100)}%):`;
+      commands.push(Buffer.from(`${vatLabel} ${vatStr.padStart(Math.max(1, 31 - vatLabel.length), ' ')}\n`));
       
       commands.push(Buffer.from('================================\n'));
       commands.push(Buffer.from([0x1B, 0x45, 0x01])); // Bold on

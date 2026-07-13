@@ -12,6 +12,9 @@ dist
 dist-ssr
 *.local
 backups/
+test-results/
+playwright-report/
+blob-report/
 
 # Editor directories and files
 .vscode/*

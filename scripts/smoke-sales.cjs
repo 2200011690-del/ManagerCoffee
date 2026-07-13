@@ -459,6 +459,41 @@ async function main() {
       successfulReturn
     );
 
+    const limitedVoucherCode = `LIMIT${String(Date.now()).slice(-8)}`;
+    const limitedVoucher = await request('/api/vouchers', {
+      method: 'POST',
+      headers: auth(adminToken),
+      body: JSON.stringify({
+        code: limitedVoucherCode,
+        type: 'FIXED',
+        value: 1000,
+        minOrderValue: 0,
+        maxUses: 1,
+        isActive: true,
+      }),
+    });
+    assert(limitedVoucher.status === 200 && limitedVoucher.body?.maxUses === 1, 'Tao voucher gioi han that bai', limitedVoucher);
+    const limitedPayload = (suffix) => ({
+      tableId: null,
+      tableName: 'Mang về',
+      cart: [{ id: product.id, name: product.name, price: product.price, qty: 1 }],
+      paymentMethod: 'cash',
+      employeeId: adminLogin.body.id,
+      voucherCode: limitedVoucherCode,
+      clientRequestId: `limited-voucher-${suffix}-${Date.now()}`,
+    });
+    const [limitedA, limitedB] = await Promise.all([
+      request('/api/orders/checkout', { method: 'POST', headers: auth(adminToken), body: JSON.stringify(limitedPayload('a')) }),
+      request('/api/orders/checkout', { method: 'POST', headers: auth(adminToken), body: JSON.stringify(limitedPayload('b')) }),
+    ]);
+    const limitedStatuses = [limitedA.status, limitedB.status].sort((a, b) => a - b);
+    assert(limitedStatuses[0] === 200 && limitedStatuses[1] === 409, 'Voucher gioi han 1 luot bi dung qua han khi checkout dong thoi', { limitedA, limitedB });
+    const limitedVoucherAfter = await request('/api/vouchers', { headers: auth(adminToken) });
+    const limitedRow = limitedVoucherAfter.body.find((voucher) => voucher.id === limitedVoucher.body.id);
+    assert(limitedRow?.usedCount === 1, 'Bo dem voucher khong tang dung mot lan', limitedRow);
+    const deleteLimitedVoucher = await request(`/api/vouchers/${limitedVoucher.body.id}`, { method: 'DELETE', headers: auth(adminToken) });
+    assert(deleteLimitedVoucher.status === 200, 'Khong xoa duoc voucher da co lich su su dung', deleteLimitedVoucher);
+
     const voucherQty = Math.max(1, Math.ceil(50000 / product.price));
     const voucherDiscount = 10000;
     const voucherCheckout = await request('/api/orders/checkout', {
@@ -487,6 +522,7 @@ async function main() {
     assert(
       authoritativeVoucherSubtotal > voucherDiscount
         && voucherCheckout.body?.discountAmount === voucherDiscount
+        && voucherCheckout.body?.vatRate === 0.08
         && voucherCheckout.body?.vatAmount === voucherVat
         && voucherCheckout.body?.total === authoritativeVoucherSubtotal - voucherDiscount + voucherVat,
       'VAT phai tinh tren gia sau chiet khau',
@@ -513,12 +549,25 @@ async function main() {
       paymentMethod: 'cash',
       employeeId: staffUser.id,
     };
+    const fullSplitCart = [{ ...splitPayload.cart[0], qty: 2 }];
+    const persistSplitCart = await request(`/api/carts/${splitTable.id}`, {
+      method: 'PUT',
+      headers: auth(staffToken),
+      body: JSON.stringify({ cart: fullSplitCart }),
+    });
+    assert(persistSplitCart.status === 200, 'Khong luu duoc gio nguon cho don tach', persistSplitCart);
     const partialSplit = await request('/api/orders/checkout', {
       method: 'POST',
       headers: auth(staffToken),
-      body: JSON.stringify({ ...splitPayload, keepTableOpen: true }),
+      body: JSON.stringify({ ...splitPayload, splitCartKey: splitTable.id }),
     });
-    assert(partialSplit.status === 200, 'Thanh toan mot phan cua don tach that bai', partialSplit);
+    assert(
+      partialSplit.status === 200 && partialSplit.body?.splitCheckout === true && partialSplit.body?.keptTableOpen === true,
+      'Thanh toan mot phan cua don tach that bai',
+      partialSplit
+    );
+    const cartsAfterPartial = await request('/api/carts', { headers: auth(staffToken) });
+    assert(cartsAfterPartial.body?.[splitTable.id]?.[0]?.qty === 1, 'Server khong tru dung gio sau lan tach dau', cartsAfterPartial);
     const tableAfterPartial = await request('/api/tables', { headers: auth(adminToken) });
     assert(
       tableAfterPartial.body?.find((table) => table.id === splitTable.id)?.status === 'occupied',
@@ -528,9 +577,15 @@ async function main() {
     const finalSplit = await request('/api/orders/checkout', {
       method: 'POST',
       headers: auth(staffToken),
-      body: JSON.stringify(splitPayload),
+      body: JSON.stringify({ ...splitPayload, splitCartKey: splitTable.id }),
     });
-    assert(finalSplit.status === 200, 'Thanh toan phan cuoi cua don tach that bai', finalSplit);
+    assert(
+      finalSplit.status === 200 && finalSplit.body?.splitCheckout === true && finalSplit.body?.keptTableOpen === false,
+      'Thanh toan phan cuoi cua don tach that bai',
+      finalSplit
+    );
+    const cartsAfterFinal = await request('/api/carts', { headers: auth(staffToken) });
+    assert(cartsAfterFinal.body?.[splitTable.id]?.length === 0, 'Gio server phai rong sau lan tach cuoi', cartsAfterFinal);
     const tableAfterFinal = await request('/api/tables', { headers: auth(adminToken) });
     assert(
       tableAfterFinal.body?.find((table) => table.id === splitTable.id)?.status === 'dirty',

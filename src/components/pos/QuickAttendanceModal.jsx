@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
-import { X, Delete, CheckCircle2, Clock, ShieldAlert, Camera, CameraOff } from 'lucide-react';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { X, Delete, CheckCircle2, Clock, ShieldAlert, CameraOff } from 'lucide-react';
 import { api } from '../../api';
 
 export default function QuickAttendanceModal({ onClose }) {
@@ -13,6 +13,7 @@ export default function QuickAttendanceModal({ onClose }) {
   const [hasWebcam, setHasWebcam] = useState(false);
   const [stream, setStream] = useState(null);
   const [flash, setFlash] = useState(false);
+  const submittingRef = useRef(false);
 
   useEffect(() => {
     let localStream = null;
@@ -35,52 +36,30 @@ export default function QuickAttendanceModal({ onClose }) {
   }, []);
 
   useEffect(() => {
-    if (videoRef.current && stream) {
-      videoRef.current.srcObject = stream;
-    }
-  }, [stream, videoRef.current]);
+    if (videoRef.current && stream) videoRef.current.srcObject = stream;
+  }, [stream]);
 
-  const handleKeyPress = (num) => {
-    if (pin.length < 4) {
-      setPin(prev => prev + num);
-      setError('');
-    }
-  };
+  const handleKeyPress = useCallback((num) => {
+    setError('');
+    setPin(prev => {
+      if (prev.length >= 4) return prev;
+      return prev + num;
+    });
+  }, []);
 
-  const handleDelete = () => {
+  const handleDelete = useCallback(() => {
     setPin(prev => prev.slice(0, -1));
     setError('');
-  };
+  }, []);
 
   const handleClear = () => {
     setPin('');
     setError('');
   };
 
-  // Keyboard support
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      if (result) return;
-      if (e.key >= '0' && e.key <= '9') {
-        handleKeyPress(e.key);
-      } else if (e.key === 'Backspace') {
-        handleDelete();
-      } else if (e.key === 'Escape') {
-        onClose();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [pin, result]);
-
-  // Submit automatically when 4 digits are entered
-  useEffect(() => {
-    if (pin.length === 4) {
-      submitPin();
-    }
-  }, [pin]);
-
-  const submitPin = async () => {
+  const submitPin = useCallback(async () => {
+    if (submittingRef.current) return;
+    submittingRef.current = true;
     setIsLoading(true);
     setError('');
     
@@ -130,9 +109,27 @@ export default function QuickAttendanceModal({ onClose }) {
       setError(err.response?.data?.error || 'Không thể điểm danh. Vui lòng thử lại.');
       setPin('');
     } finally {
+      submittingRef.current = false;
       setIsLoading(false);
     }
-  };
+  }, [hasWebcam, onClose, pin, stream]);
+
+  // Keyboard support
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (result) return;
+      if (e.key >= '0' && e.key <= '9') handleKeyPress(e.key);
+      else if (e.key === 'Backspace') handleDelete();
+      else if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleDelete, handleKeyPress, onClose, result]);
+
+  // Submit automatically when 4 digits are entered
+  useEffect(() => {
+    if (pin.length === 4) submitPin();
+  }, [pin, submitPin]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-fade-in">

@@ -36,7 +36,7 @@
       <h1>Báo cáo kiểm thử hoàn tất Manager Coffee</h1>
       <p>Rà soát logic, kiểm thử hệ thống và xác nhận bản nâng cấp cuối.</p>
       <p class="meta">Ngày chốt: 13/07/2026 · Mã nguồn: D:\ManagerCoffee · Nhánh: main</p>
-      <span class="tag">POS/F&amp;B</span><span class="tag">API + UI</span><span class="tag">Đa cửa hàng</span><span class="tag">Kho + báo cáo</span>
+      <span class="tag">POS/F&amp;B</span><span class="tag">API + UI</span><span class="tag">Đa cửa hàng</span><span class="tag">Kho + cung ứng</span><span class="tag">E2E desktop/mobile</span>
     </header>
 
     <section class="result">
@@ -48,18 +48,22 @@
     <section>
       <h2>1. Kết quả xác minh cuối</h2>
       <div class="grid">
-        <div class="metric"><b>5/5 đạt</b>Bộ smoke auth, sales, shifts, operations và load.</div>
-        <div class="metric"><b>Build đạt</b>Vite build thành công, 241 module được đóng gói.</div>
-        <div class="metric"><b>Lint đạt</b>Không có lỗi lint; còn cảnh báo kỹ thuật không chặn vận hành.</div>
-        <div class="metric"><b>403 đúng</b>Reset kho bị chặn trên cửa hàng không phải demo.</div>
+        <div class="metric"><b>6/6 đạt</b>Smoke auth, sales, shifts, operations, supply-chain và load.</div>
+        <div class="metric"><b>4/4 E2E đạt</b>Desktop Chromium và Pixel 7: điều hướng, giỏ hàng qua tải lại.</div>
+        <div class="metric"><b>Build đạt</b>Vite build thành công, 245 module được đóng gói.</div>
+        <div class="metric"><b>0 cảnh báo lint</b>Lint sạch; audit dependency frontend/backend đều 0 lỗ hổng.</div>
       </div>
       <ul>
         <li><code>npm run test:smoke</code>: đạt.</li>
         <li><code>npm run test:smoke:sales</code>: đạt, gồm checkout, kho, trả hàng, voucher và VAT sau giảm giá.</li>
         <li><code>npm run test:smoke:shifts</code>: đạt, gồm mở/đóng ca và đối soát tiền.</li>
         <li><code>npm run test:smoke:operations</code>: đạt, gồm kho, khách hàng, phân quyền và đặt bàn.</li>
+        <li><code>npm run test:smoke:supply-chain</code>: đạt, gồm mua hàng, giá vốn bình quân, kiểm kê xung đột, điều chuyển hai kho, backup/restore thật và dọn dữ liệu test.</li>
         <li><code>npm run test:smoke:load</code>: đạt, gồm giao dịch đồng thời.</li>
+        <li><code>npm run test:e2e</code>: 4/4 đạt trên desktop và mobile.</li>
         <li><code>npm run lint</code>, <code>npm run build</code> và kiểm tra cú pháp Node: đạt.</li>
+        <li><code>npm audit --omit=dev</code> cho frontend và backend: không phát hiện lỗ hổng.</li>
+        <li>Prisma: schema hợp lệ, 14 migration đã áp dụng đầy đủ lên database cấu hình hiện tại.</li>
       </ul>
     </section>
 
@@ -74,6 +78,8 @@
         <li>Đặt bàn: nhận cọc, xếp bàn, hoàn tất và chặn trùng lịch.</li>
         <li>Nhân viên: bắt buộc mở ca, giới hạn giảm giá/hoàn tiền, đóng ca và đăng xuất.</li>
         <li>Báo cáo: doanh thu, số đơn, món bán chạy, giá vốn, tiêu hao và tồn kho đúng cửa hàng.</li>
+        <li>Cung ứng: lập đơn mua nhiều nguyên liệu, nhận/hủy, kiểm kê nháp/ghi sổ, điều chuyển giữa chi nhánh.</li>
+        <li>Voucher: giới hạn tổng lượt và lượt mỗi khách; chặn vượt hạn mức kể cả hai checkout đồng thời.</li>
         <li>Responsive 390x844 và 768x1024: không tràn ngang, không chồng nội dung.</li>
       </ul>
     </section>
@@ -86,6 +92,13 @@
         <li>VAT trên POS, tách đơn, sơ đồ bàn, hóa đơn nhiệt và bản in thử đồng bộ theo cấu hình cửa hàng.</li>
         <li>Chặn tách đơn khi đang áp voucher, giảm giá hoặc điểm để tránh nhân đôi ưu đãi.</li>
         <li>Tách đơn nay trừ đúng món đã thanh toán; bàn vẫn “có khách” khi còn món và chỉ chuyển “chưa dọn” sau phần thanh toán cuối.</li>
+        <li>Server lưu ảnh chụp thuế suất VAT trên từng hóa đơn để lịch sử không thay đổi khi cấu hình thuế đổi.</li>
+        <li>Server tự đối chiếu phần giỏ được tách với giỏ đang lưu, khóa giao dịch và không tin cờ “giữ bàn” do client gửi.</li>
+        <li>Thêm đơn mua hàng, kiểm kê và điều chuyển kho có mã chứng từ tuần tự, audit log và transaction nguyên tử.</li>
+        <li>Sửa quan hệ lịch sử kho: xóa nguyên liệu/chi nhánh không còn bị kẹt, chứng từ cũ vẫn giữ tên, đơn vị và số lượng đã chụp.</li>
+        <li>Voucher có hạn mức tổng, hạn mức mỗi khách, lịch sử quy đổi và khóa giao dịch chống dùng quá lượt.</li>
+        <li>Thêm Error Boundary toàn ứng dụng để lỗi render không làm màn hình trắng không có hướng xử lý.</li>
+        <li>Thêm Playwright E2E vào CI, kiểm cả Chromium desktop và Pixel 7.</li>
         <li>Chặn nhân viên áp mức giảm vượt quyền ngay trên giao diện và vẫn kiểm tra lại tại server.</li>
         <li>Reset kho mẫu chỉ tồn tại với store demo <code>espresso-lab</code>; cửa hàng thật không thấy nút và API trả <code>403</code>.</li>
         <li>Đã xác minh kho E2E giữ nguyên 1 nguyên liệu và 14,94 kg sau yêu cầu reset bị từ chối.</li>
@@ -98,6 +111,7 @@
       <h2>4. Trạng thái so với các ứng dụng lớn</h2>
       <p>Về phạm vi nghiệp vụ cốt lõi, Manager Coffee đã có nền tảng khá đầy đủ: POS, bàn, KDS, QR order, đặt bàn, kho/công thức, khách hàng, khuyến mãi, ca làm, báo cáo, phân quyền và đa cửa hàng.</p>
       <p>Khoảng cách còn lại chủ yếu không còn là “thiếu màn hình”, mà là độ trưởng thành vận hành: lịch sử chạy production, hỗ trợ phần cứng đa dạng, hệ sinh thái đối tác, SLA, đội hỗ trợ và quy mô hạ tầng. Đây là những lợi thế mà sản phẩm lớn tích lũy qua nhiều năm, không thể chứng minh chỉ bằng test local.</p>
+      <p><strong>Kết luận cạnh tranh trung thực:</strong> phạm vi chức năng lõi đã đủ cho pilot nghiêm túc và đã tiến gần nhóm POS F&amp;B hoàn chỉnh hơn trước, nhưng chưa thể gọi là ngang hàng toàn diện với KiotViet, Sapo hoặc iPOS365 cho đến khi có số liệu production, tích hợp thật và năng lực hỗ trợ vận hành.</p>
     </section>
 
     <section class="warn">
@@ -108,6 +122,7 @@
         <li>Hóa đơn điện tử và quy trình thuế theo nhà cung cấp chính thức.</li>
         <li>Kiểm mạng yếu/mất mạng, nhiều thiết bị POS và vận hành liên tục nhiều ngày.</li>
         <li>Thiết lập production: domain, HTTPS, secret riêng, backup tự động, giám sát, cảnh báo và phục hồi sự cố.</li>
+        <li>Đặt API cùng khu vực với PostgreSQL/Supabase và đo lại: lần E2E này ghi nhận nhiều API mất khoảng 2,2-6,7 giây khi gọi database từ môi trường hiện tại.</li>
       </ul>
       <p class="small">Các mục này được chủ động để lại cho giai đoạn tích hợp thật theo yêu cầu, không phải chức năng đang hỏng trong code hiện tại.</p>
     </section>
@@ -117,7 +132,7 @@
       <ol>
         <li>Chạy pilot tại một quán với dữ liệu thật nhưng có người theo dõi trong 2-4 tuần.</li>
         <li>Đối soát doanh thu, tiền ca, tồn kho và báo cáo mỗi ngày trong giai đoạn pilot.</li>
-        <li>Thiết lập backup/monitoring production trước khi mở rộng nhiều quán.</li>
+        <li>Đặt backend cùng vùng database, thiết lập backup/monitoring production và đặt mục tiêu p95 API trước khi mở rộng nhiều quán.</li>
         <li>Sau pilot mới tích hợp thanh toán, hóa đơn điện tử và thiết bị in thật.</li>
       </ol>
       <p><strong>Đánh giá chốt:</strong> code hiện tại đạt điều kiện bước vào pilot nghiêm túc; chưa có cơ sở trung thực để gọi là ngang 100% sản phẩm dẫn đầu cho đến khi hoàn thành kiểm chứng production và tích hợp thật.</p>

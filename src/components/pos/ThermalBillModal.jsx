@@ -169,7 +169,7 @@ export default function ThermalBillModal({ order, store: propStore, onConfirm, o
                 </>
               );
             })()}
-            <p>{padLine(`VAT (${Math.round(Number(store?.vatRate ?? 0.08) * 100)}%):`, '+' + order.vatAmount.toLocaleString('vi-VN') + 'đ')}</p>
+            <p>{padLine(`VAT (${Math.round(Number(order.vatRate ?? store?.vatRate ?? 0.08) * 100)}%):`, '+' + order.vatAmount.toLocaleString('vi-VN') + 'đ')}</p>
             <p className="font-bold text-sm">{sep('=')}</p>
             <p className="font-bold text-sm">{padLine('TỔNG CỘNG:', order.total.toLocaleString('vi-VN') + 'đ')}</p>
             <p>{sep('=')}</p>

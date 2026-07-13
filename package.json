@@ -11,7 +11,10 @@
     "test:smoke:sales": "node scripts/smoke-sales.cjs",
     "test:smoke:shifts": "node scripts/smoke-shifts.cjs",
     "test:smoke:operations": "node scripts/smoke-operations.cjs",
+    "test:smoke:supply-chain": "node scripts/smoke-supply-chain.cjs",
     "test:smoke:load": "node scripts/smoke-load.cjs",
+    "test:e2e": "playwright test",
+    "test:e2e:headed": "playwright test --headed",
     "backup:store": "node scripts/backup-store.cjs",
     "restore:catalog": "node scripts/restore-store-catalog.cjs",
     "migrate:pins": "node scripts/migrate-pin-hashes.cjs",
@@ -29,6 +32,7 @@
     "socket.io-client": "^4.8.3"
   },
   "devDependencies": {
+    "@playwright/test": "^1.61.1",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.2",
